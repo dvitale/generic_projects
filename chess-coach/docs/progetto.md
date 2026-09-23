@@ -1,6 +1,10 @@
 # Chess Coach — progetto di applicazione con Maia e Stockfish
 
-Specifica funzionale e tecnica · 23 settembre 2026 · versione 1.1 — riferimento principale CSSLab/maia3
+Specifica funzionale e tecnica · 23 settembre 2026 · versione 1.2 — motore browser ufficiale già pronto
+
+**Aggiornamento operativo:** su indicazione dell'utente, la base iniziale è ora il modello `maia3_simplified.onnx` scaricato direttamente da maiachess.com, con worker JavaScript e ONNX Runtime Web/WebAssembly originali. Questo sostituisce la scelta iniziale di un checkpoint Python 5M e dell'inferenza Python come percorso obbligatorio nelle sezioni 2, 4, 6 e 15: quei percorsi restano alternative successive. Non servono addestramento o conversioni. Il tutor utilizzerà la policy del frontend; Stockfish e il sistema didattico mantengono i rispettivi ruoli. I dettagli aggiornati sono nel [documento sul motore browser](https://github.com/dvitale/generic_projects/blob/main/chess-coach/docs/motore-browser.md).
+
+Il pacchetto è stato scaricato localmente, verificato tramite SHA-256 e caricato con il runtime WebAssembly originale in Node.js. Non sono ancora state eseguite partite o verifiche dell'intera applicazione. I riferimenti a motori non eseguiti nel progetto originario distinguono questa verifica di caricamento dall'esecuzione scacchistica completa.
 
 **Obiettivo:** realizzare un'applicazione ispirata alle funzioni di Maia Chess, estendibile, che colleghi partite di allenamento, diagnosi delle difficoltà, esercizi personali e verifica dei progressi.
 
