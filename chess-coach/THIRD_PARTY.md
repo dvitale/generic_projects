@@ -8,3 +8,6 @@
 - **chess.js** — BSD-2-Clause; **React, Vite, FastAPI** — MIT; altre dipendenze e licenze nei rispettivi pacchetti installati e lockfile.
 
 I file applicativi nuovi e derivati sono forniti sotto GPL-3.0; il testo completo è in `LICENSE`. Le licenze di terzi continuano ad applicarsi ai rispettivi componenti.
+
+- **Chess.com Green/Neo** — tema e immagini scaricati su richiesta per l'installazione locale dai server pubblici Chess.com. Gli asset non sono inclusi nel repository Git e non sono concessi sotto la licenza GPL dell'app. URL e hash in `model-manifests/chesscom-theme.json`.
+- **DeepSeek** — servizio API esterno opzionale; nessun peso del modello viene distribuito con l'app. Documentazione: https://api-docs.deepseek.com/.

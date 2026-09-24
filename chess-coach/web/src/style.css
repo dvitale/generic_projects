@@ -7,3 +7,12 @@
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 
 .drill-settings{margin:28px 0 18px}.drill-catalog{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:18px}.drill-catalog .panel{display:flex;flex-direction:column}.drill-catalog button{margin-top:auto}.drill-count{font-size:24px}.drill-settings .row{flex-wrap:wrap}@media(max-width:620px){.sidebar nav{flex-wrap:wrap}.nav-item{font-size:12px}}
+
+.tutor-panel textarea{width:100%;box-sizing:border-box;resize:vertical}.tutor-summary{font-size:16px;line-height:1.6}.tutor-observation,.tutor-step{border-top:1px solid #dce3d9;padding:16px 0}.tutor-response p{margin:10px 0;white-space:pre-wrap}.tutor-response h4{margin:0}.tutor-panel .footnote{display:block;margin-top:12px}
+
+.board.theme-chesscom{background-image:url('/board-themes/chesscom-green.png'),conic-gradient(from 90deg,#eeeed2 25%,#769656 0 50%,#eeeed2 0 75%,#769656 0);background-size:100% 100%,25% 25%;background-position:0 0}
+.board.theme-chesscom .square,.board.theme-chesscom .square:hover:not(:disabled){background:transparent}
+.board.theme-chesscom .last-square,.board.theme-chesscom .selected-square{background:rgba(255,255,0,.4)!important;box-shadow:none}
+.board.theme-chesscom .rank-label,.board.theme-chesscom .file-label{color:#769656;font-weight:700}
+.board.theme-chesscom .dark-square .rank-label,.board.theme-chesscom .dark-square .file-label{color:#eeeed2}
+.piece-image{width:100%;height:100%;object-fit:contain;z-index:1;pointer-events:none;user-select:none;display:block}

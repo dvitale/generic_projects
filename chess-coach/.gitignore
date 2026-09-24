@@ -1,5 +1,8 @@
 .venv/
 /data/
+/.secrets/
+.env
+.env.*
 .run/
 vendor/
 __pycache__/
@@ -10,3 +13,5 @@ web/test-results/
 web/playwright-report/
 web/public/maia3/
 web/public/ort/
+web/public/pieces/neo/
+web/public/board-themes/chesscom-green.png

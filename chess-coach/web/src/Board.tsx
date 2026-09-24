@@ -4,6 +4,11 @@ import type { Color } from './types'
 
 const symbols: Record<string, string> = {wk:'♚',wq:'♛',wr:'♜',wb:'♝',wn:'♞',wp:'♟',bk:'♚',bq:'♛',br:'♜',bb:'♝',bn:'♞',bp:'♟'}
 const names: Record<string, string> = {k:'re',q:'donna',r:'torre',b:'alfiere',n:'cavallo',p:'pedone'}
+function Piece({code}:{code:string}) {
+  const [missing,setMissing]=useState(false)
+  return missing?<span aria-hidden="true" className={`piece ${code[0]==='w'?'white-piece':'black-piece'}`}>{symbols[code]}</span>:
+    <img className="piece-image" src={`/pieces/neo/${code}.png`} alt="" aria-hidden="true" draggable={false} onError={()=>setMissing(true)}/>
+}
 export default function Board({fen, orientation, interactive, legalMoves, onMove, lastMove}: {fen:string; orientation:Color; interactive:boolean; legalMoves:string[]; onMove:(uci:string)=>void; lastMove?:string}) {
   const [selected, setSelected] = useState<string | null>(null)
   const [promotion, setPromotion] = useState<string[]>([])
@@ -22,7 +27,7 @@ export default function Board({fen, orientation, interactive, legalMoves, onMove
     setSelected(legalMoves.some(m => m.startsWith(square)) ? square : null)
   }
   return <div className="board-wrap">
-    <div className="board" role="group" aria-label="Scacchiera">
+    <div className="board theme-chesscom" role="group" aria-label="Scacchiera">
       {Array.from(ranks).flatMap((rank, ri) => Array.from(files).map((file, fi) => {
         const square = file + rank
         const piece = board.get(square as Square)
@@ -31,7 +36,7 @@ export default function Board({fen, orientation, interactive, legalMoves, onMove
           className={`square ${(ri+fi)%2 ? 'dark-square' : 'light-square'} ${selected === square ? 'selected-square' : ''} ${lit ? 'last-square' : ''}`} onClick={() => click(square)}>
           {fi === 0 && <span className="rank-label">{rank}</span>}
           {ri === 7 && <span className="file-label">{file}</span>}
-          {piece && <span aria-hidden="true" className={`piece ${piece.color === 'w' ? 'white-piece' : 'black-piece'}`}>{symbols[piece.color + piece.type]}</span>}
+          {piece && <Piece key={piece.color+piece.type} code={piece.color+piece.type}/>}
           {targets.includes(square) && <span className={piece ? 'capture-ring' : 'move-dot'} aria-hidden="true"/>}
         </button>
       }))}

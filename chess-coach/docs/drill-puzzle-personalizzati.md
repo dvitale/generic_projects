@@ -99,7 +99,7 @@ Priorità iniziale: impatto scacchistico × frequenza normalizzata × rilevanza 
 
 ### Tutor conversazionale opzionale
 
-Un modello linguistico può spiegare solo fatti e varianti forniti dai verificatori. Non deve inventare motivi tattici o giudicare legalità. La versione corrente usa testi deterministici e non richiede API esterne. Il piano futuro deve permettere spiegazioni correggibili e mostrare da quale partita arriva ogni suggerimento.
+Un modello linguistico può spiegare solo fatti e varianti forniti dai verificatori. Non deve inventare motivi tattici o giudicare legalità. Aggiornamento: la revisione guidata DeepSeek è ora disponibile su richiesta; dettagli in `tutor-deepseek.md`. Il piano base rimane deterministico e le ipotesi del tutor non aggiornano automaticamente le competenze. Il piano futuro deve permettere spiegazioni correggibili e mostrare da quale partita arriva ogni suggerimento.
 
 ## Criteri di accettazione delle estensioni
 

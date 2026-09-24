@@ -3,6 +3,9 @@ async function boardMove(page:Page,move:string){await page.locator(`[data-square
 test('Real Maia play, black orientation, drill and mobile layout',async({page,request})=>{
   const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message))
   await page.goto('/')
+  await expect(page.locator('.piece-image,.piece')).toHaveCount(32)
+  await expect.poll(()=>page.locator('.piece-image').evaluateAll(images=>images.every(img=>(img as HTMLImageElement).complete&&(img as HTMLImageElement).naturalWidth>0))).toBe(true)
+  await page.screenshot({path:'test-results/green-neo.png',fullPage:true})
   await page.getByRole('button',{name:'Inizia partita'}).click()
   await expect(page.getByText('Tocca a te · scegli un pezzo e la destinazione')).toBeVisible()
   const humanResponse=page.waitForResponse(r=>r.url().endsWith('/moves')&&r.request().method()==='POST')
@@ -42,7 +45,7 @@ test('PGN review creates personalized puzzles and tracks assistance',async({page
   await page.getByRole('button',{name:'↑ Importa PGN'}).click()
   await page.getByLabel('Partita PGN').fill('[White "Demo"]\n[Black "Opponent"]\n\n1. e4 e5 2. Qh5 Nc6 3. Qxe5+ Nxe5 *')
   await page.getByRole('button',{name:'Importa partita',exact:true}).click()
-  await page.getByRole('button',{name:'Analizza partita',exact:true}).click()
+  await page.getByRole('button',{name:/^(Analizza partita|Ricalcola analisi)$/}).click()
   await expect(page.getByText(/Revisione pronta/)).toBeVisible({timeout:60000})
   await page.getByRole('button',{name:/^Puzzle/}).click()
   await expect(page.getByRole('button',{name:'Chiedi un indizio'})).toBeVisible()
@@ -52,4 +55,29 @@ test('PGN review creates personalized puzzles and tracks assistance',async({page
   await expect(page.getByText(/Soluzione mostrata/)).toBeVisible({timeout:30000})
   await page.getByRole('button',{name:'Drill',exact:true}).click()
   await expect(page.getByRole('heading',{name:'Riparti da una tua decisione'}).first()).toBeVisible()
+})
+
+test('Tutor is explicitly requested and renders a saved explanation',async({page})=>{
+  let requests=0
+  const review={provider:'DeepSeek',model:'test-double',createdAt:new Date().toISOString(),reflection:'',cached:false,
+    evidence:[{ply:4,playedSan:'Qxe5+',bestSan:['Qf3'],theme:'Calcolo'}],
+    coaching:{summary:'Una decisione da rivedere con attenzione.',observations:[{ply:4,explanation:'Confronta la tua scelta con la variante verificata.',hypothesis:'Forse non hai considerato la risposta avversaria.',question:'Quale risposta avevi previsto?'}],plan:[{title:'Pratica delle mosse candidate',minutes:5,description:'Confronta due opzioni.',exerciseId:null,drillId:'italiana'}]}}
+  await page.route('**/api/tutor/status',r=>r.fulfill({json:{configured:true,model:'test-double'}}))
+  await page.route('**/api/games/*/tutor',async r=>{
+    if(r.request().method()==='POST'){requests++;expect(r.request().postDataJSON().reflection).toBe('Volevo attaccare il re.');await r.fulfill({json:review})}
+    else await r.fulfill({json:null})
+  })
+  await page.goto('/')
+  await page.getByRole('button',{name:'↑ Importa PGN'}).click()
+  await page.getByLabel('Partita PGN').fill('1. e4 e5 2. Qh5 Nc6 3. Qxe5+ Nxe5 *')
+  await page.getByRole('button',{name:'Importa partita',exact:true}).click()
+  await page.getByRole('button',{name:/^(Analizza partita|Ricalcola analisi)$/}).click()
+  await expect(page.getByText(/Revisione pronta/)).toBeVisible({timeout:60000})
+  expect(requests).toBe(0)
+  await page.getByLabel('Il tuo ragionamento').fill('Volevo attaccare il re.')
+  await page.getByRole('button',{name:'Chiedi al tutor DeepSeek'}).click()
+  await expect(page.getByText('Una decisione da rivedere con attenzione.')).toBeVisible()
+  expect(requests).toBe(1)
+  await page.getByRole('button',{name:'Avvia il Drill',exact:true}).click()
+  await expect(page.getByText('0 / 5 decisioni')).toBeVisible()
 })

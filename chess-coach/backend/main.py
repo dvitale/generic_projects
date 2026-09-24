@@ -1,4 +1,4 @@
-"""Local, single-user training application. No external account or cloud service."""
+"""Local single-user training, with an optional, explicitly invoked DeepSeek tutor."""
 import hashlib
 import io
 import json
@@ -21,11 +21,13 @@ from pydantic import BaseModel, Field
 
 from .engine import ROOT, evaluator
 from .drills import CATALOG, materialize, decisions_played
+from . import tutor
 
 DB_PATH = Path(os.environ.get("CHESS_COACH_DATA", str(ROOT / "data"))) / "coach.sqlite3"
 jobs = {}
 jobs_lock = threading.Lock()
 executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="analysis")
+tutor_lock = threading.Lock()
 
 
 def now():
@@ -75,6 +77,9 @@ def init_db():
           created_at TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'active',
           guesses INTEGER NOT NULL DEFAULT 0, hints INTEGER NOT NULL DEFAULT 0,
           exposure TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS tutor_reviews(
+          cache_key TEXT PRIMARY KEY, game_id TEXT NOT NULL REFERENCES games(id),
+          analysis_hash TEXT NOT NULL, created_at TEXT NOT NULL, response TEXT NOT NULL);
         """)
         columns = {r[1] for r in con.execute("PRAGMA table_info(attempts)")}
         for name, declaration in {"session_id": "TEXT", "is_first": "INTEGER NOT NULL DEFAULT 0", "exposure": "TEXT NOT NULL DEFAULT 'legacy'"}.items():
@@ -146,6 +151,11 @@ class DrillInput(BaseModel):
     color: Literal["w", "b"] = "w"
     elo: int = Field(default=1500, ge=600, le=2600)
     target: int = Field(default=5, ge=3, le=12)
+
+
+class TutorInput(BaseModel):
+    version: int = Field(ge=0, le=600)
+    reflection: str = Field(default='', max_length=2000)
 
 
 def reconstruct(initial_fen, moves):
@@ -508,6 +518,76 @@ def profile():
             "plan": [{"title": "Ripassa le tue decisioni", "minutes": 5, "description": f"{due} esercizi pronti per il ripasso."},
                      {"title": "Un drill e una partita consapevole", "minutes": 15, "description": "Riparti da una tua decisione critica contro Maia, poi applica il metodo nel gioco libero."},
                      {"title": "Rivedi un momento critico", "minutes": 5, "description": "Confronta la tua scelta con una variante verificata da Stockfish."}]}
+
+
+@app.get('/api/tutor/status')
+def tutor_status():
+    try:
+        key, model = tutor.configuration()
+    except tutor.TutorError as exc:
+        raise HTTPException(exc.status, str(exc)) from None
+    return {'configured': bool(key), 'provider': 'DeepSeek', 'model': model}
+
+
+@app.get('/api/games/{game_id}/tutor')
+def saved_tutor(game_id: str):
+    with database() as con:
+        row = find_game(con, game_id)
+        if not row['analysis'] or row['analysis_version'] != len(json.loads(row['moves'])):
+            return None
+        fingerprint = hashlib.sha256(row['analysis'].encode()).hexdigest()
+        review = con.execute('SELECT response FROM tutor_reviews WHERE game_id=? AND analysis_hash=? ORDER BY created_at DESC LIMIT 1', (game_id, fingerprint)).fetchone()
+    return {**json.loads(review['response']), 'cached': True} if review else None
+
+
+@app.post('/api/games/{game_id}/tutor')
+def request_tutor(game_id: str, body: TutorInput):
+    if not tutor_lock.acquire(blocking=False):
+        raise HTTPException(429, 'Il tutor sta preparando una risposta. Attendi prima di richiederne un’altra.')
+    try:
+        key, model = tutor.configuration()
+        if not key:
+            raise tutor.TutorError('DeepSeek non è configurato sul server.', 503)
+        with database() as con:
+            row = dict(find_game(con, game_id))
+            if body.version != len(json.loads(row['moves'])) or row['analysis_version'] != body.version or not row['analysis']:
+                raise HTTPException(409, 'Completa l’analisi Stockfish della versione attuale prima di chiedere al tutor.')
+            analysis = json.loads(row['analysis'])
+            decisions = sorted(analysis['decisions'], key=lambda d: -d['loss'])[:3]
+            if not decisions:
+                raise HTTPException(422, 'Non ci sono decisioni analizzate da discutere.')
+            selected_plies = {d['ply'] for d in decisions}
+            exercise_rows = [dict(r) for r in con.execute('SELECT id,ply,theme,due_at FROM exercises WHERE game_id=?', (game_id,)) if r['ply'] in selected_plies]
+        stats = profile()
+        exercise_context = [{'id': e['id'], 'ply': e['ply'], 'theme': e['theme'], 'dueAt': e['due_at']} for e in exercise_rows]
+        drills = [{'id': t['id'], 'name': t['name'], 'goal': t['goal']} for t in CATALOG]
+        drills += [{'id': 'personal:' + e['id'], 'name': 'Continua dalla tua decisione', 'goal': e['theme']} for e in exercise_rows]
+        context = {'playerColor': row['player_color'], 'referenceElo': row['elo'], 'source': row['source'],
+                   'engine': analysis['engine'], 'analysisNote': analysis['note'], 'analyzedDecisions': len(analysis['decisions']),
+                   'decisions': decisions, 'reflection': body.reflection.strip(), 'exercises': exercise_context, 'drills': drills,
+                   'practice': {k: stats[k] for k in ('games', 'attempts', 'independentAttempts', 'unaidedSuccesses', 'due', 'themes')}}
+        fingerprint = hashlib.sha256(row['analysis'].encode()).hexdigest()
+        cache_key = hashlib.sha256(json.dumps([tutor.PROMPT_VERSION, game_id, fingerprint, model, context], sort_keys=True).encode()).hexdigest()
+        with database() as con:
+            cached = con.execute('SELECT response FROM tutor_reviews WHERE cache_key=?', (cache_key,)).fetchone()
+        if cached:
+            return {**json.loads(cached['response']), 'cached': True}
+        response = tutor.generate(context, model)
+        response.update({'gameId': game_id, 'version': body.version, 'createdAt': now(), 'reflection': body.reflection.strip(),
+                         'evidence': [{'ply': d['ply'], 'playedSan': d['playedSan'], 'bestSan': d['best']['san'], 'theme': d['theme']} for d in decisions],
+                         'cached': False})
+        # A concurrent move or re-analysis invalidates the coaching; never attach it to a newer state.
+        with database() as con:
+            con.execute('BEGIN IMMEDIATE')
+            current = find_game(con, game_id)
+            if current['analysis'] != row['analysis'] or current['moves'] != row['moves']:
+                raise HTTPException(409, 'La partita è cambiata durante la risposta: rivedi la nuova analisi.')
+            con.execute('INSERT OR IGNORE INTO tutor_reviews VALUES(?,?,?,?,?)', (cache_key, game_id, fingerprint, now(), json.dumps(response)))
+        return response
+    except tutor.TutorError as exc:
+        raise HTTPException(exc.status, str(exc)) from None
+    finally:
+        tutor_lock.release()
 
 
 DIST = ROOT / "web" / "dist"

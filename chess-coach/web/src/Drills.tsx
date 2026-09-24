@@ -5,7 +5,7 @@ import { maia, sample } from './engine/maia'
 import type { Color, Game } from './types'
 
 interface Template { id:string; name:string; kind:string; theme:string; goal:string; reason:string; color:Color|null }
-export default function Drills({onReview}:{onReview:(game:Game)=>void}) {
+export default function Drills({onReview,startTemplateId,onStarted}:{onReview:(game:Game)=>void;startTemplateId?:string|null;onStarted?:()=>void}) {
   const [catalog,setCatalog]=useState<Template[]>([])
   const [game,setGame]=useState<Game|null>(null)
   const [elo,setElo]=useState(1500)
@@ -19,6 +19,7 @@ export default function Drills({onReview}:{onReview:(game:Game)=>void}) {
   function keep(g:Game){setGame(g);localStorage.setItem('chess-coach-drill',g.id)}
   useEffect(()=>{
     api<Template[]>('/drills').then(setCatalog).catch(fail)
+    if(startTemplateId){start(startTemplateId).then(()=>onStarted?.());return}
     const id=localStorage.getItem('chess-coach-drill')
     if(id)api<Game>('/games/'+id).then(keep).catch(()=>localStorage.removeItem('chess-coach-drill'))
   },[])

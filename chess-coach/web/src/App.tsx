@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Chess } from 'chess.js'
 import Board from './Board'
 import Drills from './Drills'
+import TutorPanel from './TutorPanel'
 import { api } from './api'
 import { maia, sample, type Prediction } from './engine/maia'
 import type { Game, Color, Exercise, Attempt, Profile, Analysis, Evaluation, PuzzleSession } from './types'
@@ -42,6 +43,7 @@ export default function App() {
   const [pgn, setPgn] = useState('')
   const [showImport, setShowImport] = useState(false)
   const [retry, setRetry] = useState(0)
+  const [requestedDrill,setRequestedDrill] = useState<string|null>(null)
   const currentGame = useRef<Game | null>(null)
   currentGame.current = game
 
@@ -165,7 +167,7 @@ export default function App() {
       <a className="brand" href="#" onClick={e=>{e.preventDefault();navigate('play')}}><span className="brand-mark">♞</span><span>chess<span className="brand-light">coach</span><small>IL TUO SPAZIO DI ALLENAMENTO</small></span></a>
       <nav aria-label="Navigazione principale">{([['play','♟','Gioca'],['review','◉','Rivedi'],['drill','◇','Drill'],['train','◎','Puzzle'],['progress','↗','Progressi']] as const).map(([key,icon,label]) => <button key={key} className={tab===key?'nav-item active':'nav-item'} onClick={()=>navigate(key)} aria-current={tab===key?'page':undefined}><span aria-hidden="true">{icon}</span>{label}{key==='train'&&!!profile?.due&&<b>{profile.due}</b>}</button>)}</nav>
       <div className="sidebar-note"><span className="eyebrow">IL METODO</span><p>Gioca. Comprendi.<br/>Riprova.</p><small>Un passo concreto, ogni giorno.</small></div>
-      <div className="local-status"><span className="status-dot"/> Spazio personale locale<small>I dati restano su questo computer.</small></div>
+      <div className="local-status"><span className="status-dot"/> Spazio personale locale<small>Partite archiviate su questo computer.</small></div>
     </aside>
     <main>
       <header className="topbar"><span>Il tuo allenamento</span><span className="pill">Maia + Stockfish <span className="status-dot"/></span></header>
@@ -174,7 +176,7 @@ export default function App() {
       {notice&&<div className="notice" role="status">{notice}</div>}
       {showImport&&<section className="panel import-panel"><h2>Importa una partita</h2><p className="muted">Incolla una singola partita PGN e seleziona il colore che vuoi analizzare.</p><textarea aria-label="Partita PGN" value={pgn} onChange={e=>setPgn(e.target.value)} rows={5} placeholder={'[White "Giocatore"]\n[Black "Avversario"]\n\n1. e4 e5 2. Nf3 Nc6 *'}/><div className="row"><label>Il tuo colore <select value={color} onChange={e=>setColor(e.target.value as Color)}><option value="w">Bianco</option><option value="b">Nero</option></select></label><button className="primary" disabled={busy||!pgn.trim()} onClick={importPgn}>Importa partita</button><button onClick={()=>setShowImport(false)}>Chiudi</button></div></section>}
 
-      {tab==='drill'?<Drills onReview={g=>{keepGame(g);setCursor(g.version);setTab('review');refresh().catch(fail)}}/>:tab==='progress'?<div className="progress-layout">
+      {tab==='drill'?<Drills startTemplateId={requestedDrill} onStarted={()=>setRequestedDrill(null)} onReview={g=>{keepGame(g);setCursor(g.version);setTab('review');refresh().catch(fail)}}/>:tab==='progress'?<div className="progress-layout">
         <section className="panel"><span className="eyebrow">IL TUO PIANO</span><h2>25 minuti per allenarti</h2>{profile?.plan.map((item,i)=><div className="plan-row" key={item.title}><span className="step-number">0{i+1}</span><div><h3>{item.title}</h3><p>{item.description}</p></div><span className="duration">{item.minutes} min</span></div>)}<button className="primary" onClick={()=>navigate(exercises.length?'train':'play')}>Inizia la sessione →</button></section>
         <section className="panel"><span className="eyebrow">LE TUE OSSERVAZIONI</span><h2>{profile?.confidence||'Nessun dato'}</h2><div className="stats"><div><strong>{profile?.games||0}</strong><span>partite salvate</span></div><div><strong>{profile?.attempts||0}</strong><span>tentativi</span></div><div><strong>{profile?.unaidedSuccesses||0}</strong><span>primi tentativi riusciti</span></div></div>{profile?.themes.length?profile.themes.map(t=><div className="theme-row" key={t.theme}><span>{t.theme}</span><span>{t.examples} posizioni</span></div>):<p className="empty-text">Analizza una partita per iniziare a raccogliere le tue posizioni di allenamento.</p>}<p className="footnote">I successi contano solo il primo tentativo senza aiuti, su esercizi nuovi o in scadenza. Le ripetizioni immediate restano pratica. Non sono ancora una misura di padronanza: servono anche verifiche su posizioni nuove.</p></section>
       </div>:<div className="training-layout">
@@ -190,7 +192,7 @@ export default function App() {
             <section className="panel tutor-card"><span className="eyebrow">IL TUTOR OSSERVA</span><h3>Concentrati sulla partita.</h3><p>Alla fine rivedremo le decisioni più interessanti e creeremo esercizi dalle tue posizioni.</p><button className="full" disabled={!game?.version||busy||botThinking||!!jobId} onClick={analyze}>Rivedi questa partita</button></section>
             <div className="engine-status"><span className={maiaStatus==='Maia pronto'?'status-dot':'status-dot waiting'}/>{maiaStatus}<small>{stockfish}</small></div>
           </>}
-          {tab==='review'&&<>
+          {tab==='review'&&<>{game&&<TutorPanel key={game.id+':'+game.version+':'+game.analysis?.createdAt} game={game} disabled={!!jobId||!game.analysis} onPosition={setCursor} onPuzzle={id=>{const ex=exercises.find(e=>e.id===id);if(ex)pickExercise(ex);else fail(new Error('Esercizio non disponibile: ricarica la pagina.'))}} onDrill={id=>{setRequestedDrill(id);setTab('drill')}}/>}
             <section className="panel"><span className="eyebrow">MOMENTI DA RIVEDERE</span><h2>Trova un'alternativa</h2>{jobId?<div role="status"><p>Stockfish analizza la partita… {progress}%</p><progress value={progress} max={100}/></div>:!game?<p className="empty-text">Gioca una partita o importa un PGN per iniziare.</p>:<>{!game.analysis?<p className="muted">Avvia la revisione per individuare le decisioni da allenare.</p>:game.analysis.critical.length?game.analysis.critical.map(d=><button className={`moment ${cursor===d.ply?'chosen':''}`} key={d.ply} onClick={()=>setCursor(d.ply)}><span>{Math.floor(d.ply/2)+1}{d.ply%2?'…':'.'} {d.playedSan}</span><span>{d.label}</span><small>{d.theme}</small></button>):<p className="muted">Nessun errore rilevante individuato nel budget di analisi. Non significa gioco perfetto.</p>}<button className="full" onClick={analyze} disabled={busy||!game.version}>{game.analysis?'Ricalcola analisi':'Analizza partita'}</button></>}{decision&&<div className="decision"><h3>Hai giocato {decision.playedSan}</h3><p>Alternativa: <strong>{decision.best.san[0]||'—'}</strong></p><p className="variation">{decision.best.san.join(' ')}</p><small>Valutazione dal lato che muove: {score(decision.actual)} → {score(decision.best)}. Profondità {decision.best.depth}.</small></div>}</section>
             <section className="panel"><span className="eyebrow">LO SGUARDO DI MAIA</span><h3>Mosse umane plausibili</h3>{prediction?.moves.slice(0,3).map(m=><div className="policy" key={m.uci}><strong>{m.san}</strong><div><span style={{width:`${m.probability*100}%`}}/></div><span>{Math.round(m.probability*100)}%</span></div>)}{!prediction&&<p className="muted">{game?'Caricamento delle previsioni…':'Nessuna posizione selezionata.'}</p>}<small className="footnote">Probabilità del modello, non giudizi sulla qualità delle mosse.</small></section>
             {game&&<div className="row"><button onClick={downloadPgn}>↓ Esporta PGN</button>{game.source==='maia'&&!game.result&&<button disabled={!!jobId} onClick={()=>setTab('play')}>Continua partita</button>}</div>}
