@@ -115,6 +115,7 @@ export default function App() {
   }, [tab, boardFen, game?.elo])
 
   async function startGame() {
+    if (game?.source === 'maia' && !game.result && !window.confirm('Vuoi iniziare una nuova partita? La partita attuale resterà salvata e potrai riprenderla dall’archivio.')) return
     setBusy(true); setError(''); setNotice('')
     try { const next = await api<Game>('/games',{color,elo}); keepGame(next); setTab('play'); setCursor(0); await refresh(); maia.load().catch(fail) }
     catch (e) {fail(e)} finally {setBusy(false)}

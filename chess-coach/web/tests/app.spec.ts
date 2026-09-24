@@ -16,6 +16,14 @@ test('Real Maia play, black orientation, drill and mobile layout',async({page,re
   const id=await page.evaluate(()=>localStorage.getItem('chess-coach-game'))
   await expect.poll(async()=>(await (await request.get('/api/games/'+id)).json()).version).toBe(2)
   await page.locator('.coach-column select').selectOption('b')
+  page.once('dialog',dialog=>dialog.dismiss())
+  await page.getByRole('button',{name:'Nuova partita'}).click()
+  expect(await page.evaluate(()=>localStorage.getItem('chess-coach-game'))).toBe(id)
+  page.once('dialog',async dialog=>{
+    expect(dialog.type()).toBe('confirm')
+    expect(dialog.message()).toContain('resterà salvata')
+    await dialog.accept()
+  })
   const newResponse=page.waitForResponse(r=>r.url().endsWith('/api/games')&&r.request().method()==='POST')
   await page.getByRole('button',{name:'Nuova partita'}).click();await newResponse
   await expect(page.getByText('Tocca a te · trascina un pezzo o usa due clic')).toBeVisible({timeout:60000})
