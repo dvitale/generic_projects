@@ -1,0 +1,12 @@
+.venv/
+/data/
+.run/
+vendor/
+__pycache__/
+.pytest_cache/
+web/node_modules/
+web/dist/
+web/test-results/
+web/playwright-report/
+web/public/maia3/
+web/public/ort/

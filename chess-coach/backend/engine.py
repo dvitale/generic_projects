@@ -1,0 +1,81 @@
+"""Stockfish boundary: keep every comparison in the decision maker's perspective."""
+import os
+import threading
+from pathlib import Path
+
+import chess
+import chess.engine
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def stockfish_path():
+    configured = os.environ.get("STOCKFISH_PATH")
+    if configured:
+        return configured
+    candidates = list((ROOT / "vendor").glob("**/stockfish-ubuntu*"))
+    candidates += list((ROOT / "vendor").glob("**/stockfish-linux*"))
+    candidates += list((ROOT / "vendor").glob("**/stockfish"))
+    for candidate in candidates:
+        if candidate.is_file() and os.access(candidate, os.X_OK) and not candidate.name.endswith(".tar.gz"):
+            return str(candidate)
+    if Path("/usr/games/stockfish").exists():
+        return "/usr/games/stockfish"
+    raise RuntimeError("Stockfish non trovato. Imposta STOCKFISH_PATH.")
+
+
+class Evaluator:
+    def __init__(self):
+        self.lock = threading.RLock()
+        self.engine = None
+        self.name = "Non avviato"
+
+    def start(self):
+        with self.lock:
+            if self.engine is None:
+                self.engine = chess.engine.SimpleEngine.popen_uci(stockfish_path(), timeout=30)
+                self.engine.configure({"Threads": 2, "Hash": 64})
+                self.name = self.engine.id.get("name", "Stockfish")
+
+    def close(self):
+        with self.lock:
+            if self.engine:
+                self.engine.quit()
+                self.engine = None
+
+    def evaluate(self, board, move=None, nodes=12000):
+        with self.lock:
+            self.start()
+            kwargs = {"root_moves": [move]} if move else {}
+            try:
+                info = self.engine.analyse(board, chess.engine.Limit(nodes=nodes), **kwargs)
+            except chess.engine.EngineTerminatedError:
+                self.engine = None
+                self.start()
+                info = self.engine.analyse(board, chess.engine.Limit(nodes=nodes), **kwargs)
+            score = info["score"].pov(board.turn)
+            line = info.get("pv", [])
+            cursor = board.copy()
+            san = []
+            uci = []
+            for step in line[:8]:
+                if step not in cursor.legal_moves:
+                    break
+                san.append(cursor.san(step))
+                uci.append(step.uci())
+                cursor.push(step)
+            return {"cp": score.score(mate_score=100000), "mate": score.mate(),
+                    "pv": uci, "san": san, "depth": info.get("depth", 0),
+                    "nodes": info.get("nodes", 0), "perspective": "w" if board.turn else "b"}
+
+    def compare(self, board, played, nodes=24000):
+        # One lock prevents interleaved jobs from changing the engine's state mid-comparison.
+        with self.lock:
+            best = self.evaluate(board, nodes=nodes)
+            actual = best if best["pv"] and best["pv"][0] == played.uci() else self.evaluate(board, played, nodes)
+            if actual["cp"] > best["cp"] + 30:
+                best = self.evaluate(board, nodes=nodes * 2)
+            return best, actual, max(0, best["cp"] - actual["cp"])
+
+
+evaluator = Evaluator()
