@@ -13,7 +13,7 @@ Aprire http://localhost:8033 nel browser Windows. Per fermare il server in primo
 
 ## Funzioni
 
-- **Gioca:** bianco o nero contro il vero modello Maia3 del sito, livello selezionabile, mosse legali e salvataggio automatico.
+- **Gioca:** bianco o nero contro il vero modello Maia3 del sito, livello selezionabile, mosse legali e salvataggio automatico. Puoi trascinare i pezzi con mouse o touch oppure usare due clic; le promozioni mantengono la scelta del pezzo.
 - **Rivedi:** importazione PGN, revisione Stockfish, momenti critici, previsioni Maia ed esportazione PGN.
 - **Drill:** aperture, finale di torre e posizioni delle proprie partite; 3–12 decisioni contro Maia e revisione dedicata.
 - **Puzzle:** decisioni critiche personali, alternative verificate, tentativi, indizi, soluzione e ripassi distanziati.
