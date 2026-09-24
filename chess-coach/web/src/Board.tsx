@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { Chess, type Square } from 'chess.js'
 import type { Color } from './types'
 
@@ -10,11 +10,12 @@ function Piece({code}:{code:string}) {
   return missing?<span aria-hidden="true" className={`piece ${code[0]==='w'?'white-piece':'black-piece'}`}>{symbols[code]}</span>:
     <img className="piece-image" src={`/pieces/neo/${code}.png`} alt="" aria-hidden="true" draggable={false} onError={()=>setMissing(true)}/>
 }
-export default function Board({fen, orientation, interactive, legalMoves, onMove, lastMove}: {fen:string; orientation:Color; interactive:boolean; legalMoves:string[]; onMove:(uci:string)=>void; lastMove?:string}) {
+export default function Board({fen, orientation, interactive, legalMoves, onMove, lastMove, animateMove=false}: {fen:string; orientation:Color; interactive:boolean; legalMoves:string[]; onMove:(uci:string)=>void; lastMove?:string;animateMove?:boolean}) {
   const [selected, setSelected] = useState<string | null>(null)
   const [promotion, setPromotion] = useState<string[]>([])
   const [drag, setDrag] = useState<{from:string;code:string;x:number;y:number;size:number}|null>(null)
   const boardElement=useRef<HTMLDivElement>(null)
+  const previousFen=useRef(fen)
   const gesture=useRef<Gesture|null>(null)
   const suppressClick=useRef(false)
   function clearDrag() {
@@ -34,6 +35,31 @@ export default function Board({fen, orientation, interactive, legalMoves, onMove
   const board = new Chess(fen)
   const files = orientation === 'w' ? 'abcdefgh' : 'hgfedcba'
   const ranks = orientation === 'w' ? '87654321' : '12345678'
+  useLayoutEffect(()=>{
+    const previous=previousFen.current
+    previousFen.current=fen
+    if(previous===fen||!animateMove||!lastMove||window.matchMedia('(prefers-reduced-motion: reduce)').matches)return
+    const from=lastMove.slice(0,2),to=lastMove.slice(2,4)
+    let castling=false
+    try {
+      const before=new Chess(previous)
+      const moved=before.move({from,to,promotion:lastMove[4]})
+      if(before.fen()!==fen)return
+      castling=moved.isKingsideCastle()||moved.isQueensideCastle()
+    }catch{return}
+    const animations:Animation[]=[]
+    function slide(origin:string,destination:string){
+      const start=boardElement.current?.querySelector<HTMLElement>(`[data-square="${origin}"]`)
+      const end=boardElement.current?.querySelector<HTMLElement>(`[data-square="${destination}"]`)
+      const piece=end?.querySelector<HTMLElement>('.piece-image,.piece')
+      if(!start||!end||!piece)return
+      const a=start.getBoundingClientRect(),b=end.getBoundingClientRect()
+      animations.push(piece.animate([{transform:`translate(${a.left-b.left}px,${a.top-b.top}px)`},{transform:'translate(0,0)'}],{duration:260,easing:'cubic-bezier(.2,.65,.3,1)'}))
+    }
+    slide(from,to)
+    if(castling)slide((to[0]==='g'?'h':'a')+to[1],(to[0]==='g'?'f':'d')+to[1])
+    return()=>animations.forEach(animation=>animation.cancel())
+  },[fen,orientation,lastMove,animateMove])
   const targets = selected ? legalMoves.filter(m => m.startsWith(selected)).map(m => m.slice(2,4)) : []
   function submit(from:string,to:string) {
       const candidates = legalMoves.filter(m => m.startsWith(from + to))

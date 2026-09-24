@@ -4,7 +4,8 @@ import Board from './Board'
 import Drills from './Drills'
 import TutorPanel from './TutorPanel'
 import { api } from './api'
-import { maia, sample, type Prediction } from './engine/maia'
+import { maia, type Prediction } from './engine/maia'
+import { chooseMaiaMove } from './engine/play'
 import type { Game, Color, Exercise, Attempt, Profile, Analysis, Evaluation, PuzzleSession } from './types'
 
 type Tab = 'play' | 'review' | 'drill' | 'train' | 'progress'
@@ -64,16 +65,16 @@ export default function App() {
   useEffect(() => {
     if (!game || game.result || game.source !== 'maia' || game.turn === game.playerColor || tab !== 'play' || jobId) return
     let cancelled = false
+    const controller = new AbortController()
     const snapshot = game
     setBotThinking(true)
     ;(async () => {
-      const policy = await maia.predict(snapshot.fen, snapshot.elo, snapshot.elo)
-      const move = sample(policy)
+      const move = await chooseMaiaMove(snapshot.fen, snapshot.elo, controller.signal)
       if (cancelled || !move) return
       const updated = await api<Game>(`/games/${snapshot.id}/moves`, {move, version:snapshot.version, actor:'maia'})
       if (!cancelled && currentGame.current?.id === snapshot.id) keepGame(updated)
     })().catch(e => { if (!cancelled) fail(e) }).finally(()=> { if (!cancelled) setBotThinking(false) })
-    return () => { cancelled = true; setBotThinking(false) }
+    return () => { cancelled = true; controller.abort(); setBotThinking(false) }
   }, [game?.id, game?.version, tab, retry, jobId])
 
   useEffect(() => {
@@ -183,7 +184,7 @@ export default function App() {
       </div>:<div className="training-layout">
         <section className="board-column">
           <div className="player-row"><span className="avatar">{tab==='train'?'◎':'♞'}</span><div><strong>{tab==='train'?'Posizione di allenamento':orientation==='w'?'Maia':'Tu'}</strong><small>{tab==='train'?exercise?.theme||'Scegli un esercizio':orientation==='w'?`Livello ${game?.elo||elo} · gioco umano`:'Il tuo colore: Nero'}</small></div>{tab==='play'&&botThinking&&<span className="thinking" role="status">Maia sta pensando…</span>}</div>
-          <Board fen={boardFen} orientation={orientation} interactive={canMove} legalMoves={legal} onMove={submitMove} lastMove={tab==='play'?game?.moves.at(-1):tab==='review'&&game&&cursor>0?game.moves[cursor-1]:undefined}/>
+          <Board animateMove={tab==='play'&&!!game&&game.turn===game.playerColor} fen={boardFen} orientation={orientation} interactive={canMove} legalMoves={legal} onMove={submitMove} lastMove={tab==='play'?game?.moves.at(-1):tab==='review'&&game&&cursor>0?game.moves[cursor-1]:undefined}/>
           <div className="player-row lower"><span className="avatar light">{orientation==='w'?'♙':'♞'}</span><div><strong>{tab==='train'?(exercise?.turn==='b'?'Muove il Nero':'Muove il Bianco'):orientation==='w'?'Tu':'Maia'}</strong><small>{tab==='play'?(game?.result?`Partita conclusa · ${game.result}`:canMove?'Tocca a te · trascina un pezzo o usa due clic':game?'Attendi la risposta':'Pronto per iniziare'):tab==='review'?`Posizione dopo ${cursor} semimosse`:'Cerca una buona mossa'}</small></div><span className="mode-label">{tab==='play'?'PARTITA LIBERA':tab==='review'?'ANALISI':'ESERCIZIO'}</span></div>
           {tab==='review'&&game&&<div className="review-controls"><button aria-label="Posizione iniziale" onClick={()=>setCursor(0)} disabled={cursor===0}>⏮</button><button aria-label="Mossa precedente" onClick={()=>setCursor(c=>Math.max(0,c-1))} disabled={cursor===0}>←</button><span>{cursor} / {game.version}</span><button aria-label="Mossa successiva" onClick={()=>setCursor(c=>Math.min(game.version,c+1))} disabled={cursor===game.version}>→</button><button aria-label="Ultima posizione" onClick={()=>setCursor(game.version)} disabled={cursor===game.version}>⏭</button></div>}
         </section>

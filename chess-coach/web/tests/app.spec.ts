@@ -2,6 +2,9 @@ import {test,expect,type Page} from '@playwright/test'
 async function boardMove(page:Page,move:string){await page.locator(`[data-square="${move.slice(0,2)}"]`).click();await page.locator(`[data-square="${move.slice(2,4)}"]`).click()}
 test('Real Maia play, black orientation, drill and mobile layout',async({page,request})=>{
   const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message))
+  let humanResponseAt=0,maiaRequestAt=0
+  page.on('response',response=>{if(response.url().endsWith('/moves')&&response.request().postDataJSON()?.actor==='human')humanResponseAt=Date.now()})
+  page.on('request',request=>{if(request.url().endsWith('/moves')&&request.postDataJSON()?.actor==='maia')maiaRequestAt=Date.now()})
   await page.goto('/')
   await expect(page.locator('.piece-image,.piece')).toHaveCount(32)
   await expect.poll(()=>page.locator('.piece-image').evaluateAll(images=>images.every(img=>(img as HTMLImageElement).complete&&(img as HTMLImageElement).naturalWidth>0))).toBe(true)
@@ -15,6 +18,7 @@ test('Real Maia play, black orientation, drill and mobile layout',async({page,re
   await expect(page.getByText('Tocca a te · trascina un pezzo o usa due clic')).toBeVisible({timeout:60000})
   const id=await page.evaluate(()=>localStorage.getItem('chess-coach-game'))
   await expect.poll(async()=>(await (await request.get('/api/games/'+id)).json()).version).toBe(2)
+  expect(maiaRequestAt-humanResponseAt).toBeGreaterThanOrEqual(1150)
   await page.locator('.coach-column select').selectOption('b')
   page.once('dialog',dialog=>dialog.dismiss())
   await page.getByRole('button',{name:'Nuova partita'}).click()
@@ -46,6 +50,23 @@ test('Real Maia play, black orientation, drill and mobile layout',async({page,re
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
   await page.screenshot({path:'test-results/drill-mobile.png',fullPage:true})
   expect(errors).toEqual([])
+})
+
+test('Leaving play cancels the pending Maia move and returning resumes it',async({page,request})=>{
+  await page.addInitScript(()=>{Math.random=()=>0.5})
+  await page.goto('/')
+  await page.getByRole('button',{name:'Inizia partita'}).click()
+  await expect(page.getByText('Tocca a te · trascina un pezzo o usa due clic')).toBeVisible()
+  const human=page.waitForResponse(r=>r.url().endsWith('/moves')&&r.request().postDataJSON()?.actor==='human')
+  await boardMove(page,'e2e4');await human
+  await expect(page.getByText('Maia sta pensando…',{exact:true})).toBeVisible()
+  const id=await page.evaluate(()=>localStorage.getItem('chess-coach-game'))
+  await page.getByRole('button',{name:'Progressi',exact:true}).click()
+  await page.waitForTimeout(3500)
+  expect((await(await request.get('/api/games/'+id)).json()).version).toBe(1)
+  await page.getByRole('button',{name:'Gioca',exact:true}).click()
+  await expect(page.getByText('Maia sta pensando…',{exact:true})).toBeVisible()
+  await expect.poll(async()=>(await(await request.get('/api/games/'+id)).json()).version,{timeout:15000}).toBe(2)
 })
 
 test('PGN review creates personalized puzzles and tracks assistance',async({page})=>{
