@@ -1,8 +1,14 @@
-"""Exploratory Maia skill-profile fit, not a calibrated Elo rating."""
+"""Maia platform drill-style maximum likelihood score, not calibrated Elo.
+
+Reference: CSSLab/maia-platform-frontend a6e52f5,
+useOpeningDrillController.ts (ratingDistribution and ensureMaiaForNode).
+"""
 import json
+import math
 import chess
 
-RATING_LEVELS = list(range(600, 2601, 200))
+RATING_LEVELS = list(range(600, 2601, 100))
+RATING_METHOD = 'maia3-drill-match-v2'
 
 
 def rating_plan(row, session=None):
@@ -15,21 +21,19 @@ def rating_plan(row, session=None):
             positions.append({'fen': board.fen(), 'move': move, 'ply': ply})
         board.push_uci(move)
     total = len(positions)
-    # Bound browser work; sample deterministically across the whole game.
-    if total > 40:
-        positions = [positions[round(i * (total - 1) / 39)] for i in range(40)]
     return {'version': len(moves), 'revision': row['revision'], 'positions': positions,
             'totalPositions': total, 'levels': RATING_LEVELS,
-            'opponentElo': row['elo'] if row['source'] in {'maia', 'drill', 'snapshot'} else 1500,
-            'opponentAssumed': row['source'] not in {'maia', 'drill', 'snapshot'}}
+            'method': RATING_METHOD, 'opponentMode': 'matched-level', 'probabilityFloor': 0.001}
 
 
-def summarize_rating(scores):
+def summarize_rating(scores, sample_size):
     best = max(scores)
-    # A log-likelihood support band, deliberately NOT called a confidence interval.
-    supported = [level for level, score in zip(RATING_LEVELS, scores) if score >= best - 2]
-    informative = max(scores) - min(scores) >= 2
-    estimate = RATING_LEVELS[scores.index(best)] if informative else None
-    return {'estimate': estimate, 'low': min(supported), 'high': max(supported),
+    # Preserve a genuine numerical tie instead of claiming the lowest level wins.
+    tied = [level for level, score in zip(RATING_LEVELS, scores) if math.isclose(score, best, rel_tol=0, abs_tol=1e-8)]
+    estimate = tied[0] if len(tied) == 1 else None
+    comparisons = [{'level': level, 'meanLogLikelihood': score / sample_size,
+                    'geometricMoveProbability': math.exp(score / sample_size)}
+                   for level, score in zip(RATING_LEVELS, scores)]
+    return {'estimate': estimate, 'tiedLevels': tied if len(tied) > 1 else [], 'comparisons': comparisons,
             'boundary': 'lower' if estimate == RATING_LEVELS[0] else 'upper' if estimate == RATING_LEVELS[-1] else None,
-            'status': 'estimated' if informative else 'inconclusive'}
+            'status': 'estimated' if estimate is not None else 'tied'}

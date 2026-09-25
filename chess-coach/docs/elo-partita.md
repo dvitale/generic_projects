@@ -1,28 +1,53 @@
-# Stima Elo della partita
+# Punteggio della partita: metodo dei Drill Maia
 
-Alla conclusione della partita la stima parte automaticamente e compare in **Gioca**, sopra i comandi di nuova partita. Anche riaprendo una partita conclusa in **Rivedi** si avvia il calcolo, se manca un risultato salvato. Per le partite ancora in corso resta disponibile **Rivedi → Stima Elo della partita**. Passare tra Gioca e Rivedi mantiene il calcolo in corso; uscire da queste sezioni lo interrompe e lo riavvia alla successiva apertura. Un risultato già salvato viene mostrato senza ricalcolarlo.
+Alla conclusione della partita il calcolo parte automaticamente e compare in **Gioca**. Riaprendo una partita conclusa in **Rivedi** si avvia il calcolo se manca un risultato aggiornato. Per le partite in corso c’è **Stima Elo della partita**. Gioca e Rivedi condividono il calcolo; uscire da queste sezioni lo interrompe. Il risultato viene salvato in SQLite.
 
-Si confrontano le mosse del colore scelto con le probabilità del modello Maia3 locale. Non serve DeepSeek, né una chiamata esterna. Il risultato è salvato nel database locale con la versione della partita. Se una partita conclusa contiene meno di 10 decisioni utili, viene spiegato perché non è possibile stimare il livello.
+Il numero è il **profilo Maia più compatibile con le mosse**, sulla scala di riferimento Lichess. Non è un rating FIDE o Chess.com, né una misura calibrata della forza individuale. Mostrare un valore puntuale non dimostra di aver ridotto l’incertezza reale.
 
-È una **stima sperimentale di compatibilità con i profili Maia**, non un rating FIDE, Chess.com o Lichess, una performance agonistica o una diagnosi delle competenze. Il modello predice mosse umane: il livello che meglio spiega una sequenza non coincide necessariamente con la forza del giocatore. Aperture memorizzate, ritmo di gioco, aiuti, ripetizioni e singole scelte inconsuete possono influenzare molto il risultato. La procedura non è stata calibrata su un campione indipendente di giocatori.
+## Verifica delle fonti, 25 settembre 2026
 
-## Metodo riproducibile
+Repository CSSLab/maia-platform-frontend, commit `a6e52f5c811ee18863cb2f0e81f2433a5b9905de` (anche HEAD al momento dell’ispezione).
 
-1. Ricostruire la partita dal FEN iniziale. Considerare solo le mosse del giocatore con almeno due alternative legali; nei Drill escludere la sequenza preparatoria.
-2. Richiedere almeno 10 decisioni. Se sono più di 40, selezionare 40 posizioni a indici equidistanti, includendo prima e ultima. Si limita così il lavoro nel browser.
-3. Confrontare 11 livelli: 600, 800, …, 2600. Tenere fisso il livello avversario: quello configurato per Maia; per i PGN, 1500 come ipotesi esplicitata nell’interfaccia (gli header Elo non vengono attualmente importati).
-4. Per ciascun livello sommare `log(max(P(mossa giocata | posizione, livello, avversario), 1e-12))`. Le probabilità sono quelle di Maia normalizzate sulle mosse legali, senza campionare una risposta del bot.
-5. Mostrare il livello con somma maggiore. Se lo scarto tra massimo e minimo è inferiore a 2, mostrare **Livello non distinguibile** senza un Elo puntuale. La soglia è una scelta prudenziale del prototipo, non una soglia validata empiricamente.
-6. La fascia compatibile include i livelli con somma distante al massimo 2 dal massimo; si mostrano gli estremi dell’insieme. Non è un intervallo di confidenza statistico. Una stima al bordo mostra 600 o 2600 e segnala il limite del confronto: non permette di dedurre che la forza reale sia inferiore o superiore a quel valore.
+- [Livelli](https://github.com/CSSLab/maia-platform-frontend/blob/a6e52f5c811ee18863cb2f0e81f2433a5b9905de/src/constants/common.ts#L1-L9): 21 livelli da 600 a 2600, a passi di 100.
+- [Calcolo](https://github.com/CSSLab/maia-platform-frontend/blob/a6e52f5c811ee18863cb2f0e81f2433a5b9905de/src/hooks/useOpeningDrillController/useOpeningDrillController.ts#L835-L889): media dei logaritmi delle probabilità delle mosse, con probabilità minima 0,001; vince il livello con il valore maggiore.
+- [Inferenza](https://github.com/CSSLab/maia-platform-frontend/blob/a6e52f5c811ee18863cb2f0e81f2433a5b9905de/src/hooks/useOpeningDrillController/useOpeningDrillController.ts#L945-L951): entrambi gli input Elo, giocatore e avversario, ricevono il livello candidato. Non viene tenuto fisso il rating del bot affrontato.
+- [Presentazione](https://github.com/CSSLab/maia-platform-frontend/blob/a6e52f5c811ee18863cb2f0e81f2433a5b9905de/src/components/Openings/MaiaRatingInsights.tsx#L63-L99): il sito mostra il vincitore e una fascia intorno a esso.
 
-I punteggi per tutti i livelli, il metodo `maia3-likelihood-v1`, il numero di decisioni e l’ipotesi sull’avversario restano salvati per consentire future calibrazioni e confronti. Nessun punteggio viene inventato da un LLM o convertito arbitrariamente dalla perdita in centipawn. Una partita in corso può essere valutata, ma il risultato riguarda solo la sequenza disponibile.
+La fascia usa `standardDeviation: 150`, assegnato come **costante**. Non viene stimata dalle probabilità o dal numero di mosse. Il nome della variabile non ne fa una deviazione standard empirica. La percentuale del grafico upstream è una trasformazione lineare limitata tra 0 e 1 del log-score medio, non una distribuzione di probabilità sui rating.
 
-## Annullo e salvataggio
+Questa implementazione è nei **Drill**, non in una testa del modello Maia3 che predice direttamente il rating del giocatore. Il [paper Chessformer, §4.2](https://arxiv.org/html/2605.19091v1#S4.SS2) descrive la previsione delle mosse condizionata sui rating forniti come input. Anche i modelli Python rilasciati mantengono questa distinzione; il modello browser esistente rimane quello utilizzato dall’app.
 
-Una nuova mossa rende la stima precedente non applicabile. L’annullamento cambia anche la revisione della partita e invalida i calcoli in corso: non si può salvare una risposta riferita al ramo precedente, neppure se contiene lo stesso numero di mosse.
+## Formula e implementazione locale v2
 
-Se la partita era già stata analizzata, prima dell’annullamento si conserva una copia nell’archivio, riconoscibile da **prima dell’annullamento**. Esercizi, tentativi e spiegazioni restano associati a quella sequenza. La copia è consultabile in revisione e non aumenta il conteggio delle partite nei Progressi.
+Per ogni candidato `r` e ogni decisione `i`:
 
-## Possibili estensioni
+`p_i(r) = Maia(mossa_i | posizione_prima_della_mossa_i, EloSelf=r, EloOppo=r)`
 
-Per trasformare l’indicazione in una misura più affidabile occorrono partite di giocatori con rating noto, separate tra calibrazione e verifica, segmentazione per cadenza e piattaforma, valutazione dell’errore fuori campione e confronto su molte partite. La fascia attuale non va presentata come una probabilità di possedere un determinato rating.
+`L(r) = (1/N) × somma_i log(max(p_i(r), 0.001))`
+
+Il punteggio è `argmax_r L(r)`. Somma e media producono lo stesso vincitore, perché tutti i livelli usano le stesse posizioni. La trasformazione grafica upstream non cambia l’ordinamento e non serve a selezionare il vincitore.
+
+Nel dettaglio delle tre migliori corrispondenze mostriamo `exp(L(r))`, la media geometrica delle probabilità delle mosse dopo il limite minimo: **non** la probabilità di possedere quel rating. Valori vicini indicano che il vincitore è sensibile a piccole variazioni delle mosse.
+
+Differenze intenzionali rispetto al sito:
+
+- Almeno 10 decisioni non obbligate per evitare punteggi su pochissime mosse.
+- Mosse obbligate escluse: aggiungere fattori con probabilità 1 non cambierebbe il vincitore. Nei Drill si esclude anche la sequenza preparatoria.
+- Tutte le decisioni ammesse, senza il precedente limite di 40. L’app limita già la partita a 600 semimosse; il calcolo resta interrompibile.
+- Una parità numerica tra massimi non viene risolta scegliendo arbitrariamente il livello più basso.
+- Nessuna fascia ±150: non sarebbe un’incertezza ricavata dai dati. Al bordo si segnala il limite della griglia, senza estrapolare oltre 600–2600.
+- Il criterio dei Drill viene applicato anche alle partite libere e importate. L’estensione non costituisce una validazione scientifica del rating della partita.
+
+Non sono stati scaricati nuovi pesi o addestrati modelli: viene usato il modello ONNX browser già installato, localmente e senza DeepSeek.
+
+## Perché prima appariva 600–2600
+
+Il metodo locale v1 usava 11 livelli a passi di 200, avversario fisso, limite di probabilità `1e-12` e includeva nella fascia ogni livello entro 2 unità di log-score dal migliore. Su una curva piatta la fascia copriva tutta la griglia e il numero centrale era nascosto. La soglia 2 era una scelta del prototipo, **non una regola documentata di Maia**. Presentarla come valutazione utile della partita era inadeguato.
+
+La versione `maia3-drill-match-v2` sostituisce quel metodo. Un risultato v1 non viene presentato come aggiornato: sulle partite concluse si ricalcola automaticamente; sulle altre rimane il pulsante. Il server verifica anche la versione del metodo, impedendo a un vecchio frontend di salvare un risultato con parametri diversi.
+
+## Salvataggio e precisione futura
+
+I punteggi per livello, il numero di mosse, i parametri e il metodo restano nel database. Nuove mosse o annullamenti invalidano il risultato. I controlli di versione impediscono di associare una risposta al ramo sbagliato. Le copie delle partite già analizzate conservano esercizi e tentativi precedenti.
+
+Per ridurre realmente l’incertezza servono più partite o decisioni informative, calibrazione su giocatori con rating noto e verifica su partite separate. Il punteggio delle mosse e la qualità Stockfish sono segnali diversi: non si converte arbitrariamente la perdita in centipawn in Elo e non si chiede a un LLM di inventare il numero.

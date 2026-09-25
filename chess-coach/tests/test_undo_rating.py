@@ -3,7 +3,7 @@ import sqlite3
 import chess
 import pytest
 from backend import main
-from backend.rating import rating_plan, summarize_rating
+from backend.rating import rating_plan, summarize_rating, RATING_LEVELS, RATING_METHOD
 from test_coach import client, wait_analysis
 
 
@@ -108,12 +108,17 @@ def test_rating_saved_for_exact_position_and_short_games_rejected(client):
     for uci in imported['moves']:
         g = move(client, g, uci)
     plan = client.get(f"/api/games/{g['id']}/rating-positions").json()
-    assert len(plan['positions']) == 12 and not plan['opponentAssumed']
+    assert len(plan['positions']) == 12 and plan['opponentMode'] == 'matched-level'
+    assert plan['levels'] == list(range(600,2601,100)) and plan['probabilityFloor'] == 0.001
     path = f"/api/games/{g['id']}/rating"
-    body = {'version': g['version'], 'revision': g['revision'], 'log_scores': [-100,-90,-80,-70,-60,-50,-40,-41,-45,-60,-70]}
+    body = {'version': g['version'], 'revision': g['revision'], 'method': RATING_METHOD,
+            'log_scores': [-40-abs(level-1800)/200 for level in RATING_LEVELS]}
+    assert client.post(path, json={**body, 'method': 'maia3-likelihood-v1'}).status_code == 422
+    assert client.post(path, json={**body, 'log_scores': [-40]*11}).status_code == 422
     result = client.post(path, json=body)
     assert result.status_code == 200, result.text
-    assert result.json()['estimate'] == 1800 and result.json()['low'] == 1800 and result.json()['high'] == 2000
+    assert result.json()['estimate'] == 1800 and result.json()['method'] == RATING_METHOD
+    assert len(result.json()['comparisons']) == 21 and 'low' not in result.json()
     assert client.get('/api/games/' + g['id']).json()['rating'] == result.json()
     g = undo(client, g).json()
     assert g['rating'] is None and client.post(path, json=body).status_code == 409
@@ -124,17 +129,21 @@ def test_rating_saved_for_exact_position_and_short_games_rejected(client):
     assert client.post(f"/api/games/{g['id']}/rating", json=body).status_code == 422
 
 
-def test_rating_uncertainty_boundaries_forced_moves_and_sample():
-    assert summarize_rating([-10] * 11)['estimate'] is None
-    assert summarize_rating([-10 - i for i in range(11)])['boundary'] == 'lower'
-    assert summarize_rating([-30 + i for i in range(11)])['boundary'] == 'upper'
+def test_rating_best_match_boundaries_forced_moves_and_all_positions():
+    assert summarize_rating([-10] * 21, 10)['estimate'] is None
+    assert summarize_rating([-10 - i for i in range(21)], 10)['boundary'] == 'lower'
+    assert summarize_rating([-30 + i for i in range(21)], 10)['boundary'] == 'upper'
+    # The previous arbitrary log-score spread threshold must not hide a unique best match.
+    scores = [-30-abs(level-1400)/1000 for level in RATING_LEVELS]
+    assert summarize_rating(scores, 15)['estimate'] == 1400
+    assert summarize_rating([s*2 for s in scores], 30)['comparisons'] == summarize_rating(scores, 15)['comparisons']
     board = chess.Board()
     moves = ['g1f3','g8f6','f3g1','f6g8'] * 30
     row = {'initial_fen': board.fen(), 'moves': json.dumps(moves), 'player_color':'w', 'revision': 0, 'source':'pgn', 'elo':1500}
     plan = rating_plan(row)
-    assert plan['totalPositions'] == 60 and len(plan['positions']) == 40
+    assert plan['totalPositions'] == 60 and len(plan['positions']) == 60
     assert plan['positions'][0]['ply'] == 0 and plan['positions'][-1]['ply'] == 118
-    assert plan['opponentAssumed']
+    assert plan['opponentMode'] == 'matched-level'
     assert rating_plan(row, {'start_ply': 118})['totalPositions'] == 1
     row.update(initial_fen='k7/8/2KQ4/8/8/8/8/8 b - - 0 1', moves='["a8a7"]', player_color='b')
     assert chess.Board(row['initial_fen']).legal_moves.count() == 1

@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field, FiniteFloat
 from .engine import ROOT, evaluator
 from .drills import CATALOG, materialize, decisions_played
 from . import tutor
-from .rating import rating_plan, summarize_rating, RATING_LEVELS
+from .rating import rating_plan, summarize_rating, RATING_LEVELS, RATING_METHOD
 
 DB_PATH = Path(os.environ.get("CHESS_COACH_DATA", str(ROOT / "data"))) / "coach.sqlite3"
 jobs = {}
@@ -145,7 +145,8 @@ class UndoInput(BaseModel):
 
 
 class RatingInput(UndoInput):
-    log_scores: list[FiniteFloat] = Field(min_length=11, max_length=11)
+    method: Literal['maia3-drill-match-v2']
+    log_scores: list[FiniteFloat] = Field(min_length=21, max_length=21)
 
 
 class ImportInput(BaseModel):
@@ -340,12 +341,12 @@ def save_rating(game_id: str, body: RatingInput):
             raise HTTPException(409, 'La partita è cambiata: ricalcola la stima Elo')
         session = con.execute('SELECT * FROM drill_sessions WHERE game_id=?', (game_id,)).fetchone()
         plan = rating_plan(row, session)
-        if len(plan['positions']) < 10 or any(s > 0 or s < -2000 for s in body.log_scores):
+        if len(plan['positions']) < 10 or any(s > 0 or s < -2100 for s in body.log_scores):
             raise HTTPException(422, 'Servono almeno 10 tue decisioni e probabilità Maia valide')
-        result = {**summarize_rating(body.log_scores), 'createdAt': now(), 'version': body.version,
+        result = {**summarize_rating(body.log_scores, len(plan['positions'])), 'createdAt': now(), 'version': body.version,
                   'revision': body.revision, 'positions': len(plan['positions']), 'totalPositions': plan['totalPositions'],
-                  'opponentElo': plan['opponentElo'], 'opponentAssumed': plan['opponentAssumed'],
-                  'method': 'maia3-likelihood-v1', 'levels': RATING_LEVELS, 'logScores': body.log_scores}
+                  'opponentMode': plan['opponentMode'], 'probabilityFloor': plan['probabilityFloor'],
+                  'method': RATING_METHOD, 'levels': RATING_LEVELS, 'logScores': body.log_scores}
         con.execute('INSERT OR REPLACE INTO game_ratings VALUES(?,?,?,?)',
                     (game_id, body.version, body.revision, json.dumps(result)))
     return result
