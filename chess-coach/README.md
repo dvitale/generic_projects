@@ -14,7 +14,7 @@ Aprire http://localhost:8033 nel browser Windows. Per fermare il server in primo
 ## Funzioni
 
 - **Annulla ultima mossa:** in Gioca e Drill ritorna alla tua ultima decisione, togliendo anche la risposta di Maia o interrompendola se ancora in preparazione. Nei Drill conserva la sequenza iniziale. Disponibile anche dopo la conclusione; PGN importati e copie archiviate restano in sola revisione.
-- **Elo della partita:** in Rivedi confronta le tue mosse con 11 livelli Maia e salva una stima sperimentale con fascia di compatibilità. Richiede almeno 10 decisioni non obbligate; non equivale a un rating ufficiale. Metodo e limiti in [docs/elo-partita.md](docs/elo-partita.md).
+- **Elo della partita:** calcolo automatico e risultato visibile in Gioca a partita conclusa; in Rivedi puoi avviarlo anche durante una partita. Confronta le tue mosse con 11 livelli Maia e salva una stima sperimentale con fascia di compatibilità. Richiede almeno 10 decisioni non obbligate; non equivale a un rating ufficiale. Metodo e limiti in [docs/elo-partita.md](docs/elo-partita.md).
 - **Ritmo Maia:** risposte con attesa variabile di circa 1,2–3,2 secondi, comprendente il tempo di inferenza, e breve animazione del pezzo. Il caricamento iniziale del modello può richiedere più tempo. Lo stesso ritmo vale nei Drill; il cambio di sezione annulla le risposte ancora in preparazione.
 - **Gioca:** bianco o nero contro il vero modello Maia3 del sito, livello selezionabile, mosse legali e salvataggio automatico. Puoi trascinare i pezzi con mouse o touch oppure usare due clic; le promozioni mantengono la scelta del pezzo.
 - **Rivedi:** importazione PGN, revisione Stockfish, momenti critici, previsioni Maia ed esportazione PGN.

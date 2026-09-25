@@ -11,7 +11,14 @@ export default function RatingPanel({game,disabled,onRated}:{game:Game;disabled:
   const [progress,setProgress]=useState(0)
   const [error,setError]=useState('')
   const active=useRef<AbortController|null>(null)
+  const autoAttempted=useRef(false)
   useEffect(()=>()=>{active.current?.abort()},[])
+  useEffect(()=>{
+    if(game.result&&!disabled&&!rating&&!autoAttempted.current){
+      autoAttempted.current=true
+      void estimate()
+    }
+  },[game.result,disabled,rating])
   async function estimate(){
     const controller=new AbortController()
     active.current=controller
@@ -19,7 +26,9 @@ export default function RatingPanel({game,disabled,onRated}:{game:Game;disabled:
     try{
       const plan=await api<Plan>(`/games/${game.id}/rating-positions`)
       if(controller.signal.aborted)return
-      if(plan.positions.length<10)throw new Error('Servono almeno 10 tue decisioni non obbligate. Continua la partita e riprova.')
+      if(plan.positions.length<10)throw new Error(game.result
+        ? `Partita troppo breve per stimare il livello: ${plan.positions.length} tue decisioni non obbligate, ne servono almeno 10.`
+        : 'Servono almeno 10 tue decisioni non obbligate. Continua la partita e riprova.')
       const scores=plan.levels.map(()=>0)
       let completed=0
       for(const position of plan.positions){
@@ -40,6 +49,7 @@ export default function RatingPanel({game,disabled,onRated}:{game:Game;disabled:
   }
   function cancel(){active.current?.abort();setBusy(false);setProgress(0)}
   return <section className="panel rating-panel" aria-label="Valutazione Elo della partita">
+    {game.result&&<p className="rating-outcome"><strong>{game.result==='1/2-1/2'?'Partita patta':game.result===(game.playerColor==='w'?'1-0':'0-1')?'Hai vinto':'Hai perso'} · {game.result}</strong></p>}
     <span className="eyebrow">IL LIVELLO DI QUESTA PARTITA</span><h2>Elo stimato</h2>
     <p className="muted">Confrontiamo le tue scelte con Maia a diversi livelli. È una stima sperimentale dello stile di gioco, non un rating ufficiale o una misura certificata della tua forza.</p>
     {rating&&<div className="rating-result" role="status">

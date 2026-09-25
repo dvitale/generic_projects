@@ -1,6 +1,8 @@
 # Stima Elo della partita
 
-In **Rivedi → Stima Elo della partita** si confrontano le mosse del colore scelto con le probabilità del modello Maia3 locale. Non serve DeepSeek, né una chiamata esterna. Il risultato è salvato nel database locale con la versione della partita.
+Alla conclusione della partita la stima parte automaticamente e compare in **Gioca**, sopra i comandi di nuova partita. Anche riaprendo una partita conclusa in **Rivedi** si avvia il calcolo, se manca un risultato salvato. Per le partite ancora in corso resta disponibile **Rivedi → Stima Elo della partita**. Passare tra Gioca e Rivedi mantiene il calcolo in corso; uscire da queste sezioni lo interrompe e lo riavvia alla successiva apertura. Un risultato già salvato viene mostrato senza ricalcolarlo.
+
+Si confrontano le mosse del colore scelto con le probabilità del modello Maia3 locale. Non serve DeepSeek, né una chiamata esterna. Il risultato è salvato nel database locale con la versione della partita. Se una partita conclusa contiene meno di 10 decisioni utili, viene spiegato perché non è possibile stimare il livello.
 
 È una **stima sperimentale di compatibilità con i profili Maia**, non un rating FIDE, Chess.com o Lichess, una performance agonistica o una diagnosi delle competenze. Il modello predice mosse umane: il livello che meglio spiega una sequenza non coincide necessariamente con la forza del giocatore. Aperture memorizzate, ritmo di gioco, aiuti, ripetizioni e singole scelte inconsuete possono influenzare molto il risultato. La procedura non è stata calibrata su un campione indipendente di giocatori.
 

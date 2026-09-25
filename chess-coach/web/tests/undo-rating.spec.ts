@@ -7,6 +7,47 @@ async function play(page:Page,move:string){
   await response
 }
 
+test('Checkmate starts Elo automatically in play, retains the calculation in review and restores the saved score',async({page,request})=>{
+  const pgn='1. e4 e5 2. Nf3 d6 3. d4 Bg4 4. dxe5 Bxf3 5. Qxf3 dxe5 6. Bc4 Nf6 7. Qb3 Qe7 8. Nc3 c6 9. Bg5 b5 10. Nxb5 cxb5 11. Bxb5+ Nbd7 12. O-O-O Rd8 13. Rxd7 Rxd7 14. Rd1 Qe6 15. Bxd7+ Nxd7 16. Qb8+ Nxb8 17. Rd8#'
+  const imported=await(await request.post('/api/import',{data:{pgn}})).json()
+  let game=await(await request.post('/api/games',{data:{}})).json()
+  for(const move of imported.moves.slice(0,-1)){
+    game=await(await request.post(`/api/games/${game.id}/moves`,{data:{move,version:game.version,revision:game.revision,actor:game.turn===game.playerColor?'human':'maia'}})).json()
+  }
+  let starts=0,saves=0
+  page.on('request',req=>{if(req.url().endsWith('/rating-positions'))starts++;if(req.url().endsWith('/rating')&&req.method()==='POST')saves++})
+  await page.addInitScript(id=>localStorage.setItem('chess-coach-game',id),game.id)
+  await page.goto('/')
+  await expect(page.getByRole('button',{name:'Stima Elo della partita'})).toBeVisible()
+  await page.getByRole('button',{name:'Gioca',exact:true}).click()
+  await play(page,imported.moves.at(-1))
+  const panel=page.getByRole('region',{name:'Valutazione Elo della partita'})
+  await expect(panel).toContainText('Hai vinto · 1-0')
+  await expect(panel.getByText(/Confronto delle tue mosse/)).toBeVisible()
+  await page.getByRole('button',{name:'Rivedi',exact:true}).click()
+  await expect(panel).toContainText('Fascia compatibile',{timeout:90000})
+  expect(starts).toBe(1);expect(saves).toBe(1)
+  await page.reload()
+  await expect(panel).toContainText('Fascia compatibile')
+  await page.getByRole('button',{name:'Gioca',exact:true}).click()
+  await expect(panel).toContainText('Fascia compatibile')
+  expect(starts).toBe(1);expect(saves).toBe(1)
+})
+
+test('Reopening a finished short game explains why no Elo is available without retrying endlessly',async({page,request})=>{
+  const game=await(await request.post('/api/import',{data:{pgn:'1. f3 e5 2. g4 Qh4#',color:'w'}})).json()
+  let requests=0
+  page.on('request',req=>{if(req.url().endsWith('/rating-positions'))requests++})
+  await page.addInitScript(id=>localStorage.setItem('chess-coach-game',id),game.id)
+  await page.goto('/')
+  const panel=page.getByRole('region',{name:'Valutazione Elo della partita'})
+  await expect(panel).toContainText('Hai perso · 0-1')
+  await expect(panel.getByRole('alert')).toContainText('Partita troppo breve')
+  await expect(panel).toContainText('2 tue decisioni non obbligate')
+  expect(requests).toBe(1)
+  await expect(panel).not.toContainText('Continua la partita')
+})
+
 test('Undo while Maia thinks cancels its old reply; a new move can be played and both plies undone',async({page,request})=>{
   await page.addInitScript(()=>{Math.random=()=>0.5})
   await page.goto('/')
