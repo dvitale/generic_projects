@@ -44,7 +44,7 @@ def seed_exercise():
     # White can mate with Qg7; Qg8+ lets the king capture the queen.
     fen = '7k/8/5KQ1/8/8/8/8/8 w - - 0 1'
     with main.database() as con:
-        con.execute('INSERT INTO games VALUES(?,?,?,?,?,?,?,?,?,?)', ('seed',fen,'[]','w',1500,'Test',main.now(),None,None,'pgn'))
+        con.execute('INSERT INTO games(id,initial_fen,moves,player_color,elo,title,created_at,analysis,analysis_version,source) VALUES(?,?,?,?,?,?,?,?,?,?)', ('seed',fen,'[]','w',1500,'Test',main.now(),None,None,'pgn'))
         con.execute('INSERT INTO exercises(id,game_id,ply,initial_fen,history,theme,best_move,loss,due_at) VALUES(?,?,?,?,?,?,?,?,?)',
                     ('ex','seed',0,fen,'[]','Riconoscere il matto','g6g7',1000,main.now()))
     return 'ex'

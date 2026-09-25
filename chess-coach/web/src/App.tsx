@@ -3,6 +3,7 @@ import { Chess } from 'chess.js'
 import Board from './Board'
 import Drills from './Drills'
 import TutorPanel from './TutorPanel'
+import RatingPanel from './RatingPanel'
 import { api } from './api'
 import { maia, type Prediction } from './engine/maia'
 import { chooseMaiaMove } from './engine/play'
@@ -46,6 +47,7 @@ export default function App() {
   const [retry, setRetry] = useState(0)
   const [requestedDrill,setRequestedDrill] = useState<string|null>(null)
   const currentGame = useRef<Game | null>(null)
+  const botController = useRef<AbortController | null>(null)
   currentGame.current = game
 
   async function refresh() {
@@ -63,19 +65,20 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (!game || game.result || game.source !== 'maia' || game.turn === game.playerColor || tab !== 'play' || jobId) return
+    if (!game || busy || game.result || game.source !== 'maia' || game.turn === game.playerColor || tab !== 'play' || jobId) return
     let cancelled = false
     const controller = new AbortController()
+    botController.current = controller
     const snapshot = game
     setBotThinking(true)
     ;(async () => {
       const move = await chooseMaiaMove(snapshot.fen, snapshot.elo, controller.signal)
-      if (cancelled || !move) return
-      const updated = await api<Game>(`/games/${snapshot.id}/moves`, {move, version:snapshot.version, actor:'maia'})
-      if (!cancelled && currentGame.current?.id === snapshot.id) keepGame(updated)
-    })().catch(e => { if (!cancelled) fail(e) }).finally(()=> { if (!cancelled) setBotThinking(false) })
+      if (cancelled || controller.signal.aborted || !move) return
+      const updated = await api<Game>(`/games/${snapshot.id}/moves`, {move, version:snapshot.version, revision:snapshot.revision, actor:'maia'})
+      if (!cancelled && !controller.signal.aborted && currentGame.current?.id === snapshot.id) keepGame(updated)
+    })().catch(e => { if (!cancelled && !controller.signal.aborted) fail(e) }).finally(()=> { if (!cancelled) setBotThinking(false) })
     return () => { cancelled = true; controller.abort(); setBotThinking(false) }
-  }, [game?.id, game?.version, tab, retry, jobId])
+  }, [game?.id, game?.version, game?.revision, tab, retry, jobId, busy])
 
   useEffect(() => {
     if (!jobId) return
@@ -126,8 +129,20 @@ export default function App() {
     setBusy(true); setError('')
     try {
       if (tab === 'train' && exercise && session) { const result = await api<Attempt>(`/exercises/${exercise.id}/attempts`,{move,session_id:session.id,version:session.version}); setAttempt(result); setSession({...session,version:result.version}); await refresh() }
-      else if (game) { const next = await api<Game>(`/games/${game.id}/moves`,{move,version:game.version,actor:'human'}); keepGame(next) }
+      else if (game) { const next = await api<Game>(`/games/${game.id}/moves`,{move,version:game.version,revision:game.revision,actor:'human'}); keepGame(next) }
     } catch (e) {fail(e)} finally {setBusy(false)}
+  }
+  async function undo() {
+    if (!game?.canUndo || busy || jobId) return
+    botController.current?.abort()
+    setBusy(true); setBotThinking(false); setError(''); setNotice('')
+    try {
+      const next = await api<Game>(`/games/${game.id}/undo`, {version:game.version,revision:game.revision})
+      keepGame(next); setCursor(next.version); setNotice('Ultima mossa annullata. Tocca a te.'); await refresh()
+    } catch (e) {
+      fail(e)
+      try { const latest = await api<Game>('/games/'+game.id); keepGame(latest); setCursor(latest.version) } catch (e) { fail(e) }
+    } finally { setBusy(false) }
   }
   async function analyze() {
     if (!game) return
@@ -191,10 +206,10 @@ export default function App() {
         <aside className="coach-column">
           {tab==='play'&&<>
             <section className="panel"><span className="eyebrow">IL TUO SPARRING PARTNER</span><h2>Allenati con Maia</h2><p className="muted">Mosse e imperfezioni ispirate al gioco umano.</p><label className="field-label">Livello di riferimento <strong>{elo}</strong><input aria-label="Livello Maia" type="range" min="600" max="2600" step="100" value={elo} onChange={e=>setElo(Number(e.target.value))}/></label><div className="range-labels"><span>600</span><span>2600</span></div><label className="field-label">Il tuo colore<select value={color} onChange={e=>setColor(e.target.value as Color)}><option value="w">Bianco</option><option value="b">Nero</option></select></label><button className="primary full" onClick={startGame} disabled={busy||!!jobId||botThinking}>{game?'Nuova partita':'Inizia partita'} →</button><small className="footnote">Il livello guida il modello; non equivale a un rating agonistico certificato.</small></section>
-            <section className="panel tutor-card"><span className="eyebrow">IL TUTOR OSSERVA</span><h3>Concentrati sulla partita.</h3><p>Alla fine rivedremo le decisioni più interessanti e creeremo esercizi dalle tue posizioni.</p><button className="full" disabled={!game?.version||busy||botThinking||!!jobId} onClick={analyze}>Rivedi questa partita</button></section>
+            <section className="panel"><button className="full" disabled={!game?.canUndo||busy||!!jobId} onClick={undo}>Annulla ultima mossa</button><p className="footnote">Ritorna alla tua ultima scelta e annulla anche la risposta di Maia.</p></section><section className="panel tutor-card"><span className="eyebrow">IL TUTOR OSSERVA</span><h3>Concentrati sulla partita.</h3><p>Alla fine rivedremo le decisioni più interessanti e creeremo esercizi dalle tue posizioni.</p><button className="full" disabled={!game?.version||busy||botThinking||!!jobId} onClick={analyze}>Rivedi questa partita</button></section>
             <div className="engine-status"><span className={maiaStatus==='Maia pronto'?'status-dot':'status-dot waiting'}/>{maiaStatus}<small>{stockfish}</small></div>
           </>}
-          {tab==='review'&&<>{game&&<TutorPanel key={game.id+':'+game.version+':'+game.analysis?.createdAt} game={game} disabled={!!jobId||!game.analysis} onPosition={setCursor} onPuzzle={id=>{const ex=exercises.find(e=>e.id===id);if(ex)pickExercise(ex);else fail(new Error('Esercizio non disponibile: ricarica la pagina.'))}} onDrill={id=>{setRequestedDrill(id);setTab('drill')}}/>}
+          {tab==='review'&&<>{game&&<RatingPanel key={'rating:'+game.id+':'+game.version+':'+game.revision} game={game} disabled={!!jobId||busy} onRated={rating=>setGame(current=>current?.id===game.id&&current.version===game.version&&current.revision===game.revision?{...current,rating}:current)}/>} {game&&<TutorPanel key={game.id+':'+game.version+':'+game.analysis?.createdAt} game={game} disabled={!!jobId||!game.analysis} onPosition={setCursor} onPuzzle={id=>{const ex=exercises.find(e=>e.id===id);if(ex)pickExercise(ex);else fail(new Error('Esercizio non disponibile: ricarica la pagina.'))}} onDrill={id=>{setRequestedDrill(id);setTab('drill')}}/>}
             <section className="panel"><span className="eyebrow">MOMENTI DA RIVEDERE</span><h2>Trova un'alternativa</h2>{jobId?<div role="status"><p>Stockfish analizza la partita… {progress}%</p><progress value={progress} max={100}/></div>:!game?<p className="empty-text">Gioca una partita o importa un PGN per iniziare.</p>:<>{!game.analysis?<p className="muted">Avvia la revisione per individuare le decisioni da allenare.</p>:game.analysis.critical.length?game.analysis.critical.map(d=><button className={`moment ${cursor===d.ply?'chosen':''}`} key={d.ply} onClick={()=>setCursor(d.ply)}><span>{Math.floor(d.ply/2)+1}{d.ply%2?'…':'.'} {d.playedSan}</span><span>{d.label}</span><small>{d.theme}</small></button>):<p className="muted">Nessun errore rilevante individuato nel budget di analisi. Non significa gioco perfetto.</p>}<button className="full" onClick={analyze} disabled={busy||!game.version}>{game.analysis?'Ricalcola analisi':'Analizza partita'}</button></>}{decision&&<div className="decision"><h3>Hai giocato {decision.playedSan}</h3><p>Alternativa: <strong>{decision.best.san[0]||'—'}</strong></p><p className="variation">{decision.best.san.join(' ')}</p><small>Valutazione dal lato che muove: {score(decision.actual)} → {score(decision.best)}. Profondità {decision.best.depth}.</small></div>}</section>
             <section className="panel"><span className="eyebrow">LO SGUARDO DI MAIA</span><h3>Mosse umane plausibili</h3>{prediction?.moves.slice(0,3).map(m=><div className="policy" key={m.uci}><strong>{m.san}</strong><div><span style={{width:`${m.probability*100}%`}}/></div><span>{Math.round(m.probability*100)}%</span></div>)}{!prediction&&<p className="muted">{game?'Caricamento delle previsioni…':'Nessuna posizione selezionata.'}</p>}<small className="footnote">Probabilità del modello, non giudizi sulla qualità delle mosse.</small></section>
             {game&&<div className="row"><button onClick={downloadPgn}>↓ Esporta PGN</button>{game.source==='maia'&&!game.result&&<button disabled={!!jobId} onClick={()=>setTab('play')}>Continua partita</button>}</div>}

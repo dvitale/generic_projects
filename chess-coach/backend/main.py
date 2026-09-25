@@ -17,11 +17,12 @@ import chess.pgn
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, FiniteFloat
 
 from .engine import ROOT, evaluator
 from .drills import CATALOG, materialize, decisions_played
 from . import tutor
+from .rating import rating_plan, summarize_rating, RATING_LEVELS
 
 DB_PATH = Path(os.environ.get("CHESS_COACH_DATA", str(ROOT / "data"))) / "coach.sqlite3"
 jobs = {}
@@ -80,7 +81,12 @@ def init_db():
         CREATE TABLE IF NOT EXISTS tutor_reviews(
           cache_key TEXT PRIMARY KEY, game_id TEXT NOT NULL REFERENCES games(id),
           analysis_hash TEXT NOT NULL, created_at TEXT NOT NULL, response TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS game_ratings(
+          game_id TEXT PRIMARY KEY REFERENCES games(id), version INTEGER NOT NULL,
+          revision INTEGER NOT NULL, response TEXT NOT NULL);
         """)
+        if 'revision' not in {r[1] for r in con.execute('PRAGMA table_info(games)')}:
+            con.execute('ALTER TABLE games ADD COLUMN revision INTEGER NOT NULL DEFAULT 0')
         columns = {r[1] for r in con.execute("PRAGMA table_info(attempts)")}
         for name, declaration in {"session_id": "TEXT", "is_first": "INTEGER NOT NULL DEFAULT 0", "exposure": "TEXT NOT NULL DEFAULT 'legacy'"}.items():
             if name not in columns:
@@ -130,6 +136,16 @@ class MoveInput(BaseModel):
     move: str = Field(pattern=r"^[a-h][1-8][a-h][1-8][qrbn]?$")
     version: int = Field(ge=0, le=1000)
     actor: Literal["human", "maia"]
+    revision: int = Field(default=0, ge=0)
+
+
+class UndoInput(BaseModel):
+    version: int = Field(ge=0, le=600)
+    revision: int = Field(ge=0)
+
+
+class RatingInput(UndoInput):
+    log_scores: list[FiniteFloat] = Field(min_length=11, max_length=11)
 
 
 class ImportInput(BaseModel):
@@ -187,6 +203,8 @@ def game_view(row):
     pgn.headers["Result"] = outcome.result() if outcome else "*"
     with database() as con:
         session = con.execute("SELECT * FROM drill_sessions WHERE game_id=?", (row["id"],)).fetchone()
+        rating = con.execute('SELECT response FROM game_ratings WHERE game_id=? AND version=? AND revision=?',
+                             (row['id'], len(moves), row['revision'])).fetchone()
     drill = None
     if session:
         count = decisions_played(row["initial_fen"], moves, session["start_ply"], row["player_color"])
@@ -194,7 +212,9 @@ def game_view(row):
                  "target": session["target"], "decisions": count, "startPly": session["start_ply"],
                  "complete": count >= session["target"] or outcome is not None}
     return {"id": row["id"], "fen": board.fen(), "initialFen": row["initial_fen"],
-            "moves": moves, "version": len(moves), "playerColor": row["player_color"],
+            "moves": moves, "version": len(moves), "revision": row['revision'], "playerColor": row["player_color"],
+            "canUndo": row['source'] in {'maia', 'drill'} and undo_ply(row, session) is not None,
+            "rating": json.loads(rating['response']) if rating else None,
             "elo": row["elo"], "title": row["title"], "pgn": str(pgn),
             "turn": "w" if board.turn else "b", "legalMoves": [m.uci() for m in board.legal_moves],
             "result": outcome.result() if outcome else None, "source": row["source"], "drill": drill,
@@ -212,7 +232,7 @@ def new_game(body: NewGame):
     reconstruct(body.fen, [])
     game_id = str(uuid.uuid4())
     with database() as con:
-        con.execute("INSERT INTO games VALUES(?,?,?,?,?,?,?,?,?,?)",
+        con.execute("INSERT INTO games(id,initial_fen,moves,player_color,elo,title,created_at,analysis,analysis_version,source) VALUES(?,?,?,?,?,?,?,?,?,?)",
                     (game_id, body.fen, "[]", body.color, body.elo, f"Allenamento con Maia {body.elo}", now(), None, None, "maia"))
         return game_view(find_game(con, game_id))
 
@@ -239,7 +259,7 @@ def make_move(game_id: str, body: MoveInput):
         if row["source"] not in {"maia", "drill"}:
             raise HTTPException(409, "La partita importata è disponibile in revisione")
         moves = json.loads(row["moves"])
-        if len(moves) != body.version:
+        if len(moves) != body.version or row['revision'] != body.revision:
             raise HTTPException(409, "La posizione è cambiata: ricarica la partita")
         board = reconstruct(row["initial_fen"], moves)
         session = con.execute("SELECT * FROM drill_sessions WHERE game_id=?", (game_id,)).fetchone()
@@ -256,6 +276,79 @@ def make_move(game_id: str, body: MoveInput):
         moves.append(body.move)
         con.execute("UPDATE games SET moves=? WHERE id=?", (json.dumps(moves), game_id))
         return game_view(find_game(con, game_id))
+
+
+def undo_ply(row, session=None):
+    moves = json.loads(row['moves'])
+    start = session['start_ply'] if session else 0
+    initial_turn = chess.Board(row['initial_fen']).turn
+    return next((ply for ply in range(len(moves) - 1, start - 1, -1)
+                 if (initial_turn if ply % 2 == 0 else not initial_turn) == (row['player_color'] == 'w')), None)
+
+
+def preserve_review(con, row, session):
+    # Keep previously reviewed evidence and puzzle attempts attached to their original line.
+    if not row['analysis'] and not con.execute('SELECT 1 FROM exercises WHERE game_id=?', (row['id'],)).fetchone():
+        return
+    archive_id = str(uuid.uuid4())
+    con.execute('''INSERT INTO games(id,initial_fen,moves,player_color,elo,title,created_at,analysis,analysis_version,source,revision)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?)''',
+        (archive_id, row['initial_fen'], row['moves'], row['player_color'], row['elo'],
+         row['title'] + ' · prima dell’annullamento', now(), row['analysis'], row['analysis_version'], 'snapshot', row['revision']))
+    if session:
+        con.execute('INSERT INTO drill_sessions VALUES(?,?,?,?,?,?,?)',
+                    (archive_id, session['template_id'], session['template_name'], session['theme'], session['goal'], session['start_ply'], session['target']))
+    con.execute('UPDATE exercises SET game_id=? WHERE game_id=?', (archive_id, row['id']))
+    con.execute('UPDATE tutor_reviews SET game_id=? WHERE game_id=?', (archive_id, row['id']))
+    con.execute('UPDATE game_ratings SET game_id=? WHERE game_id=?', (archive_id, row['id']))
+
+
+@app.post('/api/games/{game_id}/undo')
+def undo_move(game_id: str, body: UndoInput):
+    with database() as con:
+        con.execute('BEGIN IMMEDIATE')
+        row = find_game(con, game_id)
+        if row['source'] not in {'maia', 'drill'}:
+            raise HTTPException(409, 'Questa partita è disponibile solo in revisione')
+        moves = json.loads(row['moves'])
+        session = con.execute('SELECT * FROM drill_sessions WHERE game_id=?', (game_id,)).fetchone()
+        ply = undo_ply(row, session)
+        # A bot reply may have arrived after the click. Accept only that one extra reply.
+        if row['revision'] != body.revision or len(moves) not in {body.version, body.version + 1} or ply is None or ply >= body.version:
+            raise HTTPException(409, 'Nessuna mossa da annullare in questa posizione: ricarica la partita')
+        preserve_review(con, row, session)
+        con.execute('UPDATE games SET moves=?,revision=revision+1,analysis=NULL,analysis_version=NULL WHERE id=?',
+                    (json.dumps(moves[:ply]), game_id))
+        con.execute('DELETE FROM game_ratings WHERE game_id=?', (game_id,))
+    return get_game(game_id)
+
+
+@app.get('/api/games/{game_id}/rating-positions')
+def prepare_rating(game_id: str):
+    with database() as con:
+        row = find_game(con, game_id)
+        session = con.execute('SELECT * FROM drill_sessions WHERE game_id=?', (game_id,)).fetchone()
+        return rating_plan(row, session)
+
+
+@app.post('/api/games/{game_id}/rating')
+def save_rating(game_id: str, body: RatingInput):
+    with database() as con:
+        con.execute('BEGIN IMMEDIATE')
+        row = find_game(con, game_id)
+        if row['revision'] != body.revision or len(json.loads(row['moves'])) != body.version:
+            raise HTTPException(409, 'La partita è cambiata: ricalcola la stima Elo')
+        session = con.execute('SELECT * FROM drill_sessions WHERE game_id=?', (game_id,)).fetchone()
+        plan = rating_plan(row, session)
+        if len(plan['positions']) < 10 or any(s > 0 or s < -2000 for s in body.log_scores):
+            raise HTTPException(422, 'Servono almeno 10 tue decisioni e probabilità Maia valide')
+        result = {**summarize_rating(body.log_scores), 'createdAt': now(), 'version': body.version,
+                  'revision': body.revision, 'positions': len(plan['positions']), 'totalPositions': plan['totalPositions'],
+                  'opponentElo': plan['opponentElo'], 'opponentAssumed': plan['opponentAssumed'],
+                  'method': 'maia3-likelihood-v1', 'levels': RATING_LEVELS, 'logScores': body.log_scores}
+        con.execute('INSERT OR REPLACE INTO game_ratings VALUES(?,?,?,?)',
+                    (game_id, body.version, body.revision, json.dumps(result)))
+    return result
 
 
 @app.post("/api/import")
@@ -278,7 +371,7 @@ def import_game(body: ImportInput):
     game_id = hashlib.sha256((initial + json.dumps(moves) + body.color).encode()).hexdigest()[:32]
     with database() as con:
         title = f"{pgn.headers.get('White', 'Bianco')} – {pgn.headers.get('Black', 'Nero')}"[:120]
-        con.execute("INSERT OR IGNORE INTO games VALUES(?,?,?,?,?,?,?,?,?,?)",
+        con.execute("INSERT OR IGNORE INTO games(id,initial_fen,moves,player_color,elo,title,created_at,analysis,analysis_version,source) VALUES(?,?,?,?,?,?,?,?,?,?)",
                     (game_id, initial, json.dumps(moves), body.color, 1500, title, now(), None, None, "pgn"))
         return game_view(find_game(con, game_id))
 
@@ -316,12 +409,16 @@ def analyze_game(job_id, snapshot):
         analysis = {"decisions": decisions, "critical": critical, "engine": evaluator.name,
                     "createdAt": now(), "version": len(moves), "source": snapshot["source"], "note": "Analisi a budget limitato. Temi indicativi, non diagnosi definitive."}
         with database() as con:
+            con.execute('BEGIN IMMEDIATE')
+            current = find_game(con, snapshot['id'])
+            if current['moves'] != snapshot['moves'] or current['revision'] != snapshot['revision']:
+                raise ValueError('La partita è cambiata: riavvia l’analisi.')
             con.execute("UPDATE games SET analysis=?, analysis_version=? WHERE id=?",
                         (json.dumps(analysis), len(moves), snapshot["id"]))
             for item in critical:
                 if not item["best"]["pv"]:
                     continue
-                ex_id = f"{snapshot['id']}:{item['ply']}"
+                ex_id = f"{snapshot['id']}:{snapshot['revision']}:{item['ply']}"
                 con.execute("""INSERT INTO exercises(id,game_id,ply,initial_fen,history,theme,best_move,loss,due_at)
                   VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(game_id,ply) DO UPDATE SET
                   best_move=excluded.best_move,loss=excluded.loss,theme=excluded.theme""",
@@ -498,7 +595,7 @@ def start_drill(template_id: str, body: DrillInput):
         initial, moves, _ = materialize(template)
     game_id = str(uuid.uuid4())
     with database() as con:
-        con.execute("INSERT INTO games VALUES(?,?,?,?,?,?,?,?,?,?)", (game_id, initial, json.dumps(moves), template.get("color", body.color), body.elo,
+        con.execute("INSERT INTO games(id,initial_fen,moves,player_color,elo,title,created_at,analysis,analysis_version,source) VALUES(?,?,?,?,?,?,?,?,?,?)", (game_id, initial, json.dumps(moves), template.get("color", body.color), body.elo,
                     template["name"], now(), None, None, "drill"))
         con.execute("INSERT INTO drill_sessions VALUES(?,?,?,?,?,?,?)", (game_id, template_id, template["name"], template["theme"], template["goal"], len(moves), body.target))
     return get_game(game_id)
@@ -507,7 +604,7 @@ def start_drill(template_id: str, body: DrillInput):
 @app.get("/api/profile")
 def profile():
     with database() as con:
-        game_count = con.execute("SELECT count(*) FROM games").fetchone()[0]
+        game_count = con.execute("SELECT count(*) FROM games WHERE source!='snapshot'").fetchone()[0]
         attempts_count = con.execute("SELECT count(*) FROM attempts").fetchone()[0]
         unaided = con.execute("SELECT count(*) FROM attempts WHERE success=1 AND assisted=0 AND is_first=1 AND exposure IN ('new','review')").fetchone()[0]
         independent = con.execute("SELECT count(*) FROM attempts WHERE assisted=0 AND is_first=1 AND exposure IN ('new','review')").fetchone()[0]
