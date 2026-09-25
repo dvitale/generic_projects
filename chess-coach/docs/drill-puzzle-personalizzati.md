@@ -6,7 +6,7 @@ Aggiornamento: 24 settembre 2026. Questo documento descrive la prima implementaz
 
 L'analisi riguarda il frontend ufficiale Maia al commit `a6e52f5c811ee18863cb2f0e81f2433a5b9905de`, non un backend privato ricostruito per supposizione.
 
-| Funzione | Comportamento osservabile nei sorgenti | Conseguenza per Chess Coach |
+| Funzione | Comportamento osservabile nei sorgenti | Conseguenza per SparringMate |
 |---|---|---|
 | Play | Maia propone mosse umane condizionate dal livello | Sparring con distribuzione Maia e controllo di legalità separato |
 | Analyze | Previsioni Maia affiancate a valutazioni Stockfish | Separare plausibilità umana e qualità scacchistica |

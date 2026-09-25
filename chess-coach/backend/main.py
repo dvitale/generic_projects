@@ -106,7 +106,7 @@ async def lifespan(app):
         evaluator.close()
 
 
-app = FastAPI(title="Chess Coach locale", lifespan=lifespan)
+app = FastAPI(title="SparringMate locale", lifespan=lifespan)
 
 
 @app.middleware("http")
@@ -396,9 +396,9 @@ def analyze_game(job_id, snapshot):
             if ply >= start_ply:
                 is_player = board.turn == (snapshot['player_color'] == 'w')
                 forced = board.legal_moves.count() == 1
-                best, actual, loss = evaluator.compare(board, move, nodes=10000)
+                best, actual, loss, choices = evaluator.compare_candidates(board, move, nodes=10000)
                 if loss >= 80:
-                    best, actual, loss = evaluator.compare(board, move, nodes=60000)
+                    best, actual, loss, choices = evaluator.compare_candidates(board, move, nodes=60000)
                 theme = "Calcolo e mosse candidate"
                 if best["mate"] is not None and best["mate"] > 0 and (actual["mate"] is None or actual["mate"] < 0):
                     theme = "Riconoscere il matto"
@@ -406,6 +406,7 @@ def analyze_game(job_id, snapshot):
                     theme = "Difesa dalle minacce di matto"
                 item = {"ply": ply, "fen": board.fen(), "played": uci, "playedSan": board.san(move),
                                   "best": best, "actual": actual, "loss": loss, "theme": theme,
+                                  "stockfishCandidates": choices,
                                   "isPlayer": is_player, "forced": forced,
                                   "label": "Mossa obbligata" if forced else "Errore" if loss >= 180 else "Imprecisione" if loss >= 80 else "Buona scelta"}
                 reviewed_moves.append(item)
@@ -414,7 +415,7 @@ def analyze_game(job_id, snapshot):
             board.push(move)
             update_job(job_id, progress=round((ply + 1) / len(moves) * 100))
         critical = sorted([d for d in decisions if d["loss"] >= 80], key=lambda d: -d["loss"])[:3]
-        analysis = {"decisions": decisions, "moves": reviewed_moves, "reviewVersion": 2, "critical": critical, "engine": evaluator.name,
+        analysis = {"decisions": decisions, "moves": reviewed_moves, "reviewVersion": 3, "critical": critical, "engine": evaluator.name,
                     "createdAt": now(), "version": len(moves), "source": snapshot["source"], "note": "Analisi a budget limitato. Temi indicativi, non diagnosi definitive."}
         with database() as con:
             con.execute('BEGIN IMMEDIATE')

@@ -186,20 +186,20 @@ export default function App() {
   function downloadPgn() {
     if (!game) return
     const url=URL.createObjectURL(new Blob([game.pgn],{type:'application/x-chess-pgn'}))
-    const link=document.createElement('a'); link.href=url; link.download='chess-coach.pgn'; link.click(); URL.revokeObjectURL(url)
+    const link=document.createElement('a'); link.href=url; link.download='sparringmate.pgn'; link.click(); URL.revokeObjectURL(url)
   }
   function navigate(next: Tab) {setTab(next); setError(''); setNotice(''); if(next==='review'&&game)setCursor(game.version); if(next==='train'&&!exercise&&exercises[0])pickExercise(exercises[0]); refresh().catch(fail)}
 
   return <div className="app-shell">
     <aside className="sidebar">
-      <a className="brand" href="#" onClick={e=>{e.preventDefault();navigate('play')}}><span className="brand-mark">♞</span><span>chess<span className="brand-light">coach</span><small>IL TUO SPAZIO DI ALLENAMENTO</small></span></a>
+      <a className="brand" href="#" onClick={e=>{e.preventDefault();navigate('play')}}><span className="brand-mark">♞</span><span>Sparring<span className="brand-light">Mate</span><small>IL TUO SPAZIO DI ALLENAMENTO</small></span></a>
       <nav aria-label="Navigazione principale">{([['play','♟','Gioca'],['review','◉','Rivedi'],['drill','◇','Drill'],['train','◎','Puzzle'],['progress','↗','Progressi'],['archive','▤','Partite']] as const).map(([key,icon,label]) => <button key={key} className={tab===key?'nav-item active':'nav-item'} onClick={()=>navigate(key)} aria-current={tab===key?'page':undefined}><span aria-hidden="true">{icon}</span>{label}{key==='train'&&!!profile?.due&&<b>{profile.due}</b>}</button>)}</nav>
       <div className="sidebar-note"><span className="eyebrow">IL METODO</span><p>Gioca. Comprendi.<br/>Riprova.</p><small>Un passo concreto, ogni giorno.</small></div>
       <div className="local-status"><span className="status-dot"/> Spazio personale locale<small>Partite archiviate su questo computer.</small></div>
     </aside>
     <main className={'page-'+tab}>
       <header className="topbar"><span>Il tuo allenamento</span><span className="pill">Maia + Stockfish <span className="status-dot"/></span></header>
-      <section className="page-intro"><div><span className="eyebrow">CHESS COACH / {tab==='play'?'SPARRING':tab==='review'?'REVISIONE':tab==='train'?'PUZZLE':tab==='drill'?'DRILL':tab==='archive'?'ARCHIVIO':'PERCORSO'}</span><h1>{titles[tab]}</h1><p>{tab==='play'?'Un avversario dal gioco umano. Uno spazio per migliorare.':tab==='review'?'Confronta mosse plausibili e conseguenze sulla scacchiera.':tab==='train'?'Riparti dalle decisioni delle tue partite, senza suggerimenti anticipati.':tab==='drill'?'Metti in pratica un piano contro Maia, poi rivedi le tue decisioni.':tab==='archive'?'Riprendi una partita o torna sulle tue decisioni.':'Osservazioni reali, piccoli obiettivi e ripassi mirati.'}</p></div><button className="quiet" onClick={()=>setShowImport(!showImport)}>↑ Importa PGN</button></section>
+      <section className="page-intro"><div><span className="eyebrow">SparringMate / {tab==='play'?'SPARRING':tab==='review'?'REVISIONE':tab==='train'?'PUZZLE':tab==='drill'?'DRILL':tab==='archive'?'ARCHIVIO':'PERCORSO'}</span><h1>{titles[tab]}</h1><p>{tab==='play'?'Un avversario dal gioco umano. Uno spazio per migliorare.':tab==='review'?'Confronta mosse plausibili e conseguenze sulla scacchiera.':tab==='train'?'Riparti dalle decisioni delle tue partite, senza suggerimenti anticipati.':tab==='drill'?'Metti in pratica un piano contro Maia, poi rivedi le tue decisioni.':tab==='archive'?'Riprendi una partita o torna sulle tue decisioni.':'Osservazioni reali, piccoli obiettivi e ripassi mirati.'}</p></div><button className="quiet" onClick={()=>setShowImport(!showImport)}>↑ Importa PGN</button></section>
       {error&&<div className="alert" role="alert">{error}<button onClick={()=>{setError('');setRetry(x=>x+1)}}>Riprova</button></div>}
       {notice&&<div className="notice" role="status">{notice}</div>}
       {showImport&&<section className="panel import-panel"><h2>Importa una partita</h2><p className="muted">Incolla una singola partita PGN e seleziona il colore che vuoi analizzare.</p><textarea aria-label="Partita PGN" value={pgn} onChange={e=>setPgn(e.target.value)} rows={5} placeholder={'[White "Giocatore"]\n[Black "Avversario"]\n\n1. e4 e5 2. Nf3 Nc6 *'}/><div className="row"><label>Il tuo colore <select value={color} onChange={e=>setColor(e.target.value as Color)}><option value="w">Bianco</option><option value="b">Nero</option></select></label><button className="primary" disabled={busy||!pgn.trim()} onClick={importPgn}>Importa partita</button><button onClick={()=>setShowImport(false)}>Chiudi</button></div></section>}
@@ -235,7 +235,7 @@ export default function App() {
         </aside>
       </div>}
       {tab==='archive'&&<section className="archive"><div className="section-head"><h2>Le tue partite</h2><span>{saved.length} salvate</span></div>{saved.length?<div className="game-list">{saved.map(item=><button key={item.id} onClick={()=>openGame(item.id)} disabled={!!jobId||busy}><span className="archive-icon">♟</span><span><strong>{item.title}</strong><small>{new Date(item.createdAt).toLocaleDateString('it-IT')} · {item.plies} semimosse · {item.source==='pgn'?'Importata':'Maia'}</small></span><span className="arrow">↗</span></button>)}</div>:<p className="empty-text">Le partite vengono salvate automaticamente, mossa dopo mossa.</p>}</section>}
-      <footer>Chess Coach · Prototipo locale <span>Maia per il gioco umano. Stockfish per la verifica.</span></footer>
+      <footer>SparringMate · Prototipo locale <span>Maia per il gioco umano. Stockfish per la verifica.</span></footer>
     </main>
   </div>
 }

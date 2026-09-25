@@ -15,4 +15,4 @@ except FileNotFoundError:
 if str(root / '.venv/bin/python').encode() not in args or b'backend.main:app' not in args:
     raise SystemExit('Il PID appartiene a un altro processo: nessun segnale inviato.')
 os.kill(pid, signal.SIGTERM)
-print('Arresto di Chess Coach richiesto. Le analisi in corso vengono completate.')
+print('Arresto di SparringMate richiesto. Le analisi in corso vengono completate.')

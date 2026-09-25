@@ -1,6 +1,6 @@
 export type Color = 'w' | 'b'
 export interface Evaluation { cp: number; mate: number | null; pv: string[]; san: string[]; depth: number; nodes: number; perspective: Color }
-export interface Decision { ply: number; fen: string; played: string; playedSan: string; best: Evaluation; actual: Evaluation; loss: number; theme: string; label: string; isPlayer?:boolean; forced?:boolean }
+export interface Decision { ply: number; fen: string; played: string; playedSan: string; best: Evaluation; stockfishCandidates?:Evaluation[]; actual: Evaluation; loss: number; theme: string; label: string; isPlayer?:boolean; forced?:boolean }
 export interface Analysis { createdAt:string; decisions: Decision[]; moves?:Decision[]; reviewVersion?:number; critical: Decision[]; engine: string; version: number; note: string }
 export interface Rating { estimate:number|null; boundary:'lower'|'upper'|null; status:'estimated'|'tied'|'inconclusive'; positions:number; totalPositions:number; createdAt:string; method:string; tiedLevels?:number[]; comparisons?:{level:number;meanLogLikelihood:number;geometricMoveProbability:number}[] }
 export interface Game { id: string; fen: string; initialFen: string; moves: string[]; version: number; revision:number; canUndo:boolean; rating:Rating|null; playerColor: Color; elo: number; turn: Color; title: string; pgn: string; legalMoves: string[]; result: string | null; source: string; analysis: Analysis | null; drill: {name:string; goal:string; theme:string; target:number; decisions:number; startPly:number; complete:boolean} | null }

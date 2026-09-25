@@ -25,6 +25,15 @@ test('Review compares every move before it is played and uses the selected Maia 
   await expect(table.locator('tbody td').nth(0)).toContainText('e4')
   await expect(table.locator('tbody td').nth(1)).toContainText(game.analysis.moves[0].best.san[0])
   await expect(table.locator('tbody td').nth(2)).toContainText('%',{timeout:60000})
+  await expect(table.locator('tbody tr')).toHaveCount(3)
+  for(let rank=0;rank<3;rank++){
+    const row=table.locator('tbody tr').nth(rank)
+    const cells=row.locator('td')
+    await expect(cells.nth(rank===0?1:0)).toContainText(game.analysis.moves[0].stockfishCandidates[rank].san[0])
+    await expect(cells.nth(rank===0?1:0)).toContainText(`${rank+1}ª scelta`)
+    await expect(cells.last()).toContainText(`${rank+1}ª scelta`)
+    await expect(cells.last()).toContainText('%')
+  }
   await expect(page.locator('[data-square="e2"] img')).toBeVisible()
   await review.getByRole('button',{name:'Decisione successiva'}).click()
   await expect(review.getByRole('combobox',{name:'Mossa da confrontare'})).toHaveValue('1')
@@ -48,6 +57,7 @@ test('Review compares every move before it is played and uses the selected Maia 
     expect(board!.y+board!.height).toBeLessThan(size.height)
     expect(panel!.x+panel!.width).toBeGreaterThan(size.width-60)
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
+    await page.screenshot({path:`test-results/review-${size.width}.png`,fullPage:true})
     expect(await page.evaluate(()=>document.documentElement.scrollHeight)).toBeLessThan(size.height+180)
   }
   await page.setViewportSize({width:1920,height:1080})

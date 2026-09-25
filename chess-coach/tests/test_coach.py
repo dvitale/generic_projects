@@ -120,12 +120,24 @@ def test_import_analysis_and_personal_drill(client):
     g=response.json()
     assert client.post('/api/import',json=body).json()['id']==g['id']
     analysis=wait_analysis(client,g['id'])
-    assert analysis['reviewVersion'] == 2 and len(analysis['moves']) == 6
+    assert analysis['reviewVersion'] == 3 and len(analysis['moves']) == 6
     board=chess.Board()
     for entry,move in zip(analysis['moves'],g['moves']):
         assert entry['fen'] == board.fen() and entry['played'] == move
         assert entry['actual']['perspective'] == ('w' if board.turn else 'b')
         assert entry['isPlayer'] == (board.turn == chess.WHITE)
+        choices = entry['stockfishCandidates']
+        assert len(choices) == min(3, board.legal_moves.count())
+        assert choices[0] == entry['best']
+        assert len({choice['pv'][0] for choice in choices}) == len(choices)
+        assert [choice['cp'] for choice in choices] == sorted([choice['cp'] for choice in choices], reverse=True)
+        for choice in choices:
+            assert choice['perspective'] == ('w' if board.turn else 'b')
+            assert chess.Move.from_uci(choice['pv'][0]) in board.legal_moves
+            line = board.copy()
+            for uci, san in zip(choice['pv'], choice['san']):
+                assert line.san(chess.Move.from_uci(uci)) == san
+                line.push_uci(uci)
         board.push_uci(move)
     assert any(d['played']=='h5e5' and d['loss']>180 for d in analysis['critical'])
     exs=client.get('/api/exercises').json()
@@ -143,4 +155,5 @@ def test_forced_moves_are_in_step_review_but_not_personal_weaknesses(client):
     analysis=wait_analysis(client,g['id'])
     assert len(analysis['moves']) == 1 and analysis['moves'][0]['forced']
     assert analysis['moves'][0]['label'] == 'Mossa obbligata'
+    assert len(analysis['moves'][0]['stockfishCandidates']) == 1
     assert analysis['decisions'] == [] and analysis['critical'] == []
