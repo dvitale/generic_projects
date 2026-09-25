@@ -14,7 +14,7 @@ function pause(milliseconds:number,signal:AbortSignal):Promise<void> {
 export async function chooseMaiaMove(fen:string,elo:number,signal:AbortSignal) {
   const started=performance.now()
   const thinkingTime=1200+(Math.random()+Math.random())*1000
-  const policy=await maia.predict(fen,elo,elo)
+  const policy=await maia.predict(fen,elo,elo,signal)
   await pause(thinkingTime-(performance.now()-started),signal)
   if(signal.aborted)throw new DOMException('Turn cancelled','AbortError')
   return sample(policy)

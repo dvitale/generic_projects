@@ -37,7 +37,7 @@ export default function RatingPanel({game,disabled,onRated}:{game:Game;disabled:
         for(let i=0;i<plan.levels.length;i++){
           if(controller.signal.aborted)return
           // Match the official drill comparison: both conditioning ratings vary together.
-          const prediction=await maia.predict(position.fen,plan.levels[i],plan.levels[i])
+          const prediction=await maia.predict(position.fen,plan.levels[i],plan.levels[i],controller.signal)
           if(controller.signal.aborted)return
           const probability=prediction.moves.find(m=>m.uci===position.move)?.probability
           if(probability===undefined||!Number.isFinite(probability))throw new Error('Maia non ha restituito una probabilità valida. Riprova.')

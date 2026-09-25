@@ -120,6 +120,13 @@ def test_import_analysis_and_personal_drill(client):
     g=response.json()
     assert client.post('/api/import',json=body).json()['id']==g['id']
     analysis=wait_analysis(client,g['id'])
+    assert analysis['reviewVersion'] == 2 and len(analysis['moves']) == 6
+    board=chess.Board()
+    for entry,move in zip(analysis['moves'],g['moves']):
+        assert entry['fen'] == board.fen() and entry['played'] == move
+        assert entry['actual']['perspective'] == ('w' if board.turn else 'b')
+        assert entry['isPlayer'] == (board.turn == chess.WHITE)
+        board.push_uci(move)
     assert any(d['played']=='h5e5' and d['loss']>180 for d in analysis['critical'])
     exs=client.get('/api/exercises').json()
     assert exs
@@ -127,3 +134,13 @@ def test_import_analysis_and_personal_drill(client):
     assert drill['fen']==exs[0]['fen']
     assert drill['playerColor']==exs[0]['turn']
     assert client.post('/api/import',json={'pgn':'1. e5 *'}).status_code==422
+
+
+def test_forced_moves_are_in_step_review_but_not_personal_weaknesses(client):
+    g=client.post('/api/games',json={'color':'b','fen':'k7/8/2KQ4/8/8/8/8/8 b - - 0 1'}).json()
+    assert g['legalMoves'] == ['a8a7']
+    assert client.post(f"/api/games/{g['id']}/moves",json={'move':'a8a7','version':0,'actor':'human'}).status_code == 200
+    analysis=wait_analysis(client,g['id'])
+    assert len(analysis['moves']) == 1 and analysis['moves'][0]['forced']
+    assert analysis['moves'][0]['label'] == 'Mossa obbligata'
+    assert analysis['decisions'] == [] and analysis['critical'] == []

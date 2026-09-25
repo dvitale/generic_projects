@@ -4,6 +4,7 @@ import Board from './Board'
 import Drills from './Drills'
 import TutorPanel from './TutorPanel'
 import RatingPanel from './RatingPanel'
+import MoveReview from './MoveReview'
 import { api } from './api'
 import { maia, type Prediction } from './engine/maia'
 import { chooseMaiaMove } from './engine/play'
@@ -42,6 +43,9 @@ export default function App() {
   const [jobId, setJobId] = useState<string | null>(null)
   const [progress, setProgress] = useState(0)
   const [prediction, setPrediction] = useState<Prediction | null>(null)
+  const [predictionKey,setPredictionKey] = useState('')
+  const [predictionError,setPredictionError] = useState('')
+  const [reviewElo,setReviewElo] = useState(1500)
   const [pgn, setPgn] = useState('')
   const [showImport, setShowImport] = useState(false)
   const [retry, setRetry] = useState(0)
@@ -91,7 +95,7 @@ export default function App() {
         setProgress(job.progress)
         if (job.status === 'complete') {
           const updated = await api<Game>('/games/'+job.gameId)
-          if (currentGame.current?.id === updated.id) { keepGame(updated); setCursor(job.result?.critical[0]?.ply ?? updated.version) }
+          if (currentGame.current?.id === updated.id) { keepGame(updated); setCursor(job.result?.moves?.[0]?.ply ?? job.result?.decisions[0]?.ply ?? updated.version) }
           setJobId(null); setNotice('Revisione pronta. Gli esercizi personali sono nella sezione Puzzle.'); await refresh()
         } else if (job.status === 'failed') { throw new Error(job.error || 'Analisi non riuscita') }
         else timer = setTimeout(poll, 500)
@@ -107,16 +111,20 @@ export default function App() {
   const legal = tab === 'train' ? exercise?.legalMoves || [] : game?.legalMoves || []
   const canMove = !busy && !jobId && (tab === 'train' ? !!exercise && !!session && !attempt?.closed : tab === 'play' && !!game && !game.result && game.source === 'maia' && game.turn === game.playerColor && !botThinking)
   const decision = game?.analysis?.decisions.find(d=>d.ply === cursor)
+  const visiblePrediction = predictionKey===boardFen+':'+reviewElo?prediction:null
+
+  useEffect(()=>{if(game)setReviewElo(game.elo)},[game?.id])
 
   useEffect(() => {
-    setPrediction(null)
+    setPrediction(null);setPredictionError('')
     if (tab !== 'review' || !game || reviewBoard.isGameOver()) return
     let stale = false
+    const controller = new AbortController()
     const timer = setTimeout(() => {
-      maia.predict(reviewBoard.fen(),game.elo,game.elo).then(p => { if (!stale) setPrediction(p) }).catch(e=> { if (!stale) fail(e) })
+      maia.predict(reviewBoard.fen(),reviewElo,reviewElo,controller.signal).then(p => { if (!stale) {setPrediction(p);setPredictionKey(reviewBoard.fen()+':'+reviewElo)} }).catch(e=> { if (!stale) setPredictionError(e.message) })
     }, 150)
-    return () => {stale = true; clearTimeout(timer)}
-  }, [tab, boardFen, game?.elo])
+    return () => {stale = true; controller.abort(); clearTimeout(timer)}
+  }, [tab, boardFen, reviewElo, retry])
 
   async function startGame() {
     if (game?.source === 'maia' && !game.result && !window.confirm('Vuoi iniziare una nuova partita? La partita attuale resterà salvata e potrai riprenderla dall’archivio.')) return
@@ -204,6 +212,7 @@ export default function App() {
           {tab==='review'&&game&&<div className="review-controls"><button aria-label="Posizione iniziale" onClick={()=>setCursor(0)} disabled={cursor===0}>⏮</button><button aria-label="Mossa precedente" onClick={()=>setCursor(c=>Math.max(0,c-1))} disabled={cursor===0}>←</button><span>{cursor} / {game.version}</span><button aria-label="Mossa successiva" onClick={()=>setCursor(c=>Math.min(game.version,c+1))} disabled={cursor===game.version}>→</button><button aria-label="Ultima posizione" onClick={()=>setCursor(game.version)} disabled={cursor===game.version}>⏭</button></div>}
         </section>
         <aside className="coach-column">
+          {tab==='review'&&game&&<MoveReview game={game} cursor={cursor} onPosition={setCursor} level={reviewElo} onLevel={setReviewElo} prediction={visiblePrediction} error={predictionError} onRetry={()=>setRetry(n=>n+1)} analyzing={busy||!!jobId} onAnalyze={analyze}/>}
           {game&&(tab==='review'||(tab==='play'&&!!game.result))&&<RatingPanel key={'rating:'+game.id+':'+game.version+':'+game.revision} game={game} disabled={!!jobId||busy} onRated={rating=>setGame(current=>current?.id===game.id&&current.version===game.version&&current.revision===game.revision?{...current,rating}:current)}/>}
           {tab==='play'&&<>
             <section className="panel"><span className="eyebrow">IL TUO SPARRING PARTNER</span><h2>Allenati con Maia</h2><p className="muted">Mosse e imperfezioni ispirate al gioco umano.</p><label className="field-label">Livello di riferimento <strong>{elo}</strong><input aria-label="Livello Maia" type="range" min="600" max="2600" step="100" value={elo} onChange={e=>setElo(Number(e.target.value))}/></label><div className="range-labels"><span>600</span><span>2600</span></div><label className="field-label">Il tuo colore<select value={color} onChange={e=>setColor(e.target.value as Color)}><option value="w">Bianco</option><option value="b">Nero</option></select></label><button className="primary full" onClick={startGame} disabled={busy||!!jobId||botThinking}>{game?'Nuova partita':'Inizia partita'} →</button><small className="footnote">Il livello guida il modello; non equivale a un rating agonistico certificato.</small></section>
@@ -212,7 +221,7 @@ export default function App() {
           </>}
           {tab==='review'&&<>{game&&<TutorPanel key={game.id+':'+game.version+':'+game.analysis?.createdAt} game={game} disabled={!!jobId||!game.analysis} onPosition={setCursor} onPuzzle={id=>{const ex=exercises.find(e=>e.id===id);if(ex)pickExercise(ex);else fail(new Error('Esercizio non disponibile: ricarica la pagina.'))}} onDrill={id=>{setRequestedDrill(id);setTab('drill')}}/>}
             <section className="panel"><span className="eyebrow">MOMENTI DA RIVEDERE</span><h2>Trova un'alternativa</h2>{jobId?<div role="status"><p>Stockfish analizza la partita… {progress}%</p><progress value={progress} max={100}/></div>:!game?<p className="empty-text">Gioca una partita o importa un PGN per iniziare.</p>:<>{!game.analysis?<p className="muted">Avvia la revisione per individuare le decisioni da allenare.</p>:game.analysis.critical.length?game.analysis.critical.map(d=><button className={`moment ${cursor===d.ply?'chosen':''}`} key={d.ply} onClick={()=>setCursor(d.ply)}><span>{Math.floor(d.ply/2)+1}{d.ply%2?'…':'.'} {d.playedSan}</span><span>{d.label}</span><small>{d.theme}</small></button>):<p className="muted">Nessun errore rilevante individuato nel budget di analisi. Non significa gioco perfetto.</p>}<button className="full" onClick={analyze} disabled={busy||!game.version}>{game.analysis?'Ricalcola analisi':'Analizza partita'}</button></>}{decision&&<div className="decision"><h3>Hai giocato {decision.playedSan}</h3><p>Alternativa: <strong>{decision.best.san[0]||'—'}</strong></p><p className="variation">{decision.best.san.join(' ')}</p><small>Valutazione dal lato che muove: {score(decision.actual)} → {score(decision.best)}. Profondità {decision.best.depth}.</small></div>}</section>
-            <section className="panel"><span className="eyebrow">LO SGUARDO DI MAIA</span><h3>Mosse umane plausibili</h3>{prediction?.moves.slice(0,3).map(m=><div className="policy" key={m.uci}><strong>{m.san}</strong><div><span style={{width:`${m.probability*100}%`}}/></div><span>{Math.round(m.probability*100)}%</span></div>)}{!prediction&&<p className="muted">{game?'Caricamento delle previsioni…':'Nessuna posizione selezionata.'}</p>}<small className="footnote">Probabilità del modello, non giudizi sulla qualità delle mosse.</small></section>
+            <section className="panel"><span className="eyebrow">LO SGUARDO DI MAIA</span><h3>Mosse umane plausibili</h3>{visiblePrediction?.moves.slice(0,3).map(m=><div className="policy" key={m.uci}><strong>{m.san}</strong><div><span style={{width:`${m.probability*100}%`}}/></div><span>{Math.round(m.probability*100)}%</span></div>)}{!visiblePrediction&&<p className="muted">{game?'Caricamento delle previsioni…':'Nessuna posizione selezionata.'}</p>}<small className="footnote">Probabilità del modello, non giudizi sulla qualità delle mosse.</small></section>
             {game&&<div className="row"><button onClick={downloadPgn}>↓ Esporta PGN</button>{game.source==='maia'&&!game.result&&<button disabled={!!jobId} onClick={()=>setTab('play')}>Continua partita</button>}</div>}
           </>}
           {tab==='train'&&<section className="panel"><span className="eyebrow">DALLE TUE PARTITE</span><h2>{exercise?exercise.theme:'Il tuo primo esercizio'}</h2>{!exercise?<p className="empty-text">Gli esercizi nasceranno dalla revisione delle tue partite. Gioca o importa un PGN, poi avvia l'analisi.</p>:<><p className="muted">Muovi sulla scacchiera. Sono accettate anche alternative che mantengono la qualità della posizione.</p>{!attempt?.closed&&session&&<div className="row"><button disabled={busy} onClick={()=>puzzleHelp()}>Chiedi un indizio</button><button disabled={busy} onClick={()=>puzzleHelp(true)}>Mostra soluzione</button></div>}{hint&&<p className="hint">{hint}</p>}{busy&&<p role="status">Stockfish verifica la tua mossa…</p>}{attempt&&<div className={attempt.success?'attempt success':'attempt'} role="status"><h3>{attempt.success?'Buona scelta.':'Una posizione da riprovare.'}</h3><p>{attempt.message}</p><p className="variation">{attempt.best?.san.join(' ')}</p><small>{attempt.assisted?'Tentativo con indizio.':'Tentativo senza indizi.'} Ripasso: {new Date(attempt.dueAt).toLocaleDateString('it-IT')}.</small></div>}</>}<div className="exercise-list">{exercises.map(ex=><button key={ex.id} className={exercise?.id===ex.id?'exercise-link chosen':'exercise-link'} disabled={busy} onClick={()=>pickExercise(ex)}><span>{ex.theme}</span><small>Mossa {Math.floor(ex.ply/2)+1} · {new Date(ex.dueAt).getTime()<=Date.now()?'da ripassare':'programmato'}</small></button>)}</div></section>}

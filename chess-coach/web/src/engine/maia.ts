@@ -6,6 +6,7 @@ import mapping from './data/all_moves_maia3.json'
 const indices = mapping as Record<string, number>
 type Pending = { resolve: (value: {logitsMove: Float32Array; logitsValue: Float32Array}) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }
 export interface Prediction { moves: {uci: string; san: string; probability: number}[]; whiteExpectedScore: number }
+class InvalidMaiaOutput extends Error {}
 export function mirrorMove(move: string) {
   return move[0] + (9 - Number(move[1])) + move[2] + (9 - Number(move[3])) + move.slice(4)
 }
@@ -36,6 +37,7 @@ export function encode(fen: string) {
 }
 
 class MaiaEngine {
+  private queue: Promise<void> = Promise.resolve()
   worker: Worker | null = null
   ready: Promise<void> | null = null
   pending = new Map<number, Pending>()
@@ -43,6 +45,15 @@ class MaiaEngine {
   status = 'Da caricare'
   onStatus = (_status: string) => {}
   update(status: string) { this.status = status; this.onStatus(status) }
+
+  private reset(error: Error) {
+    this.worker?.terminate()
+    this.worker = null
+    this.ready = null
+    for (const request of this.pending.values()) { clearTimeout(request.timer); request.reject(error) }
+    this.pending.clear()
+    this.update('Riavvio Maia…')
+  }
 
   load() {
     if (this.ready) return this.ready
@@ -63,6 +74,7 @@ class MaiaEngine {
       }
       worker.onerror = event => fail(new Error(event.message || 'Errore del worker Maia'))
       worker.onmessage = event => {
+        if (this.worker !== worker) return
         const message = event.data
         if (message.type === 'status') {
           if (message.status === 'no-cache') worker.postMessage({ type: 'download' })
@@ -88,20 +100,45 @@ class MaiaEngine {
     return this.ready
   }
 
-  async predict(fen: string, selfElo: number, opponentElo: number): Promise<Prediction> {
+  predict(fen: string, selfElo: number, opponentElo: number, signal?: AbortSignal): Promise<Prediction> {
+    // One ONNX session is shared by play, review and rating. Never overlap runs.
+    const request = this.queue.then(async () => {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        signal?.throwIfAborted()
+        try {
+          const prediction = await this.predictOnce(fen, selfElo, opponentElo)
+          signal?.throwIfAborted()
+          return prediction
+        } catch (error) {
+          if (!(error instanceof InvalidMaiaOutput)) throw error
+          this.reset(error)
+          if (attempt === 1) throw new Error('Maia ha restituito valori non validi anche dopo il riavvio. Riprova il calcolo.')
+        }
+      }
+      throw new Error('Maia non disponibile')
+    })
+    // A failure must not poison subsequent requests.
+    this.queue = request.then(() => {}, () => {})
+    return request
+  }
+
+  private async predictOnce(fen: string, selfElo: number, opponentElo: number): Promise<Prediction> {
     const input = encode(fen)
     if (!input.legal.length) return { moves: [], whiteExpectedScore: 0.5 }
     await this.load()
     const id = ++this.nextId
     const output = await new Promise<{logitsMove: Float32Array; logitsValue: Float32Array}>((resolve, reject) => {
-      const timer = setTimeout(() => { this.pending.delete(id); reject(new Error('Maia non ha risposto. Riprova.')) }, 30000)
+      const timer = setTimeout(() => { this.reset(new Error('Maia non ha risposto. Riprova.')) }, 30000)
       this.pending.set(id, {resolve, reject, timer})
       const selfs = new Float32Array([selfElo])
       const oppos = new Float32Array([opponentElo])
       this.worker!.postMessage({ type: 'inference', id, tokens: input.tokens.buffer, eloSelfs: selfs.buffer, eloOppos: oppos.buffer, batchSize: 1 }, [input.tokens.buffer, selfs.buffer, oppos.buffer])
     })
     const logits = input.legal.map(move => output.logitsMove[move.index])
-    if (logits.some(v => !Number.isFinite(v))) throw new Error('Output Maia non valido')
+    if (output.logitsMove.length !== 4352 || output.logitsValue.length !== 3 ||
+        logits.some(v => !Number.isFinite(v)) || output.logitsValue.some(v => !Number.isFinite(v))) {
+      throw new InvalidMaiaOutput('Output Maia non valido')
+    }
     const max = Math.max(...logits)
     const exp = logits.map(v => Math.exp(v - max))
     const sum = exp.reduce((a, b) => a + b, 0)

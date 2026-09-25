@@ -390,9 +390,12 @@ def analyze_game(job_id, snapshot):
             drill = con.execute("SELECT * FROM drill_sessions WHERE game_id=?", (snapshot["id"],)).fetchone()
         start_ply = drill["start_ply"] if drill else 0
         decisions = []
+        reviewed_moves = []
         for ply, uci in enumerate(moves):
             move = chess.Move.from_uci(uci)
-            if ply >= start_ply and board.turn == (snapshot["player_color"] == "w") and board.legal_moves.count() > 1:
+            if ply >= start_ply:
+                is_player = board.turn == (snapshot['player_color'] == 'w')
+                forced = board.legal_moves.count() == 1
                 best, actual, loss = evaluator.compare(board, move, nodes=10000)
                 if loss >= 80:
                     best, actual, loss = evaluator.compare(board, move, nodes=60000)
@@ -401,13 +404,17 @@ def analyze_game(job_id, snapshot):
                     theme = "Riconoscere il matto"
                 elif actual["mate"] is not None and actual["mate"] < 0 and (best["mate"] is None or best["mate"] > 0):
                     theme = "Difesa dalle minacce di matto"
-                decisions.append({"ply": ply, "fen": board.fen(), "played": uci, "playedSan": board.san(move),
+                item = {"ply": ply, "fen": board.fen(), "played": uci, "playedSan": board.san(move),
                                   "best": best, "actual": actual, "loss": loss, "theme": theme,
-                                  "label": "Errore" if loss >= 180 else "Imprecisione" if loss >= 80 else "Buona scelta"})
+                                  "isPlayer": is_player, "forced": forced,
+                                  "label": "Mossa obbligata" if forced else "Errore" if loss >= 180 else "Imprecisione" if loss >= 80 else "Buona scelta"}
+                reviewed_moves.append(item)
+                if is_player and not forced:
+                    decisions.append(item)
             board.push(move)
             update_job(job_id, progress=round((ply + 1) / len(moves) * 100))
         critical = sorted([d for d in decisions if d["loss"] >= 80], key=lambda d: -d["loss"])[:3]
-        analysis = {"decisions": decisions, "critical": critical, "engine": evaluator.name,
+        analysis = {"decisions": decisions, "moves": reviewed_moves, "reviewVersion": 2, "critical": critical, "engine": evaluator.name,
                     "createdAt": now(), "version": len(moves), "source": snapshot["source"], "note": "Analisi a budget limitato. Temi indicativi, non diagnosi definitive."}
         with database() as con:
             con.execute('BEGIN IMMEDIATE')
