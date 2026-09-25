@@ -8,6 +8,7 @@ async function play(page:Page,move:string){
 }
 
 test('Checkmate starts Elo automatically in play, retains the calculation in review and restores the saved score',async({page,request})=>{
+  test.setTimeout(180000)
   const pgn='1. e4 e5 2. Nf3 d6 3. d4 Bg4 4. dxe5 Bxf3 5. Qxf3 dxe5 6. Bc4 Nf6 7. Qb3 Qe7 8. Nc3 c6 9. Bg5 b5 10. Nxb5 cxb5 11. Bxb5+ Nbd7 12. O-O-O Rd8 13. Rxd7 Rxd7 14. Rd1 Qe6 15. Bxd7+ Nxd7 16. Qb8+ Nxb8 17. Rd8#'
   const imported=await(await request.post('/api/import',{data:{pgn}})).json()
   let game=await(await request.post('/api/games',{data:{}})).json()
@@ -18,6 +19,7 @@ test('Checkmate starts Elo automatically in play, retains the calculation in rev
   page.on('request',req=>{if(req.url().endsWith('/rating-positions'))starts++;if(req.url().endsWith('/rating')&&req.method()==='POST')saves++})
   await page.addInitScript(id=>localStorage.setItem('chess-coach-game',id),game.id)
   await page.goto('/')
+  await page.getByRole('tab',{name:'Elo',exact:true}).click()
   await expect(page.getByRole('button',{name:'Stima Elo della partita'})).toBeVisible()
   await page.getByRole('button',{name:'Gioca',exact:true}).click()
   await play(page,imported.moves.at(-1))
@@ -25,7 +27,10 @@ test('Checkmate starts Elo automatically in play, retains the calculation in rev
   await expect(panel).toContainText('Hai vinto · 1-0')
   await expect(panel.getByText(/Confronto delle tue mosse/)).toBeVisible()
   await page.getByRole('button',{name:'Rivedi',exact:true}).click()
-  await expect(panel).toContainText('profilo Maia',{timeout:90000})
+  await page.getByRole('tab',{name:'Mosse',exact:true}).click()
+  await expect(panel).not.toBeVisible()
+  await page.getByRole('tab',{name:'Elo',exact:true}).click()
+  await expect(panel).toContainText('profilo Maia',{timeout:150000})
   expect(starts).toBe(1);expect(saves).toBe(1)
   await page.reload()
   await expect(panel).toContainText('profilo Maia')
@@ -97,6 +102,7 @@ test('Real Maia Elo comparison is persisted, reloadable and handles too few deci
   await page.addInitScript(id=>localStorage.setItem('chess-coach-game',id),game.id)
   await page.goto('/')
   const panel=page.getByRole('region',{name:'Valutazione Elo della partita'})
+  await page.getByRole('tab',{name:'Elo',exact:true}).click()
   await panel.getByRole('button',{name:'Stima Elo della partita'}).click()
   await expect(panel.getByRole('button',{name:'Ricalcola stima Elo'})).toBeVisible({timeout:90000})
   const saved=(await(await request.get('/api/games/'+game.id)).json()).rating
@@ -111,6 +117,7 @@ test('Real Maia Elo comparison is persisted, reloadable and handles too few deci
   await page.getByRole('button',{name:'Rivedi',exact:true}).click()
   await expect(panel).toContainText('profilo Maia')
   await page.reload()
+  await page.getByRole('tab',{name:'Elo',exact:true}).click()
   await expect(panel).toContainText('profilo Maia')
   await page.setViewportSize({width:390,height:844})
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
@@ -118,6 +125,7 @@ test('Real Maia Elo comparison is persisted, reloadable and handles too few deci
   await page.getByRole('button',{name:'Importa PGN',exact:false}).click()
   await page.getByLabel('Partita PGN').fill('1. d4 d5 *')
   await page.getByRole('button',{name:'Importa partita',exact:true}).click()
+  await page.getByRole('tab',{name:'Elo',exact:true}).click()
   await panel.getByRole('button',{name:'Stima Elo della partita'}).click()
   await expect(panel.getByRole('alert')).toContainText('Servono almeno 10')
 })

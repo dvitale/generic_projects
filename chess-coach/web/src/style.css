@@ -21,3 +21,73 @@
 .rating-value{font-size:32px;margin:12px 0}.rating-value small{display:block;font-size:13px;font-weight:400;margin-top:4px}.rating-panel details{margin:14px 0}.rating-panel summary{cursor:pointer}.rating-panel table{width:100%;margin:10px 0;font-size:12px;border-collapse:collapse}.rating-panel th,.rating-panel td{text-align:left;padding:7px 4px;border-bottom:1px solid #dce3d9}
 
 .review-step-controls{display:flex;gap:8px;align-items:center;margin:14px 0}.review-step-controls label{flex:1;min-width:0}.review-step-controls select{width:100%}.move-review table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:12px;margin:14px 0}.move-review td,.move-review th{padding:8px 3px;text-align:center;border-bottom:1px solid #dce3d9;overflow-wrap:anywhere}.move-review td strong{display:block;font-size:18px}.move-review td small{display:block;margin-top:6px}.move-review details{margin-top:12px}.move-review summary{cursor:pointer}.sr-only{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+/* Workspace: keep the board beside the selected tool, without stacking every panel. */
+[hidden]{display:none!important}
+.app-shell{grid-template-columns:188px minmax(0,1fr)}
+main{max-width:1840px;padding:0 24px}
+.sidebar{padding:24px 14px;gap:30px}
+.brand{font-size:20px}.brand-mark{font-size:34px}.brand small{display:none}
+.topbar{height:42px}
+.page-intro{padding:14px 0 18px}
+h1{font-size:30px;margin:5px 0}
+.training-layout{max-width:none;grid-template-columns:minmax(280px,min(48%,clamp(320px,calc(100dvh - 320px),680px))) minmax(0,1fr);gap:24px}
+.board-column{position:sticky;top:18px}
+.coach-column{gap:12px;min-width:0}
+.panel{padding:20px}
+.player-row{min-height:40px;padding-bottom:8px}
+.player-row.lower{padding:10px 0;min-height:50px}
+.panel-tabs{display:flex;gap:4px;background:#e9eee4;border:1px solid #dce3d5;border-radius:10px;padding:4px;flex-wrap:wrap;margin-bottom:12px}
+.coach-column>.panel-tabs{margin-bottom:0}
+.panel-tabs button{flex:1;padding:9px 10px;border-color:transparent;background:transparent;font-size:13px;white-space:nowrap}
+.panel-tabs button[aria-selected=true]{background:#fff;border-color:#d6dfcf;box-shadow:0 1px 3px #233b3210;color:#244d36;font-weight:650}
+[role=tabpanel]{min-width:0}
+.review-toolbar .row{gap:8px}.review-toolbar button{font-size:12px;padding:8px 12px}
+.review-toolbar p{font-size:12px;margin-top:10px}
+.insights-grid{display:grid;gap:14px;align-items:start}
+.move-review .field-label{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px}
+.move-review .field-label select{width:110px;margin:0}
+.move-review table{margin:12px 0}.move-review td strong{font-size:24px}
+.move-review>p+p{margin-top:8px}
+.rating-panel{max-width:none}
+.progress-layout{max-width:none}
+.archive{max-width:none;border:0;margin:0;padding:0}
+.game-list{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.exercise-list{max-height:260px;overflow:auto;overscroll-behavior:contain;padding:3px}
+.drill-settings{margin:0 0 16px}
+footer{padding:14px 0;font-size:10px}
+@media(min-width:1200px){
+  .layout-play .coach-column{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+  .layout-play .engine-status{grid-column:1/-1}
+  .layout-play .field-label{margin-top:14px}.layout-play .full{margin-top:12px}
+}
+@media(min-width:1500px){
+  .insights-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tutor-response{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 20px}
+  .tutor-response>.tutor-summary,.tutor-response>h3,.tutor-response>.footnote{grid-column:1/-1}
+}
+@media(max-width:1100px){
+  .app-shell{grid-template-columns:156px minmax(0,1fr)}
+  .sidebar{padding:20px 10px}.brand{font-size:17px}.brand-mark{font-size:28px}
+  main{padding:0 18px}.training-layout{gap:18px;grid-template-columns:minmax(260px,1fr) minmax(280px,1fr)}
+  .panel{padding:16px}.panel-tabs button{font-size:12px;padding:8px}
+}
+@media(max-width:860px){
+  .app-shell{display:block}.sidebar{padding:10px 18px;gap:12px}
+  .brand{font-size:18px}.sidebar nav{flex-wrap:wrap}.nav-item{padding:8px;font-size:12px}
+  .training-layout{grid-template-columns:minmax(240px,1fr) minmax(270px,1fr);gap:16px}
+  .sidebar-note,.local-status{display:none}
+}
+@media(max-width:680px){
+  main{padding:0 14px}.sidebar{flex-wrap:wrap;padding:10px 14px;gap:8px}
+  .sidebar nav{width:100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px}.nav-item{justify-content:center;padding:9px 6px;font-size:11px;gap:4px}.nav-item>span{font-size:16px}
+  .brand{margin:0 auto}.page-intro{padding:16px 0;gap:12px}.page-intro p{font-size:12px}
+  .training-layout,.progress-layout{grid-template-columns:minmax(0,1fr)}
+  .board-column{position:static;max-width:480px;width:100%;margin:0 auto}
+  .panel{padding:18px}.panel-tabs button{padding:10px 8px}
+  .game-list{grid-template-columns:minmax(0,1fr)}
+  .mode-label{display:none}.player-row small{font-size:10px}
+  .move-review .field-label{font-size:11px}.move-review td strong{font-size:20px}
+}
+@media(max-height:700px){.board-column{position:static}}
+@media(max-height:800px){.sidebar-note{display:none}}

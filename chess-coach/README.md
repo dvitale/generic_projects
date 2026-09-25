@@ -13,6 +13,8 @@ Aprire http://localhost:8033 nel browser Windows. Per fermare il server in primo
 
 ## Funzioni
 
+- **Spazio di lavoro:** scacchiera e pannello affiancati sui monitor grandi; in Rivedi le schede Mosse, Elo, Tutor e Approfondimenti conservano la posizione e i calcoli durante il cambio scheda. Archivio nella voce Partite. Drill separa catalogo e sessione. Su mobile il layout torna a una colonna.
+
 - **Annulla ultima mossa:** in Gioca e Drill ritorna alla tua ultima decisione, togliendo anche la risposta di Maia o interrompendola se ancora in preparazione. Nei Drill conserva la sequenza iniziale. Disponibile anche dopo la conclusione; PGN importati e copie archiviate restano in sola revisione.
 - **Elo della partita:** calcolo automatico e risultato visibile in Gioca a partita conclusa; in Rivedi puoi avviarlo anche durante una partita. Confronta tutte le tue decisioni utili con 21 livelli Maia usando il criterio dei Drill ufficiali e mostra il profilo piu compatibile, senza una fascia di precisione arbitraria. Richiede almeno 10 decisioni non obbligate; non equivale a un rating ufficiale. Metodo e limiti in [docs/elo-partita.md](docs/elo-partita.md).
 - **Ritmo Maia:** risposte con attesa variabile di circa 1,2–3,2 secondi, comprendente il tempo di inferenza, e breve animazione del pezzo. Il caricamento iniziale del modello può richiedere più tempo. Lo stesso ritmo vale nei Drill; il cambio di sezione annulla le risposte ancora in preparazione.

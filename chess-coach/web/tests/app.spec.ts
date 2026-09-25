@@ -103,6 +103,7 @@ test('Tutor is explicitly requested and renders a saved explanation',async({page
   await page.getByRole('button',{name:/^(Analizza partita|Ricalcola analisi)$/}).click()
   await expect(page.getByText(/Revisione pronta/)).toBeVisible({timeout:60000})
   expect(requests).toBe(0)
+  await page.getByRole('tab',{name:'Tutor',exact:true}).click()
   await page.getByLabel('Il tuo ragionamento').fill('Volevo attaccare il re.')
   await page.getByRole('button',{name:'Chiedi al tutor DeepSeek'}).click()
   await expect(page.getByText('Una decisione da rivedere con attenzione.')).toBeVisible()
