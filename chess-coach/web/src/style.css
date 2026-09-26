@@ -93,3 +93,4 @@ footer{padding:14px 0;font-size:10px}
 }
 @media(max-height:700px){.board-column{position:static}}
 @media(max-height:800px){.sidebar-note{display:none}}
+.board{position:relative}.board-annotations{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:3;color:#ed9229}.board-annotation{opacity:.8}.annotation-preview{opacity:.55}

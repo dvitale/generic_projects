@@ -5,6 +5,22 @@ import type { Color } from './types'
 const symbols: Record<string, string> = {wk:'♚',wq:'♛',wr:'♜',wb:'♝',wn:'♞',wp:'♟',bk:'♚',bq:'♛',br:'♜',bb:'♝',bn:'♞',bp:'♟'}
 const names: Record<string, string> = {k:'re',q:'donna',r:'torre',b:'alfiere',n:'cavallo',p:'pedone'}
 type Gesture = {id:number;from:string;startX:number;startY:number;fen:string;orientation:Color;code:string;size:number;active:boolean;element:HTMLButtonElement}
+type Annotation = {from:string;to:string}
+type Drawing = {id:number;from:string;fen:string;orientation:Color;element:HTMLButtonElement}
+
+function BoardAnnotation({from,to,orientation,preview=false}:Annotation&{orientation:Color;preview?:boolean}) {
+  function center(square:string){
+    const file=square.charCodeAt(0)-97,rank=Number(square[1])-1
+    return [(orientation==='w'?file:7-file)*100+50,(orientation==='w'?7-rank:rank)*100+50]
+  }
+  const [x1,y1]=center(from),[x2,y2]=center(to)
+  const attributes={'data-from':from,'data-to':to,className:preview?'annotation-preview':'board-annotation'}
+  if(from===to)return <circle {...attributes} cx={x1} cy={y1} r="36" fill="none" stroke="currentColor" strokeWidth="9"/>
+  const length=Math.hypot(x2-x1,y2-y1),dx=(x2-x1)/length,dy=(y2-y1)/length
+  const baseX=x2-dx*30,baseY=y2-dy*30
+  const points=[[x1-dy*8,y1+dx*8],[baseX-dy*8,baseY+dx*8],[baseX-dy*24,baseY+dx*24],[x2,y2],[baseX+dy*24,baseY-dx*24],[baseX+dy*8,baseY-dx*8],[x1+dy*8,y1-dx*8]]
+  return <polygon {...attributes} points={points.map(p=>p.join(',')).join(' ')} fill="currentColor"/>
+}
 function Piece({code}:{code:string}) {
   const [missing,setMissing]=useState(false)
   return missing?<span aria-hidden="true" className={`piece ${code[0]==='w'?'white-piece':'black-piece'}`}>{symbols[code]}</span>:
@@ -14,6 +30,9 @@ export default function Board({fen, orientation, interactive, legalMoves, onMove
   const [selected, setSelected] = useState<string | null>(null)
   const [promotion, setPromotion] = useState<string[]>([])
   const [drag, setDrag] = useState<{from:string;code:string;x:number;y:number;size:number}|null>(null)
+  const [annotations,setAnnotations]=useState<Annotation[]>([])
+  const [preview,setPreview]=useState<Annotation|null>(null)
+  const drawing=useRef<Drawing|null>(null)
   const boardElement=useRef<HTMLDivElement>(null)
   const previousFen=useRef(fen)
   const gesture=useRef<Gesture|null>(null)
@@ -26,11 +45,20 @@ export default function Board({fen, orientation, interactive, legalMoves, onMove
     if(current?.element.hasPointerCapture(current.id))current.element.releasePointerCapture(current.id)
   }
   function cancelDrag(){clearDrag();setSelected(null)}
+  function cancelDrawing(){
+    const current=drawing.current
+    drawing.current=null;setPreview(null)
+    if(current?.element.hasPointerCapture(current.id))current.element.releasePointerCapture(current.id)
+  }
+  function clearAnnotations(){cancelDrawing();setAnnotations([])}
   useEffect(() => { clearDrag(); setSelected(null); setPromotion([]) }, [fen,orientation,interactive])
+  useEffect(()=>{clearAnnotations()},[fen,orientation])
   useEffect(()=>{
-    const cancel=()=>cancelDrag()
+    const cancel=()=>{cancelDrag();cancelDrawing()}
+    const escape=(event:KeyboardEvent)=>{if(event.key==='Escape')clearAnnotations()}
     window.addEventListener('blur',cancel)
-    return()=>{window.removeEventListener('blur',cancel);gesture.current=null}
+    window.addEventListener('keydown',escape)
+    return()=>{window.removeEventListener('blur',cancel);window.removeEventListener('keydown',escape);gesture.current=null;drawing.current=null}
   },[])
   const board = new Chess(fen)
   const files = orientation === 'w' ? 'abcdefgh' : 'hgfedcba'
@@ -76,8 +104,16 @@ export default function Board({fen, orientation, interactive, legalMoves, onMove
     setSelected(legalMoves.some(m => m.startsWith(square)) ? square : null)
   }
   function pointerDown(event:ReactPointerEvent<HTMLButtonElement>,from:string) {
-    if(gesture.current)return
+    if(gesture.current||drawing.current)return
     suppressClick.current=false
+    if(event.button===2&&event.isPrimary&&!promotion.length){
+      event.preventDefault();setSelected(null)
+      drawing.current={id:event.pointerId,from,fen,orientation,element:event.currentTarget}
+      setPreview({from,to:from})
+      event.currentTarget.setPointerCapture(event.pointerId)
+      return
+    }
+    if(event.button===0)clearAnnotations()
     if(!interactive||promotion.length||event.button!==0||!event.isPrimary||!legalMoves.some(m=>m.startsWith(from)))return
     const piece=board.get(from as Square)
     if(!piece)return
@@ -86,6 +122,14 @@ export default function Board({fen, orientation, interactive, legalMoves, onMove
     event.currentTarget.setPointerCapture(event.pointerId)
   }
   function pointerMove(event:ReactPointerEvent<HTMLButtonElement>) {
+    const annotation=drawing.current
+    if(annotation?.id===event.pointerId){
+      if(!(event.buttons&2)||fen!==annotation.fen||orientation!==annotation.orientation){cancelDrawing();return}
+      event.preventDefault()
+      const to=squareAtPoint(event.clientX,event.clientY)
+      setPreview(to?{from:annotation.from,to}:null)
+      return
+    }
     const current=gesture.current
     if(!current||current.id!==event.pointerId)return
     if(!interactive||fen!==current.fen||orientation!==current.orientation){cancelDrag();return}
@@ -96,6 +140,14 @@ export default function Board({fen, orientation, interactive, legalMoves, onMove
     setDrag({from:current.from,code:current.code,x:event.clientX,y:event.clientY,size:current.size})
   }
   function pointerUp(event:ReactPointerEvent<HTMLButtonElement>) {
+    const annotation=drawing.current
+    if(annotation?.id===event.pointerId){
+      event.preventDefault();cancelDrawing()
+      if(event.button!==2||fen!==annotation.fen||orientation!==annotation.orientation)return
+      const to=squareAtPoint(event.clientX,event.clientY)
+      if(to)setAnnotations(current=>current.some(a=>a.from===annotation.from&&a.to===to)?current.filter(a=>a.from!==annotation.from||a.to!==to):[...current,{from:annotation.from,to}])
+      return
+    }
     const current=gesture.current
     if(!current||current.id!==event.pointerId)return
     clearDrag()
@@ -103,15 +155,18 @@ export default function Board({fen, orientation, interactive, legalMoves, onMove
     event.preventDefault()
     setSelected(null)
     if(!interactive||fen!==current.fen||orientation!==current.orientation)return
+    const to=squareAtPoint(event.clientX,event.clientY)
+    if(to)submit(current.from,to)
+  }
+  function squareAtPoint(x:number,y:number){
     const rect=boardElement.current?.getBoundingClientRect()
-    if(!rect||event.clientX<rect.left||event.clientX>=rect.right||event.clientY<rect.top||event.clientY>=rect.bottom)return
-    const file=Math.floor((event.clientX-rect.left)/rect.width*8)
-    const rank=Math.floor((event.clientY-rect.top)/rect.height*8)
-    submit(current.from,files[file]+ranks[rank])
+    if(!rect||x<rect.left||x>=rect.right||y<rect.top||y>=rect.bottom)return null
+    return files[Math.floor((x-rect.left)/rect.width*8)]+ranks[Math.floor((y-rect.top)/rect.height*8)]
   }
   return <div className="board-wrap">
     <div ref={boardElement} className="board theme-chesscom" role="group" aria-label="Scacchiera"
-      onKeyDown={event=>{if(event.key==='Escape'){cancelDrag();setPromotion([])}}}>
+      onContextMenu={event=>event.preventDefault()}
+      onKeyDown={event=>{if(event.key==='Escape'){cancelDrag();clearAnnotations();setPromotion([])}}}>
       {Array.from(ranks).flatMap((rank, ri) => Array.from(files).map((file, fi) => {
         const square = file + rank
         const piece = board.get(square as Square)
@@ -120,15 +175,19 @@ export default function Board({fen, orientation, interactive, legalMoves, onMove
           className={`square ${(ri+fi)%2 ? 'dark-square' : 'light-square'} ${selected === square ? 'selected-square' : ''} ${lit ? 'last-square' : ''} ${drag?.from===square?'drag-origin':''} ${interactive&&!promotion.length&&legalMoves.some(m=>m.startsWith(square))?'can-drag':''}`}
           draggable={false} onDragStart={event=>event.preventDefault()}
           onPointerDown={event=>pointerDown(event,square)} onPointerMove={pointerMove} onPointerUp={pointerUp}
-          onPointerCancel={event=>{if(gesture.current?.id===event.pointerId)cancelDrag()}}
-          onLostPointerCapture={event=>{if(gesture.current?.id===event.pointerId)cancelDrag()}}
-          onClick={event=>{if(suppressClick.current&&event.detail!==0){suppressClick.current=false;return}click(square)}}>
+          onPointerCancel={event=>{if(gesture.current?.id===event.pointerId)cancelDrag();if(drawing.current?.id===event.pointerId)cancelDrawing()}}
+          onLostPointerCapture={event=>{if(gesture.current?.id===event.pointerId)cancelDrag();if(drawing.current?.id===event.pointerId)cancelDrawing()}}
+          onClick={event=>{clearAnnotations();if(suppressClick.current&&event.detail!==0){suppressClick.current=false;return}click(square)}}>
           {fi === 0 && <span className="rank-label">{rank}</span>}
           {ri === 7 && <span className="file-label">{file}</span>}
           {piece && <Piece key={piece.color+piece.type} code={piece.color+piece.type}/>}
           {targets.includes(square) && <span className={piece ? 'capture-ring' : 'move-dot'} aria-hidden="true"/>}
         </button>
       }))}
+      <svg className="board-annotations" viewBox="0 0 800 800" aria-hidden="true">
+        {annotations.map(a=><BoardAnnotation key={a.from+a.to} {...a} orientation={orientation}/>)}
+        {preview&&<BoardAnnotation {...preview} orientation={orientation} preview/>}
+      </svg>
     </div>
     {drag&&<div className="dragged-piece" aria-hidden="true" style={{left:drag.x,top:drag.y,width:drag.size,height:drag.size,fontSize:drag.size*.82}}><Piece code={drag.code}/></div>}
     {promotion.length > 0 && <div className="promotion" role="dialog" aria-label="Scegli la promozione">
