@@ -46,6 +46,7 @@ test('Right drag annotates in review and play without moving pieces; annotations
   await expect(page.locator('polygon.board-annotation[data-from="e2"][data-to="e4"]')).toHaveCount(1)
   await annotate(page,'g1','f3')
   await expect(page.locator('.board-annotation')).toHaveCount(2)
+  await page.screenshot({path:'test-results/board-knight-arrow.png',fullPage:true})
   expect(humanMoves).toEqual([])
   expect((await(await request.get('/api/games/'+game.id)).json()).version).toBe(0)
   await annotate(page,'e2','e4')

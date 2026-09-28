@@ -2,6 +2,8 @@
 
 La revisione mostra fino a tre scelte per Stockfish (MultiPV, con valutazione e variante) e Maia (ordinate per probabilità al livello selezionato). Se le mosse legali sono meno di tre, mostra solo quelle disponibili. Le analisi salvate precedentemente si aggiornano con **Aggiorna revisione completa**.
 
+Le frecce con spostamento da cavallo seguono un percorso a L: prima due case, poi una a 90°, anche nell’anteprima e con orientamento Nero.
+
 Applicazione personale locale: Maia3 come sparring partner, Stockfish come verificatore e allenamento dalle proprie partite. Interfaccia italiana, React/TypeScript, FastAPI e SQLite. Installata in WSL Debian in `/opt/generic_projects/chess-coach`.
 
 ## Avvio sul PC

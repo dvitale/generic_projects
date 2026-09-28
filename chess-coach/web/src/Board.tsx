@@ -16,6 +16,17 @@ function BoardAnnotation({from,to,orientation,preview=false}:Annotation&{orienta
   const [x1,y1]=center(from),[x2,y2]=center(to)
   const attributes={'data-from':from,'data-to':to,className:preview?'annotation-preview':'board-annotation'}
   if(from===to)return <circle {...attributes} cx={x1} cy={y1} r="36" fill="none" stroke="currentColor" strokeWidth="9"/>
+  const horizontal=Math.abs(x2-x1),vertical=Math.abs(y2-y1)
+  if((horizontal===100&&vertical===200)||(horizontal===200&&vertical===100)){
+    // Follow the two-square leg first, then turn toward the destination.
+    const bendX=horizontal===200?x2:x1,bendY=vertical===200?y2:y1
+    const dx=(x2-bendX)/100,dy=(y2-bendY)/100
+    const baseX=x2-dx*30,baseY=y2-dy*30
+    return <g {...attributes}>
+      <path d={`M ${x1} ${y1} L ${bendX} ${bendY} L ${baseX} ${baseY}`} fill="none" stroke="currentColor" strokeWidth="16" strokeLinejoin="round"/>
+      <polygon points={`${baseX-dy*24},${baseY+dx*24} ${x2},${y2} ${baseX+dy*24},${baseY-dx*24}`} fill="currentColor"/>
+    </g>
+  }
   const length=Math.hypot(x2-x1,y2-y1),dx=(x2-x1)/length,dy=(y2-y1)/length
   const baseX=x2-dx*30,baseY=y2-dy*30
   const points=[[x1-dy*8,y1+dx*8],[baseX-dy*8,baseY+dx*8],[baseX-dy*24,baseY+dx*24],[x2,y2],[baseX+dy*24,baseY-dx*24],[baseX+dy*8,baseY-dx*8],[x1+dy*8,y1-dx*8]]
