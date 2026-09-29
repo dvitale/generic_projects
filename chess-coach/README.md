@@ -17,6 +17,8 @@ Aprire http://localhost:8033 nel browser Windows. Per fermare il server in primo
 
 ## Funzioni
 
+Verifica del motore e differenze rispetto al gioco sul sito ufficiale: [audit Maia del 29 settembre 2026](docs/verifica-maia.md). Include controlli ripetibili del modello browser ai livelli 600, 1500 e 2600; la corrispondenza del modello non implica parità con il servizio server di Play.
+
 - **Mosse durante la partita:** elenco aggiornato delle mosse di Bianco e Nero. Clicca una mossa o usa i comandi di navigazione per rivedere la posizione; dopo aver selezionato una mossa funzionano anche ←, →, Home ed End. **Torna alla posizione corrente** ripristina il gioco. Le posizioni precedenti sono consultabili senza modificare la partita; una risposta di Maia aggiorna l’elenco senza spostare la posizione osservata.
 
 - **Frecce di analisi:** Stockfish in blu, Maia in rosso, mossa giocata in bianco. Le frecce mostrano solo la prima scelta di ciascun motore; le scelte coincidenti sono affiancate. Sotto la scacchiera puoi nascondere una fonte. La tabella conserva anche la seconda e la terza scelta. Le frecce seguono la posizione prima della mossa e il livello Maia scelto; le annotazioni manuali restano arancioni.

@@ -1,0 +1,1044 @@
+{
+  "modelSha256": "405bf76c15727dad8728b352c06a8f3c1b80fb2760e8d666b32485c63d75b856",
+  "frontendRevision": "a6e52f5c811ee18863cb2f0e81f2433a5b9905de",
+  "cases": [
+    {
+      "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      "level": 600,
+      "occupiedTokenIndices": [
+        3,
+        13,
+        26,
+        40,
+        53,
+        62,
+        73,
+        87,
+        96,
+        108,
+        120,
+        132,
+        144,
+        156,
+        168,
+        180,
+        582,
+        594,
+        606,
+        618,
+        630,
+        642,
+        654,
+        666,
+        681,
+        691,
+        704,
+        718,
+        731,
+        740,
+        751,
+        765
+      ],
+      "legalIndices": [
+        80,
+        82,
+        405,
+        407,
+        528,
+        536,
+        593,
+        601,
+        658,
+        666,
+        723,
+        731,
+        788,
+        796,
+        853,
+        861,
+        918,
+        926,
+        983,
+        991
+      ],
+      "topMoves": [
+        {
+          "uci": "e2e4",
+          "san": "e4",
+          "probability": 0.6080330198313983
+        },
+        {
+          "uci": "d2d4",
+          "san": "d4",
+          "probability": 0.23441761153718677
+        },
+        {
+          "uci": "g1f3",
+          "san": "Nf3",
+          "probability": 0.03172497385303542
+        }
+      ],
+      "whiteExpectedScore": 0.5281
+    },
+    {
+      "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      "level": 1500,
+      "occupiedTokenIndices": [
+        3,
+        13,
+        26,
+        40,
+        53,
+        62,
+        73,
+        87,
+        96,
+        108,
+        120,
+        132,
+        144,
+        156,
+        168,
+        180,
+        582,
+        594,
+        606,
+        618,
+        630,
+        642,
+        654,
+        666,
+        681,
+        691,
+        704,
+        718,
+        731,
+        740,
+        751,
+        765
+      ],
+      "legalIndices": [
+        80,
+        82,
+        405,
+        407,
+        528,
+        536,
+        593,
+        601,
+        658,
+        666,
+        723,
+        731,
+        788,
+        796,
+        853,
+        861,
+        918,
+        926,
+        983,
+        991
+      ],
+      "topMoves": [
+        {
+          "uci": "e2e4",
+          "san": "e4",
+          "probability": 0.616423039194948
+        },
+        {
+          "uci": "d2d4",
+          "san": "d4",
+          "probability": 0.2651202455248062
+        },
+        {
+          "uci": "c2c4",
+          "san": "c4",
+          "probability": 0.03370625672991746
+        }
+      ],
+      "whiteExpectedScore": 0.5197
+    },
+    {
+      "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      "level": 2600,
+      "occupiedTokenIndices": [
+        3,
+        13,
+        26,
+        40,
+        53,
+        62,
+        73,
+        87,
+        96,
+        108,
+        120,
+        132,
+        144,
+        156,
+        168,
+        180,
+        582,
+        594,
+        606,
+        618,
+        630,
+        642,
+        654,
+        666,
+        681,
+        691,
+        704,
+        718,
+        731,
+        740,
+        751,
+        765
+      ],
+      "legalIndices": [
+        80,
+        82,
+        405,
+        407,
+        528,
+        536,
+        593,
+        601,
+        658,
+        666,
+        723,
+        731,
+        788,
+        796,
+        853,
+        861,
+        918,
+        926,
+        983,
+        991
+      ],
+      "topMoves": [
+        {
+          "uci": "e2e4",
+          "san": "e4",
+          "probability": 0.48046357138491974
+        },
+        {
+          "uci": "d2d4",
+          "san": "d4",
+          "probability": 0.35705020836230483
+        },
+        {
+          "uci": "g1f3",
+          "san": "Nf3",
+          "probability": 0.10229659741573069
+        }
+      ],
+      "whiteExpectedScore": 0.5352
+    },
+    {
+      "fen": "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1",
+      "level": 600,
+      "occupiedTokenIndices": [
+        3,
+        53,
+        87,
+        681,
+        731,
+        765
+      ],
+      "legalIndices": [
+        1,
+        2,
+        3,
+        8,
+        16,
+        24,
+        32,
+        40,
+        48,
+        56,
+        258,
+        259,
+        261,
+        262,
+        267,
+        268,
+        269,
+        453,
+        454,
+        463,
+        471,
+        479,
+        487,
+        495,
+        503,
+        511
+      ],
+      "topMoves": [
+        {
+          "uci": "h1h8",
+          "san": "Rxh8+",
+          "probability": 0.29944105487177436
+        },
+        {
+          "uci": "a1a8",
+          "san": "Rxa8+",
+          "probability": 0.2812988384891916
+        },
+        {
+          "uci": "h1f1",
+          "san": "Rf1",
+          "probability": 0.04450793938502708
+        }
+      ],
+      "whiteExpectedScore": 0.5026
+    },
+    {
+      "fen": "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1",
+      "level": 1500,
+      "occupiedTokenIndices": [
+        3,
+        53,
+        87,
+        681,
+        731,
+        765
+      ],
+      "legalIndices": [
+        1,
+        2,
+        3,
+        8,
+        16,
+        24,
+        32,
+        40,
+        48,
+        56,
+        258,
+        259,
+        261,
+        262,
+        267,
+        268,
+        269,
+        453,
+        454,
+        463,
+        471,
+        479,
+        487,
+        495,
+        503,
+        511
+      ],
+      "topMoves": [
+        {
+          "uci": "h1h8",
+          "san": "Rxh8+",
+          "probability": 0.4038326328327468
+        },
+        {
+          "uci": "a1a8",
+          "san": "Rxa8+",
+          "probability": 0.34541635550774397
+        },
+        {
+          "uci": "h1f1",
+          "san": "Rf1",
+          "probability": 0.034739435693097356
+        }
+      ],
+      "whiteExpectedScore": 0.6584
+    },
+    {
+      "fen": "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1",
+      "level": 2600,
+      "occupiedTokenIndices": [
+        3,
+        53,
+        87,
+        681,
+        731,
+        765
+      ],
+      "legalIndices": [
+        1,
+        2,
+        3,
+        8,
+        16,
+        24,
+        32,
+        40,
+        48,
+        56,
+        258,
+        259,
+        261,
+        262,
+        267,
+        268,
+        269,
+        453,
+        454,
+        463,
+        471,
+        479,
+        487,
+        495,
+        503,
+        511
+      ],
+      "topMoves": [
+        {
+          "uci": "a1a8",
+          "san": "Rxa8+",
+          "probability": 0.4094033550112949
+        },
+        {
+          "uci": "h1h8",
+          "san": "Rxh8+",
+          "probability": 0.37863620700892864
+        },
+        {
+          "uci": "e1e2",
+          "san": "Ke2",
+          "probability": 0.024586582520428172
+        }
+      ],
+      "whiteExpectedScore": 0.6384
+    },
+    {
+      "fen": "r3k2r/8/8/8/8/8/8/R3K2R b KQkq - 0 1",
+      "level": 600,
+      "occupiedTokenIndices": [
+        3,
+        53,
+        87,
+        681,
+        731,
+        765
+      ],
+      "legalIndices": [
+        1,
+        2,
+        3,
+        8,
+        16,
+        24,
+        32,
+        40,
+        48,
+        56,
+        258,
+        259,
+        261,
+        262,
+        267,
+        268,
+        269,
+        453,
+        454,
+        463,
+        471,
+        479,
+        487,
+        495,
+        503,
+        511
+      ],
+      "topMoves": [
+        {
+          "uci": "h8h1",
+          "san": "Rxh1+",
+          "probability": 0.29944105487177436
+        },
+        {
+          "uci": "a8a1",
+          "san": "Rxa1+",
+          "probability": 0.2812988384891916
+        },
+        {
+          "uci": "h8f8",
+          "san": "Rf8",
+          "probability": 0.04450793938502708
+        }
+      ],
+      "whiteExpectedScore": 0.4974
+    },
+    {
+      "fen": "r3k2r/8/8/8/8/8/8/R3K2R b KQkq - 0 1",
+      "level": 1500,
+      "occupiedTokenIndices": [
+        3,
+        53,
+        87,
+        681,
+        731,
+        765
+      ],
+      "legalIndices": [
+        1,
+        2,
+        3,
+        8,
+        16,
+        24,
+        32,
+        40,
+        48,
+        56,
+        258,
+        259,
+        261,
+        262,
+        267,
+        268,
+        269,
+        453,
+        454,
+        463,
+        471,
+        479,
+        487,
+        495,
+        503,
+        511
+      ],
+      "topMoves": [
+        {
+          "uci": "h8h1",
+          "san": "Rxh1+",
+          "probability": 0.4038326328327468
+        },
+        {
+          "uci": "a8a1",
+          "san": "Rxa1+",
+          "probability": 0.34541635550774397
+        },
+        {
+          "uci": "h8f8",
+          "san": "Rf8",
+          "probability": 0.034739435693097356
+        }
+      ],
+      "whiteExpectedScore": 0.3416
+    },
+    {
+      "fen": "r3k2r/8/8/8/8/8/8/R3K2R b KQkq - 0 1",
+      "level": 2600,
+      "occupiedTokenIndices": [
+        3,
+        53,
+        87,
+        681,
+        731,
+        765
+      ],
+      "legalIndices": [
+        1,
+        2,
+        3,
+        8,
+        16,
+        24,
+        32,
+        40,
+        48,
+        56,
+        258,
+        259,
+        261,
+        262,
+        267,
+        268,
+        269,
+        453,
+        454,
+        463,
+        471,
+        479,
+        487,
+        495,
+        503,
+        511
+      ],
+      "topMoves": [
+        {
+          "uci": "a8a1",
+          "san": "Rxa1+",
+          "probability": 0.4094033550112949
+        },
+        {
+          "uci": "h8h1",
+          "san": "Rxh1+",
+          "probability": 0.37863620700892864
+        },
+        {
+          "uci": "e8f7",
+          "san": "Kf7",
+          "probability": 0.024586582520428172
+        }
+      ],
+      "whiteExpectedScore": 0.3616
+    },
+    {
+      "fen": "4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 2",
+      "level": 600,
+      "occupiedTokenIndices": [
+        53,
+        426,
+        432,
+        731
+      ],
+      "legalIndices": [
+        259,
+        261,
+        267,
+        268,
+        269,
+        2347,
+        2348
+      ],
+      "topMoves": [
+        {
+          "uci": "e5e6",
+          "san": "e6",
+          "probability": 0.4000636165783879
+        },
+        {
+          "uci": "e5d6",
+          "san": "exd6",
+          "probability": 0.2881550132846659
+        },
+        {
+          "uci": "e1d2",
+          "san": "Kd2",
+          "probability": 0.11109365406732069
+        }
+      ],
+      "whiteExpectedScore": 0.5002
+    },
+    {
+      "fen": "4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 2",
+      "level": 1500,
+      "occupiedTokenIndices": [
+        53,
+        426,
+        432,
+        731
+      ],
+      "legalIndices": [
+        259,
+        261,
+        267,
+        268,
+        269,
+        2347,
+        2348
+      ],
+      "topMoves": [
+        {
+          "uci": "e1d2",
+          "san": "Kd2",
+          "probability": 0.3664566272062888
+        },
+        {
+          "uci": "e5d6",
+          "san": "exd6",
+          "probability": 0.30858741899390374
+        },
+        {
+          "uci": "e1e2",
+          "san": "Ke2",
+          "probability": 0.2853967082299636
+        }
+      ],
+      "whiteExpectedScore": 0.4925
+    },
+    {
+      "fen": "4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 2",
+      "level": 2600,
+      "occupiedTokenIndices": [
+        53,
+        426,
+        432,
+        731
+      ],
+      "legalIndices": [
+        259,
+        261,
+        267,
+        268,
+        269,
+        2347,
+        2348
+      ],
+      "topMoves": [
+        {
+          "uci": "e5d6",
+          "san": "exd6",
+          "probability": 0.861161088477055
+        },
+        {
+          "uci": "e1d2",
+          "san": "Kd2",
+          "probability": 0.09512164836549517
+        },
+        {
+          "uci": "e1e2",
+          "san": "Ke2",
+          "probability": 0.02481396455416327
+        }
+      ],
+      "whiteExpectedScore": 0.4947
+    },
+    {
+      "fen": "4k3/8/8/8/3Pp3/8/8/4K3 b - d3 0 2",
+      "level": 600,
+      "occupiedTokenIndices": [
+        53,
+        426,
+        432,
+        731
+      ],
+      "legalIndices": [
+        259,
+        261,
+        267,
+        268,
+        269,
+        2347,
+        2348
+      ],
+      "topMoves": [
+        {
+          "uci": "e4e3",
+          "san": "e3",
+          "probability": 0.40006361657838785
+        },
+        {
+          "uci": "e4d3",
+          "san": "exd3",
+          "probability": 0.28815501328466586
+        },
+        {
+          "uci": "e8d7",
+          "san": "Kd7",
+          "probability": 0.11109365406732068
+        }
+      ],
+      "whiteExpectedScore": 0.4998
+    },
+    {
+      "fen": "4k3/8/8/8/3Pp3/8/8/4K3 b - d3 0 2",
+      "level": 1500,
+      "occupiedTokenIndices": [
+        53,
+        426,
+        432,
+        731
+      ],
+      "legalIndices": [
+        259,
+        261,
+        267,
+        268,
+        269,
+        2347,
+        2348
+      ],
+      "topMoves": [
+        {
+          "uci": "e8d7",
+          "san": "Kd7",
+          "probability": 0.36645662720628885
+        },
+        {
+          "uci": "e4d3",
+          "san": "exd3",
+          "probability": 0.3085874189939038
+        },
+        {
+          "uci": "e8e7",
+          "san": "Ke7",
+          "probability": 0.28539670822996366
+        }
+      ],
+      "whiteExpectedScore": 0.5075
+    },
+    {
+      "fen": "4k3/8/8/8/3Pp3/8/8/4K3 b - d3 0 2",
+      "level": 2600,
+      "occupiedTokenIndices": [
+        53,
+        426,
+        432,
+        731
+      ],
+      "legalIndices": [
+        259,
+        261,
+        267,
+        268,
+        269,
+        2347,
+        2348
+      ],
+      "topMoves": [
+        {
+          "uci": "e4d3",
+          "san": "exd3",
+          "probability": 0.861161088477055
+        },
+        {
+          "uci": "e8d7",
+          "san": "Kd7",
+          "probability": 0.09512164836549517
+        },
+        {
+          "uci": "e8e7",
+          "san": "Ke7",
+          "probability": 0.02481396455416327
+        }
+      ],
+      "whiteExpectedScore": 0.5053
+    },
+    {
+      "fen": "4k3/P7/8/8/8/8/7p/4K3 w - - 0 1",
+      "level": 600,
+      "occupiedTokenIndices": [
+        53,
+        186,
+        576,
+        731
+      ],
+      "legalIndices": [
+        259,
+        261,
+        267,
+        268,
+        269,
+        4096,
+        4097,
+        4098,
+        4099
+      ],
+      "topMoves": [
+        {
+          "uci": "a7a8q",
+          "san": "a8=Q+",
+          "probability": 0.6095571395468997
+        },
+        {
+          "uci": "e1f1",
+          "san": "Kf1",
+          "probability": 0.21397468053358093
+        },
+        {
+          "uci": "e1f2",
+          "san": "Kf2",
+          "probability": 0.07056136048470033
+        }
+      ],
+      "whiteExpectedScore": 0.5277
+    },
+    {
+      "fen": "4k3/P7/8/8/8/8/7p/4K3 w - - 0 1",
+      "level": 1500,
+      "occupiedTokenIndices": [
+        53,
+        186,
+        576,
+        731
+      ],
+      "legalIndices": [
+        259,
+        261,
+        267,
+        268,
+        269,
+        4096,
+        4097,
+        4098,
+        4099
+      ],
+      "topMoves": [
+        {
+          "uci": "a7a8q",
+          "san": "a8=Q+",
+          "probability": 0.9687169802833894
+        },
+        {
+          "uci": "e1f2",
+          "san": "Kf2",
+          "probability": 0.014709190392773266
+        },
+        {
+          "uci": "e1f1",
+          "san": "Kf1",
+          "probability": 0.010430377846164308
+        }
+      ],
+      "whiteExpectedScore": 0.8578
+    },
+    {
+      "fen": "4k3/P7/8/8/8/8/7p/4K3 w - - 0 1",
+      "level": 2600,
+      "occupiedTokenIndices": [
+        53,
+        186,
+        576,
+        731
+      ],
+      "legalIndices": [
+        259,
+        261,
+        267,
+        268,
+        269,
+        4096,
+        4097,
+        4098,
+        4099
+      ],
+      "topMoves": [
+        {
+          "uci": "a7a8q",
+          "san": "a8=Q+",
+          "probability": 0.9892860159332127
+        },
+        {
+          "uci": "e1f2",
+          "san": "Kf2",
+          "probability": 0.005191296570662382
+        },
+        {
+          "uci": "a7a8b",
+          "san": "a8=B",
+          "probability": 0.002198133270831275
+        }
+      ],
+      "whiteExpectedScore": 0.9518
+    },
+    {
+      "fen": "4k3/P7/8/8/8/8/7p/4K3 b - - 0 1",
+      "level": 600,
+      "occupiedTokenIndices": [
+        53,
+        102,
+        660,
+        731
+      ],
+      "legalIndices": [
+        259,
+        261,
+        267,
+        268,
+        269,
+        4348,
+        4349,
+        4350,
+        4351
+      ],
+      "topMoves": [
+        {
+          "uci": "h2h1q",
+          "san": "h1=Q+",
+          "probability": 0.8541177096640594
+        },
+        {
+          "uci": "e8d8",
+          "san": "Kd8",
+          "probability": 0.058123439580524947
+        },
+        {
+          "uci": "e8d7",
+          "san": "Kd7",
+          "probability": 0.02968654811009077
+        }
+      ],
+      "whiteExpectedScore": 0.4466
+    },
+    {
+      "fen": "4k3/P7/8/8/8/8/7p/4K3 b - - 0 1",
+      "level": 1500,
+      "occupiedTokenIndices": [
+        53,
+        102,
+        660,
+        731
+      ],
+      "legalIndices": [
+        259,
+        261,
+        267,
+        268,
+        269,
+        4348,
+        4349,
+        4350,
+        4351
+      ],
+      "topMoves": [
+        {
+          "uci": "h2h1q",
+          "san": "h1=Q+",
+          "probability": 0.9920448684520531
+        },
+        {
+          "uci": "e8d7",
+          "san": "Kd7",
+          "probability": 0.0034140297435263332
+        },
+        {
+          "uci": "h2h1r",
+          "san": "h1=R+",
+          "probability": 0.0017711752982805624
+        }
+      ],
+      "whiteExpectedScore": 0.1406
+    },
+    {
+      "fen": "4k3/P7/8/8/8/8/7p/4K3 b - - 0 1",
+      "level": 2600,
+      "occupiedTokenIndices": [
+        53,
+        102,
+        660,
+        731
+      ],
+      "legalIndices": [
+        259,
+        261,
+        267,
+        268,
+        269,
+        4348,
+        4349,
+        4350,
+        4351
+      ],
+      "topMoves": [
+        {
+          "uci": "h2h1q",
+          "san": "h1=Q+",
+          "probability": 0.9954501668750404
+        },
+        {
+          "uci": "h2h1b",
+          "san": "h1=B",
+          "probability": 0.0012214883373543681
+        },
+        {
+          "uci": "e8d7",
+          "san": "Kd7",
+          "probability": 0.001061247458542942
+        }
+      ],
+      "whiteExpectedScore": 0.1176
+    }
+  ]
+}
