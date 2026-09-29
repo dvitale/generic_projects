@@ -17,7 +17,7 @@ Aprire http://localhost:8033 nel browser Windows. Per fermare il server in primo
 
 ## Funzioni
 
-- **Frecce di analisi:** Stockfish in blu, Maia in rosso, mossa giocata in bianco. Le tre candidate sono numerate e le scelte coincidenti sono affiancate. Sotto la scacchiera puoi mostrare solo la prima scelta o nascondere una fonte. Le frecce seguono la posizione prima della mossa e il livello Maia scelto; le annotazioni manuali restano arancioni.
+- **Frecce di analisi:** Stockfish in blu, Maia in rosso, mossa giocata in bianco. Le frecce mostrano solo la prima scelta di ciascun motore; le scelte coincidenti sono affiancate. Sotto la scacchiera puoi nascondere una fonte. La tabella conserva anche la seconda e la terza scelta. Le frecce seguono la posizione prima della mossa e il livello Maia scelto; le annotazioni manuali restano arancioni.
 
 - **Esito Puzzle:** un messaggio sopra la scacchiera distingue mossa corretta, tentativo da migliorare e soluzione mostrata. Una risposta corretta resta visibile sulla scacchiera. **Prossimo puzzle** apre un esercizio non ancora concluso nella sessione; alla fine è possibile ricominciare. Le soluzioni mostrate non contano come risposte corrette.
 
