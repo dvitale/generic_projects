@@ -1,0 +1,75 @@
+import {test,expect,type Page,type APIRequestContext} from '@playwright/test'
+import {Chess} from 'chess.js'
+
+async function seed(page:Page,request:APIRequestContext,fen=new Chess().fen(),color='w',moves=['e2e4','e7e5','g1f3','b8c6']){
+  let game=await(await request.post('/api/games',{data:{fen,color}})).json()
+  for(const move of moves)game=await(await request.post(`/api/games/${game.id}/moves`,{data:{move,version:game.version,revision:game.revision,actor:game.turn===color?'human':'maia'}})).json()
+  await page.addInitScript(id=>localStorage.setItem('chess-coach-game',id),game.id)
+  await page.goto('/')
+  await page.getByRole('button',{name:'Continua partita',exact:true}).click()
+  return game
+}
+
+test('Live move list revisits positions without modifying the game and retains history while Maia replies',async({page,request})=>{
+  await page.setViewportSize({width:1440,height:900})
+  const game=await seed(page,request)
+  const history=page.getByRole('region',{name:'Mosse della partita'})
+  await expect(history.getByRole('button',{name:'2… Nc6',exact:true})).toHaveAttribute('aria-current','step')
+  await history.getByRole('button',{name:'1. e4',exact:true}).click()
+  await expect(page.locator('[data-square="e7"] img')).toBeVisible()
+  await expect(page.locator('[data-square="g1"] img')).toBeVisible()
+  let humanRequests=0
+  page.on('request',r=>{if(r.url().endsWith('/moves')&&r.postDataJSON()?.actor==='human')humanRequests++})
+  await page.locator('[data-square="d2"]').click();await page.locator('[data-square="d4"]').click()
+  expect(humanRequests).toBe(0)
+  await expect(page.getByRole('button',{name:'Annulla ultima mossa',exact:true})).toBeDisabled()
+  await history.getByRole('button',{name:'1. e4',exact:true}).press('ArrowRight')
+  await expect(page.locator('[data-square="e5"] img')).toBeVisible()
+  await history.getByRole('button',{name:'Posizione iniziale',exact:true}).click()
+  await expect(page.locator('[data-square="e2"] img')).toBeVisible()
+  await page.getByRole('button',{name:'Torna alla posizione corrente'}).click()
+  await expect(page.locator('[data-square="c6"] img')).toBeVisible()
+  await expect(page.getByText('Tocca a te · trascina un pezzo o usa due clic')).toBeVisible()
+  let releaseReply!:()=>void
+  const replyGate=new Promise<void>(resolve=>{releaseReply=resolve})
+  await page.route('**/api/games/*/moves',async route=>{
+    if(route.request().postDataJSON()?.actor==='maia')await replyGate
+    await route.continue()
+  })
+  await page.locator('[data-square="f1"]').click();await page.locator('[data-square="c4"]').click()
+  await expect(history.getByRole('button',{name:'3. Bc4',exact:true})).toHaveAttribute('aria-current','step')
+  await history.getByRole('button',{name:'1. e4',exact:true}).click()
+  releaseReply()
+  await expect(history.locator('.review-controls')).toContainText('1 / 6',{timeout:60000})
+  await expect(page.locator('[data-square="e7"] img')).toBeVisible()
+  await expect(history.getByRole('button',{name:'1. e4',exact:true})).toHaveAttribute('aria-current','step')
+  expect(humanRequests).toBe(1)
+  const updated=await(await request.get('/api/games/'+game.id)).json()
+  expect(updated.moves.slice(0,5)).toEqual([...game.moves,'f1c4'])
+  await page.screenshot({path:'test-results/play-history-desktop.png',fullPage:true})
+  await page.setViewportSize({width:390,height:844})
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
+  await page.screenshot({path:'test-results/play-history-mobile.png',fullPage:true})
+  await page.getByRole('button',{name:'Torna alla posizione corrente'}).click()
+  await page.getByRole('button',{name:'Annulla ultima mossa',exact:true}).click()
+  await expect(history.getByRole('button',{name:'3. Bc4',exact:true})).toHaveCount(0)
+  await expect(history.locator('.review-controls')).toContainText('4 / 4')
+  page.once('dialog',dialog=>dialog.accept())
+  await page.getByRole('button',{name:'Nuova partita'}).click()
+  await expect(history).toContainText('Le mosse appariranno qui.')
+  await expect(page.getByRole('button',{name:'Torna alla posizione corrente'})).toHaveCount(0)
+  await expect(page.getByRole('alert')).toHaveCount(0)
+})
+
+test('Move history respects black orientation and a custom starting move number',async({page,request})=>{
+  await seed(page,request,new Chess().fen().replace(' w ',' b ').replace(' 0 1',' 0 17'),'b',['e7e5','g1f3'])
+  const history=page.getByRole('region',{name:'Mosse della partita'})
+  await expect(history.getByRole('button',{name:'17… e5',exact:true})).toBeVisible()
+  await expect(history.getByRole('button',{name:'18. Nf3',exact:true})).toHaveAttribute('aria-current','step')
+  await history.getByRole('button',{name:'17… e5',exact:true}).click()
+  await expect(page.locator('.square').first()).toHaveAttribute('data-square','h1')
+  await expect(page.locator('[data-square="g1"] img')).toBeVisible()
+  await history.getByRole('button',{name:'17… e5',exact:true}).press('End')
+  await expect(page.locator('[data-square="f3"] img')).toBeVisible()
+  await expect(page.getByRole('button',{name:'Torna alla posizione corrente'})).toHaveCount(0)
+})
