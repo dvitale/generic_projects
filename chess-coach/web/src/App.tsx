@@ -8,6 +8,8 @@ import MoveReview from './MoveReview'
 import MoveHistory from './MoveHistory'
 import PanelTabs from './PanelTabs'
 import PuzzleFeedback from './PuzzleFeedback'
+import PgnExport from './PgnExport'
+import {useMoveTime} from './useMoveTime'
 import { api } from './api'
 import { maia, type Prediction } from './engine/maia'
 import { chooseMaiaMove } from './engine/play'
@@ -61,12 +63,13 @@ export default function App() {
   const currentGame = useRef<Game | null>(null)
   const botController = useRef<AbortController | null>(null)
   currentGame.current = game
+  const moveTime=useMoveTime(game,tab==='play'&&!!game&&!game.result&&!jobId)
 
   async function refresh() {
     const [games, skills, drills] = await Promise.all([api<Saved[]>('/games'),api<Profile>('/profile'),api<Exercise[]>('/exercises')])
     setSaved(games); setProfile(skills); setExercises(drills)
   }
-  function keepGame(next: Game) { setGame(next); localStorage.setItem('chess-coach-game', next.id) }
+  function keepGame(next: Game, newTurn=false) { if(newTurn)moveTime.begin(next); setGame(next); localStorage.setItem('chess-coach-game', next.id) }
   function fail(reason: unknown) { setError(reason instanceof Error ? reason.message : 'Operazione non riuscita') }
   useEffect(() => {
     maia.onStatus = setMaiaStatus
@@ -86,8 +89,8 @@ export default function App() {
     ;(async () => {
       const move = await chooseMaiaMove(snapshot.fen, snapshot.elo, controller.signal)
       if (cancelled || controller.signal.aborted || !move) return
-      const updated = await api<Game>(`/games/${snapshot.id}/moves`, {move, version:snapshot.version, revision:snapshot.revision, actor:'maia'})
-      if (!cancelled && !controller.signal.aborted && currentGame.current?.id === snapshot.id) keepGame(updated)
+      const updated = await api<Game>(`/games/${snapshot.id}/moves`, {move, version:snapshot.version, revision:snapshot.revision, actor:'maia',elapsed_seconds:moveTime.elapsed(snapshot)})
+      if (!cancelled && !controller.signal.aborted && currentGame.current?.id === snapshot.id) keepGame(updated,true)
     })().catch(e => { if (!cancelled && !controller.signal.aborted) fail(e) }).finally(()=> { if (!cancelled) setBotThinking(false) })
     return () => { cancelled = true; controller.abort(); setBotThinking(false) }
   }, [game?.id, game?.version, game?.revision, tab, retry, jobId, busy])
@@ -150,7 +153,7 @@ export default function App() {
   async function startGame() {
     if (game?.source === 'maia' && !game.result && !window.confirm('Vuoi iniziare una nuova partita? La partita attuale resterà salvata e potrai riprenderla dall’archivio.')) return
     setBusy(true); setError(''); setNotice('')
-    try { const next = await api<Game>('/games',{color,elo}); keepGame(next); setTab('play'); setCursor(0); await refresh(); maia.load().catch(fail) }
+    try { const next = await api<Game>('/games',{color,elo}); keepGame(next,true); setTab('play'); setCursor(0); await refresh(); maia.load().catch(fail) }
     catch (e) {fail(e)} finally {setBusy(false)}
   }
   async function submitMove(move: string) {
@@ -158,7 +161,7 @@ export default function App() {
     setBusy(true); setError('')
     try {
       if (tab === 'train' && exercise && session) { const result = await api<Attempt>(`/exercises/${exercise.id}/attempts`,{move,session_id:session.id,version:session.version}); recordPuzzleResult(result,move); setSession({...session,version:result.version}); await refresh() }
-      else if (game) { const next = await api<Game>(`/games/${game.id}/moves`,{move,version:game.version,revision:game.revision,actor:'human'}); keepGame(next) }
+      else if (game) { const next = await api<Game>(`/games/${game.id}/moves`,{move,version:game.version,revision:game.revision,actor:'human',elapsed_seconds:moveTime.elapsed(game)}); keepGame(next,true) }
     } catch (e) {fail(e)} finally {setBusy(false)}
   }
   async function undo() {
@@ -167,7 +170,7 @@ export default function App() {
     setBusy(true); setBotThinking(false); setError(''); setNotice('')
     try {
       const next = await api<Game>(`/games/${game.id}/undo`, {version:game.version,revision:game.revision})
-      keepGame(next); setPlayPosition(null); setCursor(next.version); setNotice('Ultima mossa annullata. Tocca a te.'); await refresh()
+      keepGame(next,true); setPlayPosition(null); setCursor(next.version); setNotice('Ultima mossa annullata. Tocca a te.'); await refresh()
     } catch (e) {
       fail(e)
       try { const latest = await api<Game>('/games/'+game.id); keepGame(latest); setCursor(latest.version) } catch (e) { fail(e) }
@@ -207,11 +210,6 @@ export default function App() {
       else{const result=await api<{hint:string}>(`/exercises/${exercise.id}/hint`,{session_id:session.id});setHint(result.hint)}
     }catch(e){fail(e)}finally{setBusy(false)}
   }
-  function downloadPgn() {
-    if (!game) return
-    const url=URL.createObjectURL(new Blob([game.pgn],{type:'application/x-chess-pgn'}))
-    const link=document.createElement('a'); link.href=url; link.download='sparringmate.pgn'; link.click(); URL.revokeObjectURL(url)
-  }
   function navigate(next: Tab) {setTab(next); setError(''); setNotice(''); if(next==='review'&&game)setCursor(game.version); if(next==='train'&&!exercise&&exercises[0])pickExercise(exercises[0]); refresh().catch(fail)}
 
   return <div className="app-shell">
@@ -243,7 +241,8 @@ export default function App() {
         </section>
         <aside className="coach-column">
           {tab==='review'&&<>
-            <div className="review-toolbar"><div className="row"><button className="primary" onClick={analyze} disabled={!game?.version||busy||!!jobId}>{game?.analysis?'Ricalcola analisi':'Analizza partita'}</button>{game&&<button onClick={downloadPgn}>↓ Esporta PGN</button>}{game?.source==='maia'&&!game.result&&<button disabled={!!jobId} onClick={()=>setTab('play')}>Continua partita</button>}</div>{jobId&&<div role="status"><p>Stockfish analizza la partita… {progress}%</p><progress value={progress} max={100}/></div>}</div>
+            <div className="review-toolbar"><div className="row"><button className="primary" onClick={analyze} disabled={!game?.version||busy||!!jobId}>{game?.analysis?'Ricalcola analisi':'Analizza partita'}</button>{game?.source==='maia'&&!game.result&&<button disabled={!!jobId} onClick={()=>setTab('play')}>Continua partita</button>}</div>{jobId&&<div role="status"><p>Stockfish analizza la partita… {progress}%</p><progress value={progress} max={100}/></div>}</div>
+            {game&&<PgnExport game={game}/>}
             <PanelTabs id="review" label="Pannelli della revisione" value={reviewTab} onChange={setReviewTab} items={[{id:'moves',label:'Mosse'},{id:'elo',label:'Elo'},{id:'tutor',label:'Tutor'},{id:'insights',label:'Approfondimenti'}]}/>
           </>}
           {tab==='review'&&<div role="tabpanel" id="review-panel-moves" aria-labelledby="review-tab-moves" hidden={reviewTab!=='moves'}>{game?<MoveReview game={game} cursor={cursor} onPosition={setCursor} level={reviewElo} onLevel={setReviewElo} prediction={visiblePrediction} error={predictionError} onRetry={()=>setRetry(n=>n+1)} analyzing={busy||!!jobId} onAnalyze={analyze}/>:<section className="panel"><p>Gioca una partita o importa un PGN per iniziare.</p></section>}</div>}
@@ -252,6 +251,7 @@ export default function App() {
           {tab==='play'&&<>
             {game&&<MoveHistory key={game.id} game={game} ply={playPly} onPosition={showPlayPosition} onReview={analyze} reviewDisabled={!game.version||busy||botThinking||!!jobId}/>}
             <section className="panel"><span className="eyebrow">IL TUO SPARRING PARTNER</span><h2>Allenati con Maia</h2><p className="muted">Mosse e imperfezioni ispirate al gioco umano.</p><label className="field-label">Livello di riferimento <strong>{elo}</strong><input aria-label="Livello Maia" type="range" min="600" max="2600" step="100" value={elo} onChange={e=>setElo(Number(e.target.value))}/></label><div className="range-labels"><span>600</span><span>2600</span></div><label className="field-label">Il tuo colore<select value={color} onChange={e=>setColor(e.target.value as Color)}><option value="w">Bianco</option><option value="b">Nero</option></select></label><button className="primary full" onClick={startGame} disabled={busy||!!jobId||botThinking}>{game?'Nuova partita':'Inizia partita'} →</button><small className="footnote">Il livello guida il modello; non equivale a un rating agonistico certificato.</small><button className="full" disabled={!game?.canUndo||busy||!!jobId||browsingHistory} onClick={undo}>Annulla ultima mossa</button><p className="footnote">Ritorna alla tua ultima scelta e annulla anche la risposta di Maia.</p></section>{!game&&<section className="panel tutor-card"><span className="eyebrow">IL TUTOR OSSERVA</span><h3>Concentrati sulla partita.</h3><p>Alla fine rivedremo le decisioni più interessanti e creeremo esercizi dalle tue posizioni.</p></section>}
+            {game&&<PgnExport game={game}/>}
             <div className="engine-status"><span className={maiaStatus==='Maia pronto'?'status-dot':'status-dot waiting'}/>{maiaStatus}<small>{stockfish}</small></div>
           </>}
           {tab==='review'&&<><div role="tabpanel" id="review-panel-tutor" aria-labelledby="review-tab-tutor" hidden={reviewTab!=='tutor'}>{game?<TutorPanel key={game.id+':'+game.version+':'+game.analysis?.createdAt} game={game} disabled={!!jobId||!game.analysis} onPosition={setCursor} onPuzzle={id=>{const ex=exercises.find(e=>e.id===id);if(ex)pickExercise(ex);else fail(new Error('Esercizio non disponibile: ricarica la pagina.'))}} onDrill={id=>{setRequestedDrill(id);setTab('drill')}}/>:<section className="panel"><p>Seleziona una partita per consultare il tutor.</p></section>}</div><div role="tabpanel" id="review-panel-insights" aria-labelledby="review-tab-insights" hidden={reviewTab!=='insights'} className="insights-grid">

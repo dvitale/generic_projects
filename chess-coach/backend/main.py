@@ -15,7 +15,7 @@ from typing import Literal
 import chess
 import chess.pgn
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, FiniteFloat
 
@@ -87,6 +87,10 @@ def init_db():
         """)
         if 'revision' not in {r[1] for r in con.execute('PRAGMA table_info(games)')}:
             con.execute('ALTER TABLE games ADD COLUMN revision INTEGER NOT NULL DEFAULT 0')
+        columns = {r[1] for r in con.execute('PRAGMA table_info(games)')}
+        for name, declaration in {'move_times': "TEXT NOT NULL DEFAULT '[]'", 'pgn_headers': "TEXT NOT NULL DEFAULT '{}'"}.items():
+            if name not in columns:
+                con.execute(f'ALTER TABLE games ADD COLUMN {name} {declaration}')
         columns = {r[1] for r in con.execute("PRAGMA table_info(attempts)")}
         for name, declaration in {"session_id": "TEXT", "is_first": "INTEGER NOT NULL DEFAULT 0", "exposure": "TEXT NOT NULL DEFAULT 'legacy'"}.items():
             if name not in columns:
@@ -137,6 +141,7 @@ class MoveInput(BaseModel):
     version: int = Field(ge=0, le=1000)
     actor: Literal["human", "maia"]
     revision: int = Field(default=0, ge=0)
+    elapsed_seconds: FiniteFloat | None = Field(default=None, ge=0, le=604800)
 
 
 class UndoInput(BaseModel):
@@ -194,14 +199,37 @@ def find_game(con, game_id):
     return row
 
 
-def game_view(row):
+def game_pgn(row, include_times=True):
     moves = json.loads(row["moves"])
     board = reconstruct(row["initial_fen"], moves)
     pgn = chess.pgn.Game.from_board(board)
-    pgn.headers["White"] = "Tu" if row["player_color"] == "w" else "Maia"
-    pgn.headers["Black"] = "Maia" if row["player_color"] == "w" else "Tu"
+    stored_headers = json.loads(row['pgn_headers'])
+    pgn.headers.update(stored_headers)
+    if not stored_headers:
+        pgn.headers['Event'] = row['title']
+        pgn.headers['Site'] = 'SparringMate locale'
+        pgn.headers['Date'] = row['created_at'][:10].replace('-', '.')
+        pgn.headers['White'] = 'Tu' if row['player_color'] == 'w' else f"Maia {row['elo']}"
+        pgn.headers['Black'] = f"Maia {row['elo']}" if row['player_color'] == 'w' else 'Tu'
+        pgn.headers['TimeControl'] = '-'  # Free play, without a countdown clock.
+    pgn.headers['GameId'] = row['id']
     outcome = board.outcome(claim_draw=True)
-    pgn.headers["Result"] = outcome.result() if outcome else "*"
+    pgn.headers['Result'] = outcome.result() if outcome else stored_headers.get('Result', '*')
+    if include_times:
+        for node, timing in zip(pgn.mainline(), json.loads(row['move_times'])):
+            if timing:
+                if timing.get('emt') is not None:
+                    node.set_emt(timing['emt'])
+                if timing.get('clk') is not None:
+                    node.set_clock(timing['clk'])
+    return pgn
+
+
+def game_view(row):
+    moves = json.loads(row['moves'])
+    board = reconstruct(row['initial_fen'], moves)
+    pgn = game_pgn(row)
+    outcome = board.outcome(claim_draw=True)
     with database() as con:
         session = con.execute("SELECT * FROM drill_sessions WHERE game_id=?", (row["id"],)).fetchone()
         rating = con.execute('SELECT response FROM game_ratings WHERE game_id=? AND version=? AND revision=?',
@@ -217,8 +245,9 @@ def game_view(row):
             "canUndo": row['source'] in {'maia', 'drill'} and undo_ply(row, session) is not None,
             "rating": json.loads(rating['response']) if rating else None,
             "elo": row["elo"], "title": row["title"], "pgn": str(pgn),
+            "timedMoves": sum(bool(t) for t in json.loads(row['move_times'])),
             "turn": "w" if board.turn else "b", "legalMoves": [m.uci() for m in board.legal_moves],
-            "result": outcome.result() if outcome else None, "source": row["source"], "drill": drill,
+            "result": pgn.headers['Result'] if pgn.headers['Result'] != '*' else None, "source": row["source"], "drill": drill,
             "analysis": json.loads(row["analysis"]) if row["analysis"] and row["analysis_version"] == len(moves) else None}
 
 
@@ -275,8 +304,20 @@ def make_move(game_id: str, body: MoveInput):
         if move not in board.legal_moves:
             raise HTTPException(422, "Mossa non legale")
         moves.append(body.move)
-        con.execute("UPDATE games SET moves=? WHERE id=?", (json.dumps(moves), game_id))
+        times = json.loads(row['move_times'])
+        times = (times + [None] * body.version)[:body.version]
+        times.append({'emt': round(body.elapsed_seconds, 3)} if body.elapsed_seconds is not None else None)
+        con.execute("UPDATE games SET moves=?,move_times=? WHERE id=?", (json.dumps(moves), json.dumps(times), game_id))
         return game_view(find_game(con, game_id))
+
+
+@app.get('/api/games/{game_id}/pgn')
+def export_pgn(game_id: str, include_times: bool = True):
+    with database() as con:
+        row = find_game(con, game_id)
+        pgn = game_pgn(row, include_times)
+    return Response(str(pgn) + '\n', media_type='application/x-chess-pgn',
+                    headers={'Content-Disposition': f'attachment; filename="sparringmate-{row["id"]}.pgn"'})
 
 
 def undo_ply(row, session=None):
@@ -296,6 +337,7 @@ def preserve_review(con, row, session):
         VALUES(?,?,?,?,?,?,?,?,?,?,?)''',
         (archive_id, row['initial_fen'], row['moves'], row['player_color'], row['elo'],
          row['title'] + ' · prima dell’annullamento', now(), row['analysis'], row['analysis_version'], 'snapshot', row['revision']))
+    con.execute('UPDATE games SET move_times=?,pgn_headers=? WHERE id=?', (row['move_times'], row['pgn_headers'], archive_id))
     if session:
         con.execute('INSERT INTO drill_sessions VALUES(?,?,?,?,?,?,?)',
                     (archive_id, session['template_id'], session['template_name'], session['theme'], session['goal'], session['start_ply'], session['target']))
@@ -318,8 +360,8 @@ def undo_move(game_id: str, body: UndoInput):
         if row['revision'] != body.revision or len(moves) not in {body.version, body.version + 1} or ply is None or ply >= body.version:
             raise HTTPException(409, 'Nessuna mossa da annullare in questa posizione: ricarica la partita')
         preserve_review(con, row, session)
-        con.execute('UPDATE games SET moves=?,revision=revision+1,analysis=NULL,analysis_version=NULL WHERE id=?',
-                    (json.dumps(moves[:ply]), game_id))
+        con.execute('UPDATE games SET moves=?,move_times=?,revision=revision+1,analysis=NULL,analysis_version=NULL WHERE id=?',
+                    (json.dumps(moves[:ply]), json.dumps(json.loads(row['move_times'])[:ply]), game_id))
         con.execute('DELETE FROM game_ratings WHERE game_id=?', (game_id,))
     return get_game(game_id)
 
@@ -374,6 +416,13 @@ def import_game(body: ImportInput):
         title = f"{pgn.headers.get('White', 'Bianco')} – {pgn.headers.get('Black', 'Nero')}"[:120]
         con.execute("INSERT OR IGNORE INTO games(id,initial_fen,moves,player_color,elo,title,created_at,analysis,analysis_version,source) VALUES(?,?,?,?,?,?,?,?,?,?)",
                     (game_id, initial, json.dumps(moves), body.color, 1500, title, now(), None, None, "pgn"))
+        times = [{k: v for k, v in {'emt': n.emt(), 'clk': n.clock()}.items() if v is not None} or None for n in pgn.mainline()]
+        # Reimporting the same line can enrich its metadata without replacing analysis.
+        existing = find_game(con, game_id)
+        old_times = json.loads(existing['move_times'])
+        merged_times = [{**((old_times[i] or {}) if i < len(old_times) else {}), **(t or {})} or None for i, t in enumerate(times)]
+        headers = {**json.loads(existing['pgn_headers']), **dict(pgn.headers)}
+        con.execute('UPDATE games SET move_times=?,pgn_headers=? WHERE id=?', (json.dumps(merged_times), json.dumps(headers), game_id))
         return game_view(find_game(con, game_id))
 
 
