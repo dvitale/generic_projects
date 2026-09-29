@@ -6,6 +6,7 @@ import TutorPanel from './TutorPanel'
 import RatingPanel from './RatingPanel'
 import MoveReview from './MoveReview'
 import PanelTabs from './PanelTabs'
+import PuzzleFeedback from './PuzzleFeedback'
 import { api } from './api'
 import { maia, type Prediction } from './engine/maia'
 import { chooseMaiaMove } from './engine/play'
@@ -33,6 +34,8 @@ export default function App() {
   const [attempt, setAttempt] = useState<Attempt | null>(null)
   const [session, setSession] = useState<PuzzleSession | null>(null)
   const [hint, setHint] = useState('')
+  const [puzzleMove,setPuzzleMove]=useState<string|null>(null)
+  const [completedPuzzles,setCompletedPuzzles]=useState<string[]>([])
   const [color, setColor] = useState<Color>('w')
   const [elo, setElo] = useState(1500)
   const [busy, setBusy] = useState(false)
@@ -108,7 +111,10 @@ export default function App() {
   }, [jobId])
 
   const reviewBoard = game ? position(game, cursor) : new Chess()
-  const boardFen = tab === 'train' && exercise ? exercise.fen : tab === 'review' ? reviewBoard.fen() : game?.fen || initialFen
+  const puzzleBoard=exercise?new Chess(exercise.fen):null
+  if(puzzleBoard&&puzzleMove)puzzleBoard.move({from:puzzleMove.slice(0,2),to:puzzleMove.slice(2,4),promotion:puzzleMove[4]})
+  const nextPuzzle=exercises.find(ex=>ex.id!==exercise?.id&&!completedPuzzles.includes(ex.id))
+  const boardFen = tab === 'train' && puzzleBoard ? puzzleBoard.fen() : tab === 'review' ? reviewBoard.fen() : game?.fen || initialFen
   const orientation: Color = tab === 'train' && exercise ? exercise.turn : game?.playerColor || color
   const legal = tab === 'train' ? exercise?.legalMoves || [] : game?.legalMoves || []
   const canMove = !busy && !jobId && (tab === 'train' ? !!exercise && !!session && !attempt?.closed : tab === 'play' && !!game && !game.result && game.source === 'maia' && game.turn === game.playerColor && !botThinking)
@@ -138,7 +144,7 @@ export default function App() {
     if (!canMove) return
     setBusy(true); setError('')
     try {
-      if (tab === 'train' && exercise && session) { const result = await api<Attempt>(`/exercises/${exercise.id}/attempts`,{move,session_id:session.id,version:session.version}); setAttempt(result); setSession({...session,version:result.version}); await refresh() }
+      if (tab === 'train' && exercise && session) { const result = await api<Attempt>(`/exercises/${exercise.id}/attempts`,{move,session_id:session.id,version:session.version}); recordPuzzleResult(result,move); setSession({...session,version:result.version}); await refresh() }
       else if (game) { const next = await api<Game>(`/games/${game.id}/moves`,{move,version:game.version,revision:game.revision,actor:'human'}); keepGame(next) }
     } catch (e) {fail(e)} finally {setBusy(false)}
   }
@@ -171,15 +177,20 @@ export default function App() {
     try {const next=await api<Game>('/import',{pgn,color}); keepGame(next); setCursor(next.version); setTab('review'); setShowImport(false); setPgn(''); await refresh()}
     catch(e){fail(e)} finally {setBusy(false)}
   }
+  function recordPuzzleResult(result:Attempt,move?:string){
+    setAttempt(result)
+    setPuzzleMove(result.closed?(result.success?move:result.best?.pv[0])??null:null)
+    if(result.closed&&exercise)setCompletedPuzzles(current=>current.includes(exercise.id)?current:[...current,exercise.id])
+  }
   async function pickExercise(ex: Exercise) {
-    setExercise(ex); setAttempt(null); setSession(null); setHint(''); setTab('train'); setError(''); setBusy(true)
+    setExercise(ex); setAttempt(null); setPuzzleMove(null); setSession(null); setHint(''); setNotice(''); setTab('train'); setError(''); setBusy(true)
     try {setSession(await api<PuzzleSession>(`/exercises/${ex.id}/sessions`,{}))}catch(e){fail(e)}finally{setBusy(false)}
   }
   async function puzzleHelp(reveal=false) {
     if(!exercise||!session)return
     setBusy(true)
     try {
-      if(reveal){const result=await api<Attempt>(`/exercises/${exercise.id}/reveal`,{session_id:session.id});setAttempt(result);await refresh()}
+      if(reveal){const result=await api<Attempt>(`/exercises/${exercise.id}/reveal`,{session_id:session.id});recordPuzzleResult(result);await refresh()}
       else{const result=await api<{hint:string}>(`/exercises/${exercise.id}/hint`,{session_id:session.id});setHint(result.hint)}
     }catch(e){fail(e)}finally{setBusy(false)}
   }
@@ -209,9 +220,10 @@ export default function App() {
         <section className="panel"><span className="eyebrow">LE TUE OSSERVAZIONI</span><h2>{profile?.confidence||'Nessun dato'}</h2><div className="stats"><div><strong>{profile?.games||0}</strong><span>partite salvate</span></div><div><strong>{profile?.attempts||0}</strong><span>tentativi</span></div><div><strong>{profile?.unaidedSuccesses||0}</strong><span>primi tentativi riusciti</span></div></div>{profile?.themes.length?profile.themes.map(t=><div className="theme-row" key={t.theme}><span>{t.theme}</span><span>{t.examples} posizioni</span></div>):<p className="empty-text">Analizza una partita per iniziare a raccogliere le tue posizioni di allenamento.</p>}<p className="footnote">I successi contano solo il primo tentativo senza aiuti, su esercizi nuovi o in scadenza. Le ripetizioni immediate restano pratica. Non sono ancora una misura di padronanza: servono anche verifiche su posizioni nuove.</p></section>
       </div>:tab==='archive'?null:<div className={'training-layout layout-'+tab}>
         <section className="board-column">
+          {tab==='train'&&exercise&&<PuzzleFeedback attempt={attempt} busy={busy} ready={!!session} hasNext={!!nextPuzzle} onNext={()=>{if(nextPuzzle)void pickExercise(nextPuzzle)}} onRestart={()=>{setCompletedPuzzles([]);if(exercises[0])void pickExercise(exercises[0])}}/>}
           <div className="player-row"><span className="avatar">{tab==='train'?'◎':'♞'}</span><div><strong>{tab==='train'?'Posizione di allenamento':orientation==='w'?'Maia':'Tu'}</strong><small>{tab==='train'?exercise?.theme||'Scegli un esercizio':orientation==='w'?`Livello ${game?.elo||elo} · gioco umano`:'Il tuo colore: Nero'}</small></div>{tab==='play'&&botThinking&&<span className="thinking" role="status">Maia sta pensando…</span>}</div>
-          <Board animateMove={tab==='play'&&!!game&&game.turn===game.playerColor} fen={boardFen} orientation={orientation} interactive={canMove} legalMoves={legal} onMove={submitMove} lastMove={tab==='play'?game?.moves.at(-1):tab==='review'&&game&&cursor>0?game.moves[cursor-1]:undefined}/>
-          <div className="player-row lower"><span className="avatar light">{orientation==='w'?'♙':'♞'}</span><div><strong>{tab==='train'?(exercise?.turn==='b'?'Muove il Nero':'Muove il Bianco'):orientation==='w'?'Tu':'Maia'}</strong><small>{tab==='play'?(game?.result?`Partita conclusa · ${game.result}`:canMove?'Tocca a te · trascina un pezzo o usa due clic':game?'Attendi la risposta':'Pronto per iniziare'):tab==='review'?`Posizione dopo ${cursor} semimosse`:'Cerca una buona mossa'}</small></div><span className="mode-label">{tab==='play'?'PARTITA LIBERA':tab==='review'?'ANALISI':'ESERCIZIO'}</span></div>
+          <Board animateMove={tab==='play'&&!!game&&game.turn===game.playerColor} fen={boardFen} orientation={orientation} interactive={canMove} legalMoves={legal} onMove={submitMove} lastMove={tab==='train'?puzzleMove||undefined:tab==='play'?game?.moves.at(-1):tab==='review'&&game&&cursor>0?game.moves[cursor-1]:undefined}/>
+          <div className="player-row lower"><span className="avatar light">{orientation==='w'?'♙':'♞'}</span><div><strong>{tab==='train'?(attempt?.closed?(attempt.success?'Puzzle risolto':'Soluzione del puzzle'):exercise?.turn==='b'?'Muove il Nero':'Muove il Bianco'):orientation==='w'?'Tu':'Maia'}</strong><small>{tab==='play'?(game?.result?`Partita conclusa · ${game.result}`:canMove?'Tocca a te · trascina un pezzo o usa due clic':game?'Attendi la risposta':'Pronto per iniziare'):tab==='review'?`Posizione dopo ${cursor} semimosse`:attempt?.closed?'Esercizio concluso':'Cerca una buona mossa'}</small></div><span className="mode-label">{tab==='play'?'PARTITA LIBERA':tab==='review'?'ANALISI':'ESERCIZIO'}</span></div>
           {tab==='review'&&game&&<div className="review-controls"><button aria-label="Posizione iniziale" onClick={()=>setCursor(0)} disabled={cursor===0}>⏮</button><button aria-label="Mossa precedente" onClick={()=>setCursor(c=>Math.max(0,c-1))} disabled={cursor===0}>←</button><span>{cursor} / {game.version}</span><button aria-label="Mossa successiva" onClick={()=>setCursor(c=>Math.min(game.version,c+1))} disabled={cursor===game.version}>→</button><button aria-label="Ultima posizione" onClick={()=>setCursor(game.version)} disabled={cursor===game.version}>⏭</button></div>}
         </section>
         <aside className="coach-column">
@@ -231,7 +243,7 @@ export default function App() {
             <section className="panel"><span className="eyebrow">LO SGUARDO DI MAIA</span><h3>Mosse umane plausibili</h3>{visiblePrediction?.moves.slice(0,3).map(m=><div className="policy" key={m.uci}><strong>{m.san}</strong><div><span style={{width:`${m.probability*100}%`}}/></div><span>{Math.round(m.probability*100)}%</span></div>)}{!visiblePrediction&&<p className="muted">{game?'Caricamento delle previsioni…':'Nessuna posizione selezionata.'}</p>}<small className="footnote">Probabilità del modello, non giudizi sulla qualità delle mosse.</small></section>
             </div>
           </>}
-          {tab==='train'&&<section className="panel"><span className="eyebrow">DALLE TUE PARTITE</span><h2>{exercise?exercise.theme:'Il tuo primo esercizio'}</h2>{!exercise?<p className="empty-text">Gli esercizi nasceranno dalla revisione delle tue partite. Gioca o importa un PGN, poi avvia l'analisi.</p>:<><p className="muted">Muovi sulla scacchiera. Sono accettate anche alternative che mantengono la qualità della posizione.</p>{!attempt?.closed&&session&&<div className="row"><button disabled={busy} onClick={()=>puzzleHelp()}>Chiedi un indizio</button><button disabled={busy} onClick={()=>puzzleHelp(true)}>Mostra soluzione</button></div>}{hint&&<p className="hint">{hint}</p>}{busy&&<p role="status">Stockfish verifica la tua mossa…</p>}{attempt&&<div className={attempt.success?'attempt success':'attempt'} role="status"><h3>{attempt.success?'Buona scelta.':'Una posizione da riprovare.'}</h3><p>{attempt.message}</p><p className="variation">{attempt.best?.san.join(' ')}</p><small>{attempt.assisted?'Tentativo con indizio.':'Tentativo senza indizi.'} Ripasso: {new Date(attempt.dueAt).toLocaleDateString('it-IT')}.</small></div>}</>}<div className="exercise-list">{exercises.map(ex=><button key={ex.id} className={exercise?.id===ex.id?'exercise-link chosen':'exercise-link'} disabled={busy} onClick={()=>pickExercise(ex)}><span>{ex.theme}</span><small>Mossa {Math.floor(ex.ply/2)+1} · {new Date(ex.dueAt).getTime()<=Date.now()?'da ripassare':'programmato'}</small></button>)}</div></section>}
+          {tab==='train'&&<section className="panel"><span className="eyebrow">DALLE TUE PARTITE</span><h2>{exercise?exercise.theme:'Il tuo primo esercizio'}</h2>{!exercise?<p className="empty-text">Gli esercizi nasceranno dalla revisione delle tue partite. Gioca o importa un PGN, poi avvia l'analisi.</p>:<><p className="muted">{attempt?.closed?'Confronta la posizione sulla scacchiera con la variante di riferimento.':'Muovi sulla scacchiera. Sono accettate anche alternative che mantengono la qualità della posizione.'}</p>{!attempt?.closed&&session&&<div className="row"><button disabled={busy} onClick={()=>puzzleHelp()}>Chiedi un indizio</button><button disabled={busy} onClick={()=>puzzleHelp(true)}>Mostra soluzione</button></div>}{hint&&<p className="hint">{hint}</p>}{attempt?.closed&&<div className="puzzle-solution"><h3>Variante di riferimento</h3><p className="variation">{attempt.best?.san.join(' ')}</p><small>{attempt.assisted?'Esercizio con aiuto.':'Esercizio senza aiuti.'} Ripasso: {new Date(attempt.dueAt).toLocaleDateString('it-IT')}.</small></div>}</>}<div className="exercise-list">{exercises.map(ex=><button key={ex.id} className={exercise?.id===ex.id?'exercise-link chosen':'exercise-link'} disabled={busy} onClick={()=>pickExercise(ex)}><span>{ex.theme}</span><small>Mossa {Math.floor(ex.ply/2)+1} · {new Date(ex.dueAt).getTime()<=Date.now()?'da ripassare':'programmato'}</small></button>)}</div></section>}
         </aside>
       </div>}
       {tab==='archive'&&<section className="archive"><div className="section-head"><h2>Le tue partite</h2><span>{saved.length} salvate</span></div>{saved.length?<div className="game-list">{saved.map(item=><button key={item.id} onClick={()=>openGame(item.id)} disabled={!!jobId||busy}><span className="archive-icon">♟</span><span><strong>{item.title}</strong><small>{new Date(item.createdAt).toLocaleDateString('it-IT')} · {item.plies} semimosse · {item.source==='pgn'?'Importata':'Maia'}</small></span><span className="arrow">↗</span></button>)}</div>:<p className="empty-text">Le partite vengono salvate automaticamente, mossa dopo mossa.</p>}</section>}

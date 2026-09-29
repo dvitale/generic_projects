@@ -17,6 +17,8 @@ Aprire http://localhost:8033 nel browser Windows. Per fermare il server in primo
 
 ## Funzioni
 
+- **Esito Puzzle:** un messaggio sopra la scacchiera distingue mossa corretta, tentativo da migliorare e soluzione mostrata. Una risposta corretta resta visibile sulla scacchiera. **Prossimo puzzle** apre un esercizio non ancora concluso nella sessione; alla fine è possibile ricominciare. Le soluzioni mostrate non contano come risposte corrette.
+
 - **Frecce sulla scacchiera:** tieni premuto il tasto destro e trascina tra due case. Puoi aggiungere più frecce; ripetere lo stesso gesto elimina quella freccia. Un clic destro senza trascinare evidenzia una casa con un cerchio. Clic sinistro, Esc o cambio di posizione cancellano le annotazioni. Disponibili anche durante la revisione e nei Drill; non modificano la partita.
 
 - **Spazio di lavoro:** scacchiera e pannello affiancati sui monitor grandi; in Rivedi le schede Mosse, Elo, Tutor e Approfondimenti conservano la posizione e i calcoli durante il cambio scheda. Archivio nella voce Partite. Drill separa catalogo e sessione. Su mobile il layout torna a una colonna.
