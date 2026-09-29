@@ -98,3 +98,12 @@ L'installazione sul PC usa il tema **Green** e i pezzi **Neo** richiesti, scaric
 ## Configurazione del tutor
 
 `python3 scripts/configure_deepseek.py` configura la chiave con input nascosto. La credenziale rimane in `.secrets/deepseek.json`, esclusa da Git. La spiegazione viene salvata nel database con l'analisi a cui si riferisce. Dettagli sui dati inviati, sul modello e sui limiti in `docs/tutor-deepseek.md`.
+
+
+## Esportare PGN e tempi
+
+**Esporta PGN** è disponibile in Gioca, Rivedi e nelle sessioni Drill, anche a partita in corso. **Includi tempi** aggiunge i dati registrati a ciascuna mossa. I file riportano risultato, nomi, data e posizione iniziale; l'importazione conserva anche i nomi originali, il risultato dichiarato e il controllo del tempo.
+
+Le partite libere non hanno un conto alla rovescia: si registra il tempo attivo per mossa con l'annotazione PGN `[%emt h:mm:ss]`. Il conteggio si sospende lasciando il pannello di gioco o nascondendo la scheda; il tempo di Maia comprende inferenza e attesa visibile. Il turno in corso viene recuperato dopo un normale ricaricamento nella stessa scheda. I dati delle mosse confermate restano nel database, anche dopo il riavvio. Un turno il cui inizio non è stato osservato rimane senza tempo; le mosse delle vecchie partite non ricevono valori inventati.
+
+Nei PGN importati si conservano sia `[%clk ...]` (tempo residuo sull'orologio) sia `[%emt ...]` (durata della mossa), quando presenti. Disattivare Includi tempi esclude queste annotazioni dal download senza cancellare i dati. Annullare una mossa rimuove anche i relativi tempi; un'eventuale copia di revisione conserva la linea originale con i suoi tempi.
