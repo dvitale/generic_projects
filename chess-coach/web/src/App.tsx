@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Chess } from 'chess.js'
-import Board from './Board'
+import Board, {type AnalysisArrow} from './Board'
 import Drills from './Drills'
 import TutorPanel from './TutorPanel'
 import RatingPanel from './RatingPanel'
@@ -26,6 +26,8 @@ function score(evaluation: Evaluation) { return evaluation.mate !== null ? `Matt
 export default function App() {
   const [tab, setTab] = useState<Tab>('play')
   const [reviewTab,setReviewTab] = useState('moves')
+  const [arrowCount,setArrowCount]=useState(3)
+  const [arrowSources,setArrowSources]=useState({stockfish:true,maia:true,played:true})
   const [game, setGame] = useState<Game | null>(null)
   const [saved, setSaved] = useState<Saved[]>([])
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -120,6 +122,13 @@ export default function App() {
   const canMove = !busy && !jobId && (tab === 'train' ? !!exercise && !!session && !attempt?.closed : tab === 'play' && !!game && !game.result && game.source === 'maia' && game.turn === game.playerColor && !botThinking)
   const decision = game?.analysis?.decisions.find(d=>d.ply === cursor)
   const visiblePrediction = predictionKey===boardFen+':'+reviewElo?prediction:null
+  const reviewedMove=(game?.analysis?.moves||game?.analysis?.decisions)?.find(d=>d.ply===cursor)
+  const analysisArrows:AnalysisArrow[]=[]
+  if(tab==='review'&&reviewedMove?.fen===boardFen){
+    if(arrowSources.stockfish)(reviewedMove.stockfishCandidates||[reviewedMove.best]).slice(0,arrowCount).forEach((choice,index)=>{if(choice.pv[0])analysisArrows.push({move:choice.pv[0],source:'stockfish',rank:index+1})})
+    if(arrowSources.maia)visiblePrediction?.moves.slice(0,arrowCount).forEach((choice,index)=>analysisArrows.push({move:choice.uci,source:'maia',rank:index+1}))
+    if(arrowSources.played)analysisArrows.push({move:reviewedMove.played,source:'played',rank:1})
+  }
 
   useEffect(()=>{if(game){setReviewElo(game.elo);setReviewTab(game.result?'elo':'moves')}},[game?.id])
 
@@ -222,9 +231,10 @@ export default function App() {
         <section className="board-column">
           {tab==='train'&&exercise&&<PuzzleFeedback attempt={attempt} busy={busy} ready={!!session} hasNext={!!nextPuzzle} onNext={()=>{if(nextPuzzle)void pickExercise(nextPuzzle)}} onRestart={()=>{setCompletedPuzzles([]);if(exercises[0])void pickExercise(exercises[0])}}/>}
           <div className="player-row"><span className="avatar">{tab==='train'?'◎':'♞'}</span><div><strong>{tab==='train'?'Posizione di allenamento':orientation==='w'?'Maia':'Tu'}</strong><small>{tab==='train'?exercise?.theme||'Scegli un esercizio':orientation==='w'?`Livello ${game?.elo||elo} · gioco umano`:'Il tuo colore: Nero'}</small></div>{tab==='play'&&botThinking&&<span className="thinking" role="status">Maia sta pensando…</span>}</div>
-          <Board animateMove={tab==='play'&&!!game&&game.turn===game.playerColor} fen={boardFen} orientation={orientation} interactive={canMove} legalMoves={legal} onMove={submitMove} lastMove={tab==='train'?puzzleMove||undefined:tab==='play'?game?.moves.at(-1):tab==='review'&&game&&cursor>0?game.moves[cursor-1]:undefined}/>
+          <Board analysisArrows={analysisArrows} animateMove={tab==='play'&&!!game&&game.turn===game.playerColor} fen={boardFen} orientation={orientation} interactive={canMove} legalMoves={legal} onMove={submitMove} lastMove={tab==='train'?puzzleMove||undefined:tab==='play'?game?.moves.at(-1):tab==='review'&&game&&cursor>0?game.moves[cursor-1]:undefined}/>
           <div className="player-row lower"><span className="avatar light">{orientation==='w'?'♙':'♞'}</span><div><strong>{tab==='train'?(attempt?.closed?(attempt.success?'Puzzle risolto':'Soluzione del puzzle'):exercise?.turn==='b'?'Muove il Nero':'Muove il Bianco'):orientation==='w'?'Tu':'Maia'}</strong><small>{tab==='play'?(game?.result?`Partita conclusa · ${game.result}`:canMove?'Tocca a te · trascina un pezzo o usa due clic':game?'Attendi la risposta':'Pronto per iniziare'):tab==='review'?`Posizione dopo ${cursor} semimosse`:attempt?.closed?'Esercizio concluso':'Cerca una buona mossa'}</small></div><span className="mode-label">{tab==='play'?'PARTITA LIBERA':tab==='review'?'ANALISI':'ESERCIZIO'}</span></div>
           {tab==='review'&&game&&<div className="review-controls"><button aria-label="Posizione iniziale" onClick={()=>setCursor(0)} disabled={cursor===0}>⏮</button><button aria-label="Mossa precedente" onClick={()=>setCursor(c=>Math.max(0,c-1))} disabled={cursor===0}>←</button><span>{cursor} / {game.version}</span><button aria-label="Mossa successiva" onClick={()=>setCursor(c=>Math.min(game.version,c+1))} disabled={cursor===game.version}>→</button><button aria-label="Ultima posizione" onClick={()=>setCursor(game.version)} disabled={cursor===game.version}>⏭</button></div>}
+          {tab==='review'&&game&&<div className="analysis-arrow-controls" role="group" aria-label="Frecce di analisi">{([['stockfish','Stockfish · blu'],['maia','Maia · rosso'],['played','Giocata · bianco']] as const).map(([source,label])=><label key={source}><input type="checkbox" checked={arrowSources[source]} onChange={e=>setArrowSources(current=>({...current,[source]:e.target.checked}))}/><span className={'arrow-swatch source-'+source}/>{label}</label>)}<select aria-label="Numero di scelte sulle frecce" value={arrowCount} onChange={e=>setArrowCount(Number(e.target.value))}><option value={1}>Prima scelta</option><option value={3}>Tre scelte (1–3)</option></select></div>}
         </section>
         <aside className="coach-column">
           {tab==='review'&&<>

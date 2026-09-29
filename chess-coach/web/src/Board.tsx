@@ -7,14 +7,15 @@ const names: Record<string, string> = {k:'re',q:'donna',r:'torre',b:'alfiere',n:
 type Gesture = {id:number;from:string;startX:number;startY:number;fen:string;orientation:Color;code:string;size:number;active:boolean;element:HTMLButtonElement}
 type Annotation = {from:string;to:string}
 type Drawing = {id:number;from:string;fen:string;orientation:Color;element:HTMLButtonElement}
+export type AnalysisArrow = {move:string;source:'stockfish'|'maia'|'played';rank:number}
 
-function BoardAnnotation({from,to,orientation,preview=false}:Annotation&{orientation:Color;preview?:boolean}) {
-  function center(square:string){
+function squareCenter(square:string,orientation:Color){
     const file=square.charCodeAt(0)-97,rank=Number(square[1])-1
     return [(orientation==='w'?file:7-file)*100+50,(orientation==='w'?7-rank:rank)*100+50]
-  }
-  const [x1,y1]=center(from),[x2,y2]=center(to)
-  const attributes={'data-from':from,'data-to':to,className:preview?'annotation-preview':'board-annotation'}
+}
+function BoardAnnotation({from,to,orientation,preview=false,automatic=false}:Annotation&{orientation:Color;preview?:boolean;automatic?:boolean}) {
+  const [x1,y1]=squareCenter(from,orientation),[x2,y2]=squareCenter(to,orientation)
+  const attributes={'data-from':from,'data-to':to,className:automatic?'analysis-arrow-shape':preview?'annotation-preview':'board-annotation'}
   if(from===to)return <circle {...attributes} cx={x1} cy={y1} r="36" fill="none" stroke="currentColor" strokeWidth="9"/>
   const horizontal=Math.abs(x2-x1),vertical=Math.abs(y2-y1)
   if((horizontal===100&&vertical===200)||(horizontal===200&&vertical===100)){
@@ -37,7 +38,7 @@ function Piece({code}:{code:string}) {
   return missing?<span aria-hidden="true" className={`piece ${code[0]==='w'?'white-piece':'black-piece'}`}>{symbols[code]}</span>:
     <img className="piece-image" src={`/pieces/neo/${code}.png`} alt="" aria-hidden="true" draggable={false} onError={()=>setMissing(true)}/>
 }
-export default function Board({fen, orientation, interactive, legalMoves, onMove, lastMove, animateMove=false}: {fen:string; orientation:Color; interactive:boolean; legalMoves:string[]; onMove:(uci:string)=>void; lastMove?:string;animateMove?:boolean}) {
+export default function Board({fen, orientation, interactive, legalMoves, onMove, lastMove, animateMove=false,analysisArrows=[]}: {fen:string; orientation:Color; interactive:boolean; legalMoves:string[]; onMove:(uci:string)=>void; lastMove?:string;animateMove?:boolean;analysisArrows?:AnalysisArrow[]}) {
   const [selected, setSelected] = useState<string | null>(null)
   const [promotion, setPromotion] = useState<string[]>([])
   const [drag, setDrag] = useState<{from:string;code:string;x:number;y:number;size:number}|null>(null)
@@ -196,6 +197,17 @@ export default function Board({fen, orientation, interactive, legalMoves, onMove
         </button>
       }))}
       <svg className="board-annotations" viewBox="0 0 800 800" aria-hidden="true">
+        {[...analysisArrows].sort((a,b)=>b.rank-a.rank).map(arrow=>{
+          const from=arrow.move.slice(0,2),to=arrow.move.slice(2,4)
+          const [x1,y1]=squareCenter(from,orientation),[x2,y2]=squareCenter(to,orientation)
+          const length=Math.hypot(x2-x1,y2-y1)||1
+          const shared=analysisArrows.filter(a=>a.move.slice(0,4)===arrow.move.slice(0,4))
+          const lane=(shared.indexOf(arrow)-(shared.length-1)/2)*Math.min(18,42/Math.max(1,shared.length-1))
+          return <g key={arrow.source+arrow.rank+arrow.move} className={`analysis-arrow source-${arrow.source}`} data-source={arrow.source} data-rank={arrow.rank} data-move={arrow.move} transform={`translate(${-(y2-y1)/length*lane} ${(x2-x1)/length*lane})`} opacity={arrow.rank===1?1:arrow.rank===2?.7:.5}>
+            <BoardAnnotation from={from} to={to} orientation={orientation} automatic/>
+            {arrow.source!=='played'&&<text className="analysis-arrow-rank" x={x2} y={y2-30} textAnchor="middle">{arrow.rank}</text>}
+          </g>
+        })}
         {annotations.map(a=><BoardAnnotation key={a.from+a.to} {...a} orientation={orientation}/>)}
         {preview&&<BoardAnnotation {...preview} orientation={orientation} preview/>}
       </svg>
