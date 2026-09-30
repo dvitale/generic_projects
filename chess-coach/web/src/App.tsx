@@ -12,6 +12,7 @@ import PuzzleFeedback from './PuzzleFeedback'
 import MistakeHistory from './MistakeHistory'
 import {useTrainingMove} from './useTrainingMove'
 import ChessInsights,{ThinkingGuide} from './ChessInsights'
+import EvaluationChart from './EvaluationChart'
 import PgnExport from './PgnExport'
 import {useMoveTime} from './useMoveTime'
 import { api } from './api'
@@ -197,7 +198,7 @@ export default function App() {
   }
   async function analyze() {
     if (!game) return
-    setReviewTab('moves')
+    setReviewTab(current=>current==='evaluation'?'evaluation':'moves')
     setBusy(true); setError(''); setTab('review'); setCursor(game.version)
     try { const result = await api<{jobId:string}>(`/games/${game.id}/analysis`,{}); setProgress(0); setJobId(result.jobId) }
     catch (e) {fail(e)} finally {setBusy(false)}
@@ -263,8 +264,9 @@ export default function App() {
           {tab==='review'&&<>
             <div className="review-toolbar"><div className="row"><button className="primary" onClick={analyze} disabled={!game?.version||busy||!!jobId}>{game?.analysis?'Ricalcola analisi':'Analizza partita'}</button>{game?.source==='maia'&&!game.result&&<button disabled={!!jobId} onClick={()=>setTab('play')}>Continua partita</button>}</div>{jobId&&<div role="status"><p>Stockfish analizza la partita… {progress}%</p><progress value={progress} max={100}/></div>}</div>
             {game&&<PgnExport game={game}/>}
-            <PanelTabs id="review" label="Pannelli della revisione" value={reviewTab} onChange={setReviewTab} items={[{id:'moves',label:'Mosse'},{id:'elo',label:'Elo'},{id:'tutor',label:'Tutor'},{id:'insights',label:'Approfondimenti'}]}/>
+            <PanelTabs id="review" label="Pannelli della revisione" value={reviewTab} onChange={setReviewTab} items={[{id:'moves',label:'Mosse'},{id:'evaluation',label:'Andamento'},{id:'elo',label:'Elo'},{id:'tutor',label:'Tutor'},{id:'insights',label:'Approfondimenti'}]}/>
           </>}
+          {tab==='review'&&<div role="tabpanel" id="review-panel-evaluation" aria-labelledby="review-tab-evaluation" hidden={reviewTab!=='evaluation'}>{game?<EvaluationChart game={game} cursor={cursor} onPosition={setCursor} analyzing={!!jobId} onAnalyze={analyze}/>:<section className="panel"><p>Seleziona una partita per visualizzare il grafico.</p></section>}</div>}
           {tab==='review'&&<div role="tabpanel" id="review-panel-moves" aria-labelledby="review-tab-moves" hidden={reviewTab!=='moves'}>{game?<MoveReview game={game} cursor={cursor} onPosition={setCursor} level={reviewElo} onLevel={setReviewElo} prediction={visiblePrediction} error={predictionError} onRetry={()=>setRetry(n=>n+1)} analyzing={busy||!!jobId} onAnalyze={analyze}/>:<section className="panel"><p>Gioca una partita o importa un PGN per iniziare.</p></section>}</div>}
           {game&&(tab==='review'||(tab==='play'&&!!game.result))&&<div role={tab==='review'?'tabpanel':undefined} id="review-panel-elo" aria-labelledby={tab==='review'?'review-tab-elo':undefined} hidden={tab==='review'&&reviewTab!=='elo'}><RatingPanel key={'rating:'+game.id+':'+game.version+':'+game.revision} game={game} disabled={!!jobId||busy} onRated={rating=>setGame(current=>current?.id===game.id&&current.version===game.version&&current.revision===game.revision?{...current,rating}:current)}/></div>}
           {tab==='review'&&!game&&<div role="tabpanel" id="review-panel-elo" aria-labelledby="review-tab-elo" hidden={reviewTab!=='elo'} className="panel">Seleziona una partita per stimarne il livello.</div>}

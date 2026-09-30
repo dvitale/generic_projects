@@ -121,3 +121,9 @@ In **Puzzle** e **Blunder prevention**, la mossa tentata viene mostrata subito e
 ## Tattica, posizione e strategia
 
 La revisione e le spiegazioni DeepSeek distinguono conseguenze tattiche, cambiamenti posizionali e piano strategico. Gli indicatori confrontano la posizione prima della mossa, dopo la scelta e dopo l'alternativa Stockfish: sono fatti descrittivi, non una scomposizione del punteggio NNUE. Il saldo materiale è separato dalla valutazione e i casi non spiegabili vengono segnalati come causa da approfondire. La guida è disponibile anche in Puzzle, Blunder prevention e Drill; i Progressi distinguono i tipi di evidenza senza diagnosticare carenze da pochi esempi. [Review, confronto con altri sistemi e limiti](docs/strategy-tactics-review.md).
+
+## Andamento della valutazione
+
+In **Rivedi → Andamento** il grafico mostra la valutazione Stockfish iniziale e dopo ogni mossa dei due colori. Sopra lo zero è favorito il Bianco, sotto il Nero, indipendentemente dall'orientamento della scacchiera. Il punteggio è espresso in unità di pedone: non è Elo né un conteggio del materiale. I matti sono indicati separatamente con rombi ai bordi e non ricevono un valore numerico.
+
+Cliccando un punto, usando le frecce della tastiera sul grafico o scegliendo una posizione dall'elenco si aggiorna la scacchiera. **Tutte le valutazioni** apre anche la tabella. Il grafico riutilizza le valutazioni salvate e si aggiorna al termine dell'analisi. Per vecchie analisi incomplete, **Completa il grafico** ricalcola tutte le mosse; i segmenti mancanti non vengono interpolati. Nei Drill la curva parte dalla prima posizione analizzata, dopo la preparazione iniziale. La scala verticale si adatta alla partita e le valutazioni rimangono stime alla profondità di analisi raggiunta.
