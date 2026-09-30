@@ -11,7 +11,9 @@ def provider_payload():
     return {'choices': [{'finish_reason': 'stop', 'message': {'content': json.dumps({
         'reason': 'La donna diventa catturabile dalla torre.',
         'continuation': 'La variante mostra la risposta della torre dopo lo scacco.',
-        'lesson': 'Dopo la tua mossa, controlla tutte le catture avversarie.'})}}]}
+        'lesson': 'Dopo la tua mossa, controlla tutte le catture avversarie.',
+        'tactical':'La donna è catturata nella variante.', 'positional':'Non basta per stabilire un fattore posizionale dominante.',
+        'strategicPlan':'Metti al sicuro la donna prima di scegliere un piano.', 'uncertainty':'Non tutte le risposte sono rappresentate.'})}}]}
 
 
 @pytest.mark.parametrize('kind', ['prevention', 'puzzle'])

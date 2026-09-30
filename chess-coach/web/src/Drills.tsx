@@ -4,6 +4,7 @@ import PanelTabs from './PanelTabs'
 import PgnExport from './PgnExport'
 import {useMoveTime} from './useMoveTime'
 import { api } from './api'
+import {ThinkingGuide} from './ChessInsights'
 import { chooseMaiaMove } from './engine/play'
 import type { Color, Game } from './types'
 
@@ -65,6 +66,7 @@ export default function Drills({onReview,startTemplateId,onStarted}:{onReview:(g
   }
   return <div>
     {error&&<div className="alert" role="alert">{error}<button onClick={()=>{setError('');setRetry(n=>n+1)}}>Riprova</button></div>}
+    <section className="panel"><ThinkingGuide/><p className="muted">Prima scegli un obiettivo posizionale; dopo ogni risposta di Maia ricontrolla scacchi, catture e minacce. In revisione distinguerai qualità del piano ed errori di calcolo.</p></section>
     <PanelTabs id="drills" label="Pannelli dei drill" value={view} onChange={setView} items={[{id:'catalog',label:'Scegli un drill'},{id:'session',label:'Sessione'}]}/>
     <div role="tabpanel" id="drills-panel-session" aria-labelledby="drills-tab-session" hidden={view!=='session'}>
     {!game&&<section className="panel"><p>Scegli un drill per iniziare una sessione.</p><button onClick={()=>setView('catalog')}>Scegli un drill</button></section>}

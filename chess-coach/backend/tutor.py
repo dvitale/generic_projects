@@ -2,6 +2,7 @@
 import json
 import os
 from pathlib import Path
+from typing import Literal
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -10,7 +11,7 @@ from .engine import ROOT
 
 CONFIG_PATH = ROOT / '.secrets' / 'deepseek.json'
 ENDPOINT = 'https://api.deepseek.com/chat/completions'
-PROMPT_VERSION = 'coach-1'
+PROMPT_VERSION = 'coach-2-strategy'
 HTTP_CLIENT = httpx.Client
 
 
@@ -45,6 +46,10 @@ class Observation(BaseModel):
     explanation: str = Field(min_length=1, max_length=1600)
     hypothesis: str = Field(min_length=1, max_length=900)
     question: str = Field(min_length=1, max_length=500)
+    tactical: str = Field(min_length=1, max_length=1400)
+    positional: str = Field(min_length=1, max_length=1400)
+    strategicPlan: str = Field(min_length=1, max_length=1000)
+    uncertainty: str = Field(min_length=1, max_length=700)
 
 
 class TrainingStep(BaseModel):
@@ -54,6 +59,7 @@ class TrainingStep(BaseModel):
     description: str = Field(min_length=1, max_length=1200)
     exerciseId: str | None = Field(default=None, max_length=100)
     drillId: str | None = Field(default=None, max_length=120)
+    focus: Literal['tactical','strategic','mixed']
 
 
 class Coaching(BaseModel):
@@ -62,6 +68,34 @@ class Coaching(BaseModel):
     observations: list[Observation] = Field(min_length=1, max_length=3)
     plan: list[TrainingStep] = Field(min_length=1, max_length=3)
 
+
+PEDAGOGY = '''Distingui SEMPRE gravità e causa: errore/blunder misura il peggioramento,
+non dice se sia tattico o strategico. Un calo di 2 punti Stockfish NON equivale a
+due pedoni catturati: il materiale è separato in insight.material/lines.
+TATTICA = conseguenze concrete a breve termine e calcolo delle risposte: scacchi,
+catture, minacce, difese, promozione, patta forzata, opportunità perse; non soltanto
+attacco o guadagno di materiale. Un singolo scacco/cambio non prova una tattica.
+POSIZIONE = caratteristiche osservabili: struttura pedonale, attività e coordinamento,
+colonne, controllo del centro, sicurezza del re, qualità dei cambi. STRATEGIA = piano
+per sfruttare o migliorare quelle caratteristiche nelle mosse successive.
+Usa insight come evidenza descrittiva: before/played/alternative sono posizioni
+alla stessa distanza (prima e dopo UNA mossa). Spiega cosa è cambiato, a vantaggio
+di chi, quale risorsa o piano diventa possibile e come l'alternativa lo affronta.
+La portata dei pezzi e le case attaccate sono geometriche: non garantiscono mosse
+legali o case sicure (es. pezzi inchiodati). Un pedone isolato o la coppia degli
+alfieri non sono automaticamente svantaggio/vantaggio. La sicurezza del re cambia
+significato nei finali. Considera entrambi i colori e la compensazione dei sacrifici.
+Il saldo materiale alla fine di linee di lunghezza diversa non dimostra una perdita
+inevitabile: controlla ricatture, promozioni e continuazioni troncate nei passi forniti.
+Una tattica può creare un vantaggio posizionale: descrivi entrambe le dimensioni.
+Non inventare percentuali o una scomposizione del punteggio NNUE per fattori.
+NON concludere "è strategico" solo perché nella linea breve non cade un pezzo.
+Se il nesso causale non è supportato, scrivi che resta da approfondire; formula
+l'interpretazione posizionale come ipotesi, senza presentarla come certezza del motore.
+I campi tactical, positional, strategicPlan e uncertainty sono obbligatori:
+anche quando una dimensione manca, dillo. Il piano è un obiettivo concreto con
+un controllo delle minacce, non una variante inventata né una lista di principi generici.
+'''
 
 SYSTEM = '''Sei un tutor di scacchi. Rispondi in italiano con un oggetto JSON.
 Scrivi per il giocatore: nei testi evita il termine interno "ply", usa il numero
@@ -84,10 +118,15 @@ devono esistere negli elenchi. Per un'attività libera usa null. Non restituire 
 Formato JSON esatto (le stringhe sono esempi di formato, non conclusioni da copiare):
 {"summary":"Sintesi prudente", "observations":[{"ply":0,
 "explanation":"Fatto sostenuto dalla variante fornita",
-"hypothesis":"Una possibile spiegazione da verificare", "question":"Cosa avevi previsto?"}],
+"hypothesis":"Una possibile spiegazione da verificare", "question":"Cosa avevi previsto?",
+"tactical":"Conseguenze concrete o evidenza insufficiente", "positional":"Cosa cambia nella posizione",
+"strategicPlan":"Obiettivo e controllo delle minacce", "uncertainty":"Limiti delle evidenze"}],
 "plan":[{"title":"Ripasso", "minutes":5, "description":"Obiettivo concreto",
-"exerciseId":null, "drillId":null}]}
-'''
+"exerciseId":null, "drillId":null, "focus":"strategic"}]}
+Il focus di ogni attività è tactical, strategic oppure mixed. Proponi allenamento
+di calcolo per problemi tattici, confronto di piani e continuazioni nei Drill per
+ipotesi posizionali, o una combinazione motivata. Non dedurre carenze stabili dai soli conteggi.
+''' + PEDAGOGY
 
 
 def request_json(context, model, system=SYSTEM):
@@ -100,7 +139,7 @@ def request_json(context, model, system=SYSTEM):
         {'role': 'system', 'content': system},
         {'role': 'user', 'content': json.dumps(context, ensure_ascii=False)}],
         'response_format': {'type': 'json_object'}, 'thinking': {'type': 'disabled'},
-        'temperature': 0.3, 'max_tokens': 2400, 'stream': False}
+        'temperature': 0.3, 'max_tokens': 4200, 'stream': False}
     try:
         # Fixed official host; never forward credentials to a user-provided URL.
         with HTTP_CLIENT(timeout=httpx.Timeout(55, connect=10), follow_redirects=False, trust_env=False) as client:
@@ -149,7 +188,7 @@ def generate(context, model):
     return {'coaching': coaching.model_dump(), 'usage': tokens, 'model': model, 'provider': 'DeepSeek'}
 
 
-MISTAKE_PROMPT_VERSION = 'mistake-1'
+MISTAKE_PROMPT_VERSION = 'mistake-2-strategy'
 MISTAKE_SYSTEM = '''Sei un tutor di scacchi. Spiega in italiano semplice perché la
 mossa indicata peggiora la posizione, dal punto di vista del giocatore (turn).
 Ricevi una posizione e due varianti Stockfish con SAN, valutazioni e fatti verificati
@@ -168,8 +207,12 @@ l'avversario. Se la linea breve non chiarisce il motivo, dichiaralo esplicitamen
 Non promettere certezza oltre la ricerca Stockfish disponibile.
 Restituisci solo JSON: {"reason":"Motivo comprensibile, massimo 1800 caratteri",
 "continuation":"Come la variante dimostra il problema, massimo 1800 caratteri",
-"lesson":"Una domanda o controllo concreto prima di muovere, massimo 600 caratteri"}.
-'''
+"lesson":"Una domanda o controllo concreto prima di muovere, massimo 600 caratteri",
+"tactical":"Conseguenze concrete o evidenza insufficiente, massimo 1400 caratteri",
+"positional":"Cosa cambia nella posizione, massimo 1400 caratteri",
+"strategicPlan":"Obiettivo e controllo delle minacce, massimo 1000 caratteri",
+"uncertainty":"Cosa è verificato e cosa resta ipotesi, massimo 700 caratteri"}.
+''' + PEDAGOGY
 
 
 class MistakeExplanation(BaseModel):
@@ -177,6 +220,10 @@ class MistakeExplanation(BaseModel):
     reason: str = Field(min_length=1, max_length=1800)
     continuation: str = Field(min_length=1, max_length=1800)
     lesson: str = Field(min_length=1, max_length=600)
+    tactical: str = Field(min_length=1, max_length=1400)
+    positional: str = Field(min_length=1, max_length=1400)
+    strategicPlan: str = Field(min_length=1, max_length=1000)
+    uncertainty: str = Field(min_length=1, max_length=700)
 
 
 def explain_mistake(context, model):

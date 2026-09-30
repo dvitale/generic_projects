@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from .engine import evaluator
 from . import mistakes
+from . import insights
 
 SAFE_CP = -100
 BLUNDER_CP = -200
@@ -182,6 +183,7 @@ def install(app, database, reconstruct, now):
             if not success:
                 mistakes.record(con, 'prevention', position_id, result['attemptId'], board, move, best, actual, now())
         return {**result, 'success': success, 'assisted': False, 'move': body.move, 'san': board.san(move), 'actual': actual,
+                'insight': insights.public(insights.compare(board.fen(),body.move,best,actual)),
                 'example': best if success else None,
                 'original': explanation(row, json.loads(row['verification'])) if success else None,
                 'message': 'Blunder evitato: questa mossa mantiene la posizione difendibile.' if success else 'Questa mossa scende sotto la soglia di sicurezza secondo Stockfish. Riprova: non serve trovare la migliore.'}

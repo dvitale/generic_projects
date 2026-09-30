@@ -19,8 +19,10 @@ def client(tmp_path, monkeypatch):
 
 def sample_coaching(ply=4, exercise_id=None):
     return {'summary':'Una decisione da rivedere.', 'observations':[{'ply':ply,'explanation':'Confronta la tua mossa con la variante Stockfish.',
-            'hypothesis':'Potresti aver trascurato una risposta: è da verificare.','question':'Quale risposta avevi previsto?'}],
-            'plan':[{'title':'Ripassa la decisione','minutes':5,'description':'Confronta due mosse candidate.','exerciseId':exercise_id,'drillId':None}]}
+            'hypothesis':'Potresti aver trascurato una risposta: è da verificare.','question':'Quale risposta avevi previsto?',
+            'tactical':'La variante contiene una cattura.', 'positional':'Il confronto delle attività va interpretato.',
+            'strategicPlan':'Verifica le risposte avversarie prima di attaccare.', 'uncertainty':'Una linea breve non descrive ogni possibilità.'}],
+            'plan':[{'title':'Ripassa la decisione','minutes':5,'description':'Confronta due mosse candidate.','exerciseId':exercise_id,'drillId':None,'focus':'mixed'}]}
 
 
 def install_transport(monkeypatch, status=200, payload=None):
