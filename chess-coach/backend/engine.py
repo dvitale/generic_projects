@@ -80,7 +80,10 @@ class Evaluator:
                 return []
             # MultiPV ranks distinct root moves, not subsequent moves in one variation.
             infos = self._analyse(board, nodes * count, multipv=count)
-            return [self._format(board, info) for info in infos]
+            # A node-limited search can stop partway through a MultiPV iteration;
+            # its numbered lines may then contain scores from different depths.
+            # Rank the returned evaluations consistently for comparison and display.
+            return sorted((self._format(board, info) for info in infos), key=lambda value: value['cp'], reverse=True)
 
     def compare_candidates(self, board, played, nodes=24000):
         with self.lock:

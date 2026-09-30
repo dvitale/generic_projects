@@ -23,6 +23,7 @@ from .engine import ROOT, evaluator
 from .drills import CATALOG, materialize, decisions_played
 from . import tutor
 from . import prevention
+from . import mistakes
 from .rating import rating_plan, summarize_rating, RATING_LEVELS, RATING_METHOD
 
 DB_PATH = Path(os.environ.get("CHESS_COACH_DATA", str(ROOT / "data"))) / "coach.sqlite3"
@@ -97,6 +98,7 @@ def init_db():
             if name not in columns:
                 con.execute(f"ALTER TABLE attempts ADD COLUMN {name} {declaration}")
         prevention.init_schema(con)
+        mistakes.init_schema(con)
         for row in con.execute('SELECT * FROM games WHERE analysis IS NOT NULL').fetchall():
             if row['analysis_version'] == len(json.loads(row['moves'])):
                 prevention.seed_game(con, row, json.loads(row['analysis']), now())
@@ -597,8 +599,10 @@ def attempt(exercise_id: str, body: AttemptInput):
             interval = [1, 3, 7, 14, 30][min(max(streak - 1, 0), 4)]
             due = (datetime.now(timezone.utc) + timedelta(days=interval)).isoformat()
             con.execute("UPDATE exercises SET streak=?,due_at=? WHERE id=?", (streak, due, exercise_id))
-        con.execute("INSERT INTO attempts(exercise_id,move,success,assisted,created_at,session_id,is_first,exposure) VALUES(?,?,?,?,?,?,?,?)",
+        inserted = con.execute("INSERT INTO attempts(exercise_id,move,success,assisted,created_at,session_id,is_first,exposure) VALUES(?,?,?,?,?,?,?,?)",
                     (exercise_id, body.move, int(success), int(assisted), now(), body.session_id, int(first), session["exposure"]))
+        if not success:
+            mistakes.record(con, 'puzzle', exercise_id, inserted.lastrowid, board, move, best, actual, now())
         con.execute("UPDATE puzzle_sessions SET guesses=guesses+1,status=? WHERE id=?", ("complete" if success else "active", body.session_id))
     return {"success": success, "assisted": assisted, "loss": loss, "best": best if success else None, "actual": actual,
             "dueAt": due, "version": body.version + 1, "closed": success,
@@ -753,6 +757,7 @@ def request_tutor(game_id: str, body: TutorInput):
 
 
 prevention.install(app, database, reconstruct, now)
+mistakes.install(app, database, tutor_lock)
 
 DIST = ROOT / "web" / "dist"
 if DIST.exists():

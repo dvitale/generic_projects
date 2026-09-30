@@ -38,7 +38,7 @@ function Piece({code}:{code:string}) {
   return missing?<span aria-hidden="true" className={`piece ${code[0]==='w'?'white-piece':'black-piece'}`}>{symbols[code]}</span>:
     <img className="piece-image" src={`/pieces/neo/${code}.png`} alt="" aria-hidden="true" draggable={false} onError={()=>setMissing(true)}/>
 }
-export default function Board({fen, orientation, interactive, legalMoves, onMove, lastMove, animateMove=false,analysisArrows=[]}: {fen:string; orientation:Color; interactive:boolean; legalMoves:string[]; onMove:(uci:string)=>void; lastMove?:string;animateMove?:boolean;analysisArrows?:AnalysisArrow[]}) {
+export default function Board({fen, orientation, interactive, legalMoves, onMove, lastMove, animateMove=false,reverseMove=false,analysisArrows=[]}: {fen:string; orientation:Color; interactive:boolean; legalMoves:string[]; onMove:(uci:string)=>void; lastMove?:string;animateMove?:boolean;reverseMove?:boolean;analysisArrows?:AnalysisArrow[]}) {
   const [selected, setSelected] = useState<string | null>(null)
   const [promotion, setPromotion] = useState<string[]>([])
   const [drag, setDrag] = useState<{from:string;code:string;x:number;y:number;size:number}|null>(null)
@@ -82,9 +82,9 @@ export default function Board({fen, orientation, interactive, legalMoves, onMove
     const from=lastMove.slice(0,2),to=lastMove.slice(2,4)
     let castling=false
     try {
-      const before=new Chess(previous)
+      const before=new Chess(reverseMove?fen:previous)
       const moved=before.move({from,to,promotion:lastMove[4]})
-      if(before.fen()!==fen)return
+      if(before.fen()!==(reverseMove?previous:fen))return
       castling=moved.isKingsideCastle()||moved.isQueensideCastle()
     }catch{return}
     const animations:Animation[]=[]
@@ -94,12 +94,25 @@ export default function Board({fen, orientation, interactive, legalMoves, onMove
       const piece=end?.querySelector<HTMLElement>('.piece-image,.piece')
       if(!start||!end||!piece)return
       const a=start.getBoundingClientRect(),b=end.getBoundingClientRect()
-      animations.push(piece.animate([{transform:`translate(${a.left-b.left}px,${a.top-b.top}px)`},{transform:'translate(0,0)'}],{duration:260,easing:'cubic-bezier(.2,.65,.3,1)'}))
+      animations.push(piece.animate([{transform:`translate(${a.left-b.left}px,${a.top-b.top}px)`,zIndex:4},{transform:'translate(0,0)',zIndex:4}],{duration:reverseMove?650:260,easing:'cubic-bezier(.2,.65,.3,1)'}))
     }
-    slide(from,to)
-    if(castling)slide((to[0]==='g'?'h':'a')+to[1],(to[0]==='g'?'f':'d')+to[1])
+    slide(reverseMove?to:from,reverseMove?from:to)
+    if(castling){
+      const rookFrom=(to[0]==='g'?'h':'a')+to[1],rookTo=(to[0]==='g'?'f':'d')+to[1]
+      slide(reverseMove?rookTo:rookFrom,reverseMove?rookFrom:rookTo)
+    }
+    if(reverseMove){
+      // Captured pieces (including en passant) reappear after the moving piece returns.
+      const before=new Chess(previous),after=new Chess(fen)
+      for(const rank of '12345678')for(const file of 'abcdefgh'){
+        const square=(file+rank) as Square
+        if(square===from||!after.get(square)||before.get(square)?.color===after.get(square)?.color)continue
+        const piece=boardElement.current?.querySelector<HTMLElement>(`[data-square="${square}"] .piece-image,[data-square="${square}"] .piece`)
+        if(piece)animations.push(piece.animate([{opacity:0,offset:0},{opacity:0,offset:.8},{opacity:1,offset:1}],{duration:650}))
+      }
+    }
     return()=>animations.forEach(animation=>animation.cancel())
-  },[fen,orientation,lastMove,animateMove])
+  },[fen,orientation,lastMove,animateMove,reverseMove])
   const targets = selected ? legalMoves.filter(m => m.startsWith(selected)).map(m => m.slice(2,4)) : []
   function submit(from:string,to:string) {
       const candidates = legalMoves.filter(m => m.startsWith(from + to))
