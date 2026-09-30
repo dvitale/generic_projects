@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field, FiniteFloat
 from .engine import ROOT, evaluator
 from .drills import CATALOG, materialize, decisions_played
 from . import tutor
+from . import prevention
 from .rating import rating_plan, summarize_rating, RATING_LEVELS, RATING_METHOD
 
 DB_PATH = Path(os.environ.get("CHESS_COACH_DATA", str(ROOT / "data"))) / "coach.sqlite3"
@@ -95,6 +96,10 @@ def init_db():
         for name, declaration in {"session_id": "TEXT", "is_first": "INTEGER NOT NULL DEFAULT 0", "exposure": "TEXT NOT NULL DEFAULT 'legacy'"}.items():
             if name not in columns:
                 con.execute(f"ALTER TABLE attempts ADD COLUMN {name} {declaration}")
+        prevention.init_schema(con)
+        for row in con.execute('SELECT * FROM games WHERE analysis IS NOT NULL').fetchall():
+            if row['analysis_version'] == len(json.loads(row['moves'])):
+                prevention.seed_game(con, row, json.loads(row['analysis']), now())
 
 
 @asynccontextmanager
@@ -344,6 +349,7 @@ def preserve_review(con, row, session):
     con.execute('UPDATE exercises SET game_id=? WHERE game_id=?', (archive_id, row['id']))
     con.execute('UPDATE tutor_reviews SET game_id=? WHERE game_id=?', (archive_id, row['id']))
     con.execute('UPDATE game_ratings SET game_id=? WHERE game_id=?', (archive_id, row['id']))
+    con.execute('UPDATE prevention_positions SET game_id=? WHERE game_id=?', (archive_id, row['id']))
 
 
 @app.post('/api/games/{game_id}/undo')
@@ -473,6 +479,7 @@ def analyze_game(job_id, snapshot):
                 raise ValueError('La partita è cambiata: riavvia l’analisi.')
             con.execute("UPDATE games SET analysis=?, analysis_version=? WHERE id=?",
                         (json.dumps(analysis), len(moves), snapshot["id"]))
+            prevention.seed_game(con, snapshot, analysis, now())
             for item in critical:
                 if not item["best"]["pv"]:
                     continue
@@ -744,6 +751,8 @@ def request_tutor(game_id: str, body: TutorInput):
     finally:
         tutor_lock.release()
 
+
+prevention.install(app, database, reconstruct, now)
 
 DIST = ROOT / "web" / "dist"
 if DIST.exists():

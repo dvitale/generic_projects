@@ -107,3 +107,10 @@ L'installazione sul PC usa il tema **Green** e i pezzi **Neo** richiesti, scaric
 Le partite libere non hanno un conto alla rovescia: si registra il tempo attivo per mossa con l'annotazione PGN `[%emt h:mm:ss]`. Il conteggio si sospende lasciando il pannello di gioco o nascondendo la scheda; il tempo di Maia comprende inferenza e attesa visibile. Il turno in corso viene recuperato dopo un normale ricaricamento nella stessa scheda. I dati delle mosse confermate restano nel database, anche dopo il riavvio. Un turno il cui inizio non è stato osservato rimane senza tempo; le mosse delle vecchie partite non ricevono valori inventati.
 
 Nei PGN importati si conservano sia `[%clk ...]` (tempo residuo sull'orologio) sia `[%emt ...]` (durata della mossa), quando presenti. Disattivare Includi tempi esclude queste annotazioni dal download senza cancellare i dati. Annullare una mossa rimuove anche i relativi tempi; un'eventuale copia di revisione conserva la linea originale con i suoi tempi.
+
+
+## Blunder prevention
+
+La sezione **Blunder prevention** propone le posizioni delle tue partite analizzate prima di un errore che rende la posizione perdente. Accetta qualsiasi mossa valutata da Stockfish almeno −1,00 dal tuo punto di vista, senza matto forzato contro di te: non serve trovare la prima scelta. Le posizioni già perse e le mosse obbligate vengono escluse, e ogni candidato è ricontrollato prima del primo tentativo.
+
+I tentativi e i ripassi sono separati dai Puzzle. Dopo una scelta corretta o la richiesta di un esempio, puoi confrontare il vecchio errore, aprire la partita originale e passare alla posizione successiva. I retry e gli aiuti non gonfiano i successi al primo tentativo. Le analisi già presenti alimentano il catalogo automaticamente; per altre partite usa **Analizza partita**. [Criteri e limiti](docs/blunder-prevention.md).
