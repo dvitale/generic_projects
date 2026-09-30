@@ -3,13 +3,14 @@ import {Chess} from 'chess.js'
 import Board from './Board'
 import MistakeHistory from './MistakeHistory'
 import {useTrainingMove} from './useTrainingMove'
+import ChessInsights,{ThinkingGuide,type Insight} from './ChessInsights'
 import {api} from './api'
 import type {Color,Evaluation} from './types'
 
 interface Position {id:string;gameId:string;title:string;ply:number;fen:string;turn:Color;moveNumber:number;legalMoves:string[];dueAt:string;streak:number}
 interface Catalog {positions:Position[];stats:{firstAttempts:number;firstSuccesses:number};analyzedGames:number;rule:{description:string}}
 interface Session {id:string;version:number;exposure:string;excluded?:boolean;message?:string}
-interface Result {success:boolean;assisted:boolean;closed:boolean;version:number;firstTry:boolean;move:string;san:string;actual:Evaluation;example:Evaluation|null;original:{move:string;san:string;evaluation:Evaluation}|null;message:string}
+interface Result {success:boolean;assisted:boolean;closed:boolean;version:number;firstTry:boolean;move:string;san:string;actual:Evaluation;example:Evaluation|null;original:{move:string;san:string;evaluation:Evaluation}|null;message:string;insight?:Insight}
 const evaluation=(e:Evaluation)=>e.mate!==null?(e.mate>0?`Matto a tuo favore in ${e.mate}`:`Matto contro di te in ${Math.abs(e.mate)}`):`${e.cp>=0?'+':''}${(e.cp/100).toFixed(2)}`
 
 export default function BlunderPrevention({onArchive,onReview}:{onArchive:()=>void;onReview:(id:string,ply:number)=>void}) {
@@ -78,6 +79,7 @@ export default function BlunderPrevention({onArchive,onReview}:{onArchive:()=>vo
         <p className="footnote">{showOriginal?'Scacchiera dopo il tuo errore originale.':result?.closed?'Scacchiera dopo la mossa verificata.':'Scacchiera prima del tuo errore: trascina un pezzo o usa due clic.'}</p>
       </section>
       <aside className="coach-column">
+        <section className="panel"><ThinkingGuide/><p className="footnote">La mossa può perdere per una tattica o compromettere una posizione difendibile. Stockfish decide l’esito; la spiegazione distingue fatti e ipotesi.</p></section>
         <section className="panel"><span className="eyebrow">PRIMA DI MUOVERE</span><h2>Controlla entrambi i colori.</h2><ol><li>Il re è al sicuro?</li><li>Quali pezzi sono attaccati o indifesi?</li><li>Quali scacchi e catture avrà l’avversario?</li></ol><p className="muted">Una mossa semplice che evita la perdita è sufficiente.</p>
           {!result?.closed&&<div className="row"><button disabled={busy||!session} onClick={()=>void submit()}>Mostra una mossa sicura</button><button disabled={busy||!remaining.length} onClick={()=>{setDone(d=>[...d,position.id]);next()}}>Salta posizione</button></div>}
           <p className="footnote">{catalog?.rule.description} I valori sono dal tuo punto di vista e sono stime del motore.</p>
@@ -85,6 +87,7 @@ export default function BlunderPrevention({onArchive,onReview}:{onArchive:()=>vo
         </section>
         {result&&<section className="panel"><span className="eyebrow">LA TUA SCELTA</span><h2>{result.san} · {evaluation(result.actual)}</h2>{!result.closed?<><p>Dopo aver mostrato la mossa, la scacchiera torna alla posizione iniziale per riprovare.</p><p className="variation">Possibile seguito: {result.actual.san.join(' ')}</p></>:<><p>{result.assisted?'Esempio mostrato con aiuto.':result.firstTry?'Riuscito al primo tentativo senza aiuti.':'Mossa accettata. I tentativi precedenti restano registrati.'}</p><p className="variation">Possibile seguito: {result.actual.san.join(' ')}</p></>}</section>}
         {result?.closed&&result.original&&<section className="panel"><span className="eyebrow">IL CONFRONTO CON LA PARTITA</span><h3>Avevi giocato {result.original.san}</h3><p>Valutazione dopo l’errore: {evaluation(result.original.evaluation)}.</p><p className="variation">{result.original.evaluation.san.join(' ')}</p><div className="row"><button onClick={()=>setShowOriginal(v=>!v)}>{showOriginal?'Mostra la mossa sicura':'Mostra il vecchio errore'}</button><button onClick={()=>onReview(position.gameId,position.ply)}>Rivedi nella partita</button></div></section>}
+        {result?.closed&&<ChessInsights insight={result.insight} compact/>}
         <MistakeHistory key={position.id} kind="prevention" targetId={position.id} revision={session?.version??0}/>
       </aside>
     </div>}

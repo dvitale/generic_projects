@@ -43,7 +43,7 @@ test('an explanation can be opened, hidden and reopened without another provider
   let calls=0
   await page.route('**/api/training/prevention/explain/mistakes/1/explain',route=>{calls++;return route.fulfill({json:{explanation:{reason:'La donna rimane in presa.',continuation:'Il re può catturarla.',lesson:'Controlla le catture avversarie.'},provider:'DeepSeek',cached:false}})})
   await page.goto('/');await page.getByRole('button',{name:'Blunder prevention',exact:false}).click();await page.getByRole('button',{name:'Inizia Blunder prevention'}).click()
-  await expect(page.getByText('Perdita 4.00 pedoni')).toBeVisible();expect(calls).toBe(0)
+  await expect(page.getByText('Calo 4.00 punti')).toBeVisible();expect(calls).toBe(0)
   await page.getByRole('button',{name:'Spiega motivo',exact:true}).click();await expect(page.getByText('La donna rimane in presa.')).toBeVisible()
   await page.getByRole('button',{name:'Nascondi spiegazione'}).click();await expect(page.getByText('La donna rimane in presa.')).toHaveCount(0)
   await page.getByRole('button',{name:'Spiega motivo',exact:true}).click();await expect(page.getByText('La donna rimane in presa.')).toBeVisible();expect(calls).toBe(1)

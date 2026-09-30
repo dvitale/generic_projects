@@ -7,6 +7,7 @@ import chess
 from fastapi import HTTPException
 
 from . import tutor
+from . import insights
 from .engine import evaluator
 
 
@@ -38,6 +39,7 @@ def record(con, kind, target_id, attempt_id, board, move, best, actual, timestam
 def context_for(evidence):
     """Replay both engine lines, adding concrete captures and checks for the tutor."""
     context = dict(evidence)
+    context['insight'] = insights.compare(evidence['fen'],evidence['move'],evidence['best'],evidence['actual'])
     for name in ('best', 'actual'):
         board = chess.Board(evidence['fen'])
         steps = []
@@ -64,6 +66,7 @@ def install(app, database, lock):
                                (kind, target_id)).fetchall()
         # No best-move disclosure in the exercise list: it is used only on explicit explanation.
         return [{'id': r['id'], 'createdAt': r['created_at'],
+                 'insight': insights.public(insights.compare(**{k:json.loads(r['evidence'])[v] for k,v in [('fen','fen'),('played','move'),('best','best'),('actual','actual')]})),
                  'reference': {k: json.loads(r['evidence'])['best'][k] for k in ('cp', 'mate')},
                  **{k: v for k, v in json.loads(r['evidence']).items() if k != 'best'}} for r in rows]
 
@@ -78,7 +81,7 @@ def install(app, database, lock):
                 if row is None:
                     raise HTTPException(404, 'Tentativo non trovato per questo esercizio.')
                 _, model = tutor.configuration()
-                key = hashlib.sha256(json.dumps([row['evidence'], model, tutor.MISTAKE_PROMPT_VERSION]).encode()).hexdigest()
+                key = hashlib.sha256(json.dumps([row['evidence'], model, tutor.MISTAKE_PROMPT_VERSION, insights.VERSION]).encode()).hexdigest()
                 cached = con.execute('SELECT response FROM mistake_explanations WHERE cache_key=?', (key,)).fetchone()
                 if cached:
                     return {**json.loads(cached['response']), 'cached': True}

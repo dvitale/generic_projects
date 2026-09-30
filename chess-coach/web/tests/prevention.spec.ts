@@ -12,6 +12,11 @@ async function seed(request:APIRequestContext,black=false){
 test('Blunder prevention accepts alternatives, rejects the original blunder and advances to the next personal position',async({page,request})=>{
   await page.setViewportSize({width:1440,height:960})
   const white=await seed(request);const black=await seed(request,true)
+  const before=(await(await request.get('/api/prevention')).json()).stats
+  await page.route('**/api/prevention',async route=>{
+    const response=await route.fetch();const catalog=await response.json()
+    await route.fulfill({json:{...catalog,positions:catalog.positions.filter((p:{gameId:string})=>[white.id,black.id].includes(p.gameId))}})
+  })
   await page.goto('/')
   await page.getByRole('button',{name:'Blunder prevention',exact:false}).click()
   await expect(page.getByRole('heading',{name:'Blunder prevention',exact:true})).toBeVisible()
@@ -44,7 +49,7 @@ test('Blunder prevention accepts alternatives, rejects the original blunder and 
   await page.locator('[data-square="g3"]').click();await page.locator('[data-square="f4"]').click()
   await expect(page.getByRole('heading',{name:'✓ Blunder evitato!'})).toBeVisible()
   const catalog=await(await request.get('/api/prevention')).json()
-  expect(catalog.stats).toEqual({firstAttempts:2,firstSuccesses:1})
+  expect(catalog.stats).toEqual({firstAttempts:before.firstAttempts+2,firstSuccesses:before.firstSuccesses+1})
   expect((await(await request.get('/api/games/'+white.id)).json()).moves).toEqual(white.moves)
   expect((await(await request.get('/api/games/'+black.id)).json()).moves).toEqual(black.moves)
   await page.setViewportSize({width:390,height:844})

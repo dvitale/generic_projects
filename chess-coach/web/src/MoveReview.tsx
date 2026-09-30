@@ -1,5 +1,6 @@
 import type { Decision, Evaluation, Game } from './types'
 import type { Prediction } from './engine/maia'
+import ChessInsights,{ThinkingGuide} from './ChessInsights'
 
 function score(value:Evaluation){return value.mate!==null?`Matto ${value.mate>0?'+':''}${value.mate}`:`${value.cp>0?'+':''}${(value.cp/100).toFixed(2)}`}
 function label(d:Decision){const fields=d.fen.split(' ');return `${fields[5]}${fields[1]==='b'?'…':'.'} ${d.playedSan}`}
@@ -23,6 +24,7 @@ export default function MoveReview({game,cursor,onPosition,level,onLevel,predict
   const currentLabel=current?label(current):''
   return <section className="panel move-review" aria-label="Revisione passo passo">
     <span className="eyebrow">UNA MOSSA ALLA VOLTA</span><h2>Revisione passo passo</h2>
+    <ThinkingGuide/>
     <label className="field-label">Livello Maia per il confronto<select aria-label="Livello Maia per l’analisi" value={level} onChange={e=>onLevel(Number(e.target.value))}>{Array.from({length:21},(_,i)=>600+i*100).map(r=><option key={r} value={r}>{r}</option>)}</select></label>
     {!moves.length?<><p>{analyzing?'Stockfish sta preparando il confronto di tutte le mosse…':'Avvia la revisione per confrontare ogni mossa con Stockfish e Maia.'}</p><button className="primary full" disabled={analyzing||!game.version} onClick={onAnalyze}>Avvia revisione passo passo</button></>:<>
       {(!game.analysis?.moves||(game.analysis.reviewVersion||0)<3)&&<><p className="footnote">Aggiorna l’analisi salvata per confrontare fino a tre scelte Stockfish per ogni mossa.</p><button disabled={analyzing} onClick={onAnalyze}>Aggiorna revisione completa</button></>}
@@ -37,9 +39,10 @@ export default function MoveReview({game,cursor,onPosition,level,onLevel,predict
             <td>{maiaMove?<><span className="choice-rank">{rank+1}ª scelta</span><strong>{maiaMove.san}</strong><small>{(maiaMove.probability*100).toFixed(1)}%</small></>:<small>{prediction?'—':'Calcolo…'}</small>}</td>
           </tr>
         })}</tbody></table>
-        <p>{current.forced?'Era l’unica mossa legale.':best===current.played?'La mossa giocata coincide con la scelta di Stockfish.':current.best.mate!==null||current.actual.mate!==null?'La differenza tra le due scelte riguarda una sequenza di matto: confronta le varianti.':`Rispetto alla scelta di Stockfish, la mossa giocata perde ${(current.loss/100).toFixed(2)} pedoni di valutazione.`}</p>
+        <p>{current.forced?'Era l’unica mossa legale.':best===current.played?'La mossa giocata coincide con la scelta di Stockfish.':current.best.mate!==null||current.actual.mate!==null?'La differenza tra le due scelte riguarda una sequenza di matto: confronta le varianti.':`Rispetto alla scelta di Stockfish, la mossa giocata perde ${(current.loss/100).toFixed(2)} punti di valutazione: non significa aver perso altrettanti pedoni.`}</p>
         {human&&<p>{human.uci===current.played?`La mossa giocata è anche la più probabile per Maia ${level}.`:human.uci===best?`Stockfish e Maia ${level} indicano la stessa mossa alternativa.`:`Maia ${level} preferisce ${human.san}: è la scelta umana più probabile secondo il modello, non necessariamente la migliore.`}</p>}
         <details><summary>Varianti verificate da Stockfish</summary><p><strong>Dopo la mossa giocata:</strong> {current.actual.san.join(' ')||current.playedSan}</p>{stockfishChoices.map((choice,rank)=><p key={rank}><strong>{rank+1}ª scelta ({score(choice)}):</strong> {choice.san.join(' ')||'—'}</p>)}</details>
+        <ChessInsights insight={current.insight} compact/>
       </>:<p>Seleziona una mossa per vedere le tre scelte nella stessa posizione.</p>}
     </>}
     {error&&<div className="alert" role="alert">{error}<button onClick={onRetry}>Riprova Maia</button></div>}

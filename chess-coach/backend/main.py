@@ -24,6 +24,7 @@ from .drills import CATALOG, materialize, decisions_played
 from . import tutor
 from . import prevention
 from . import mistakes
+from . import insights
 from .rating import rating_plan, summarize_rating, RATING_LEVELS, RATING_METHOD
 
 DB_PATH = Path(os.environ.get("CHESS_COACH_DATA", str(ROOT / "data"))) / "coach.sqlite3"
@@ -255,7 +256,7 @@ def game_view(row):
             "timedMoves": sum(bool(t) for t in json.loads(row['move_times'])),
             "turn": "w" if board.turn else "b", "legalMoves": [m.uci() for m in board.legal_moves],
             "result": pgn.headers['Result'] if pgn.headers['Result'] != '*' else None, "source": row["source"], "drill": drill,
-            "analysis": json.loads(row["analysis"]) if row["analysis"] and row["analysis_version"] == len(moves) else None}
+            "analysis": insights.enrich(json.loads(row["analysis"])) if row["analysis"] and row["analysis_version"] == len(moves) else None}
 
 
 @app.get("/api/health")
@@ -466,6 +467,11 @@ def analyze_game(job_id, snapshot):
                                   "stockfishCandidates": choices,
                                   "isPlayer": is_player, "forced": forced,
                                   "label": "Mossa obbligata" if forced else "Errore" if loss >= 180 else "Imprecisione" if loss >= 80 else "Buona scelta"}
+                item['insight'] = insights.public(insights.compare(board.fen(), uci, best, actual))
+                if theme == 'Calcolo e mosse candidate':
+                    item['theme'] = {'tactical':'Conseguenze tattiche', 'mixed':'Tattica e posizione',
+                                     'positional':'Valutare la posizione e scegliere un piano',
+                                     'unclear':'Confrontare piani e varianti', 'neutral':theme}[item['insight']['kind']]
                 reviewed_moves.append(item)
                 if is_player and not forced:
                     decisions.append(item)
@@ -605,6 +611,7 @@ def attempt(exercise_id: str, body: AttemptInput):
             mistakes.record(con, 'puzzle', exercise_id, inserted.lastrowid, board, move, best, actual, now())
         con.execute("UPDATE puzzle_sessions SET guesses=guesses+1,status=? WHERE id=?", ("complete" if success else "active", body.session_id))
     return {"success": success, "assisted": assisted, "loss": loss, "best": best if success else None, "actual": actual,
+            "insight": insights.public(insights.compare(board.fen(), body.move, best, actual)),
             "dueAt": due, "version": body.version + 1, "closed": success,
             "message": "Mossa valida: mantiene la qualità della posizione." if success else "C'è un'alternativa migliore. Puoi riprovare: il primo tentativo è già registrato."}
 
@@ -679,8 +686,18 @@ def profile():
         independent = con.execute("SELECT count(*) FROM attempts WHERE assisted=0 AND is_first=1 AND exposure IN ('new','review')").fetchone()[0]
         due = con.execute("SELECT count(*) FROM exercises WHERE due_at<=?", (now(),)).fetchone()[0]
         themes = [dict(r) for r in con.execute("SELECT theme,count(*) AS examples FROM exercises GROUP BY theme ORDER BY examples DESC")]
+        domains = {key:0 for key in ('tactical','positional','mixed','unclear')}
+        seen = set()
+        for row in con.execute('SELECT analysis FROM games WHERE analysis IS NOT NULL AND source!=?', ('snapshot',)):
+            for d in json.loads(row['analysis']).get('decisions',[]):
+                identity=(d['fen'],d['played'])
+                if d['loss']<80 or identity in seen:continue
+                seen.add(identity)
+                saved=d.get('insight')
+                kind=(saved if saved and saved.get('version')==insights.VERSION else insights.compare(d['fen'],d['played'],d['best'],d['actual']))['kind']
+                if kind in domains:domains[kind]+=1
     return {"games": game_count, "attempts": attempts_count, "independentAttempts": independent, "unaidedSuccesses": unaided, "due": due,
-            "themes": themes, "confidence": "Osservazioni iniziali",
+            "themes": themes, "domains": [{'kind':key,'label':insights.LABELS[key],'examples':value} for key,value in domains.items()], "confidence": "Osservazioni iniziali",
             "plan": [{"title": "Ripassa le tue decisioni", "minutes": 5, "description": f"{due} esercizi pronti per il ripasso."},
                      {"title": "Un drill e una partita consapevole", "minutes": 15, "description": "Riparti da una tua decisione critica contro Maia, poi applica il metodo nel gioco libero."},
                      {"title": "Rivedi un momento critico", "minutes": 5, "description": "Confronta la tua scelta con una variante verificata da Stockfish."}]}
@@ -720,6 +737,8 @@ def request_tutor(game_id: str, body: TutorInput):
                 raise HTTPException(409, 'Completa l’analisi Stockfish della versione attuale prima di chiedere al tutor.')
             analysis = json.loads(row['analysis'])
             decisions = sorted(analysis['decisions'], key=lambda d: -d['loss'])[:3]
+            for d in decisions:
+                d['insight'] = insights.compare(d['fen'],d['played'],d['best'],d['actual'])
             if not decisions:
                 raise HTTPException(422, 'Non ci sono decisioni analizzate da discutere.')
             selected_plies = {d['ply'] for d in decisions}
@@ -731,7 +750,7 @@ def request_tutor(game_id: str, body: TutorInput):
         context = {'playerColor': row['player_color'], 'referenceElo': row['elo'], 'source': row['source'],
                    'engine': analysis['engine'], 'analysisNote': analysis['note'], 'analyzedDecisions': len(analysis['decisions']),
                    'decisions': decisions, 'reflection': body.reflection.strip(), 'exercises': exercise_context, 'drills': drills,
-                   'practice': {k: stats[k] for k in ('games', 'attempts', 'independentAttempts', 'unaidedSuccesses', 'due', 'themes')}}
+                   'practice': {k: stats[k] for k in ('games', 'attempts', 'independentAttempts', 'unaidedSuccesses', 'due', 'themes','domains')}}
         fingerprint = hashlib.sha256(row['analysis'].encode()).hexdigest()
         cache_key = hashlib.sha256(json.dumps([tutor.PROMPT_VERSION, game_id, fingerprint, model, context], sort_keys=True).encode()).hexdigest()
         with database() as con:
@@ -740,7 +759,7 @@ def request_tutor(game_id: str, body: TutorInput):
             return {**json.loads(cached['response']), 'cached': True}
         response = tutor.generate(context, model)
         response.update({'gameId': game_id, 'version': body.version, 'createdAt': now(), 'reflection': body.reflection.strip(),
-                         'evidence': [{'ply': d['ply'], 'playedSan': d['playedSan'], 'bestSan': d['best']['san'], 'theme': d['theme']} for d in decisions],
+                         'evidence': [{'ply': d['ply'], 'playedSan': d['playedSan'], 'bestSan': d['best']['san'], 'theme': d['theme'], 'insight':insights.public(d['insight'])} for d in decisions],
                          'cached': False})
         # A concurrent move or re-analysis invalidates the coaching; never attach it to a newer state.
         with database() as con:
