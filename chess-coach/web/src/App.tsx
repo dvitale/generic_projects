@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Chess } from 'chess.js'
 import Board, {type AnalysisArrow} from './Board'
 import Drills from './Drills'
+import BlunderPrevention from './BlunderPrevention'
 import TutorPanel from './TutorPanel'
 import RatingPanel from './RatingPanel'
 import MoveReview from './MoveReview'
@@ -15,10 +16,10 @@ import { maia, type Prediction } from './engine/maia'
 import { chooseMaiaMove } from './engine/play'
 import type { Game, Color, Exercise, Attempt, Profile, Analysis, Evaluation, PuzzleSession } from './types'
 
-type Tab = 'play' | 'review' | 'drill' | 'train' | 'progress' | 'archive'
+type Tab = 'play' | 'review' | 'drill' | 'train' | 'progress' | 'archive' | 'prevention'
 type Saved = {id:string; title:string; createdAt:string; plies:number; source:string}
 const initialFen = new Chess().fen()
-const titles: Record<Tab, string> = {play:'Una mossa alla volta.',review:'Capisci le tue scelte.',drill:'Allena una sequenza.',train:'Trasforma gli errori in pratica.',progress:'Il tuo percorso, nel tempo.',archive:'Le tue partite.'}
+const titles: Record<Tab, string> = {prevention:'Blunder prevention',play:'Una mossa alla volta.',review:'Capisci le tue scelte.',drill:'Allena una sequenza.',train:'Trasforma gli errori in pratica.',progress:'Il tuo percorso, nel tempo.',archive:'Le tue partite.'}
 function position(game: Game, ply: number) {
   const board = new Chess(game.initialFen)
   for (const move of game.moves.slice(0, ply)) board.move({from:move.slice(0,2),to:move.slice(2,4),promotion:move[4]})
@@ -137,7 +138,7 @@ export default function App() {
     if(arrowSources.played)analysisArrows.push({move:reviewedMove.played,source:'played',rank:1})
   }
 
-  useEffect(()=>{if(game){setReviewElo(game.elo);setReviewTab(game.result?'elo':'moves')}},[game?.id])
+  useEffect(()=>{if(game){setReviewElo(game.elo);setReviewTab(cursor<game.version?'moves':game.result?'elo':'moves')}},[game?.id])
 
   useEffect(() => {
     setPrediction(null);setPredictionError('')
@@ -183,9 +184,9 @@ export default function App() {
     try { const result = await api<{jobId:string}>(`/games/${game.id}/analysis`,{}); setProgress(0); setJobId(result.jobId) }
     catch (e) {fail(e)} finally {setBusy(false)}
   }
-  async function openGame(id: string) {
+  async function openGame(id: string, ply?:number) {
     setBusy(true); setError('')
-    try {const next = await api<Game>('/games/'+id); keepGame(next); setCursor(next.version); setTab('review')}
+    try {const next = await api<Game>('/games/'+id); keepGame(next); setCursor(ply??next.version); setTab('review')}
     catch(e){fail(e)} finally {setBusy(false)}
   }
   async function importPgn() {
@@ -215,18 +216,18 @@ export default function App() {
   return <div className="app-shell">
     <aside className="sidebar">
       <a className="brand" href="#" onClick={e=>{e.preventDefault();navigate('play')}}><span className="brand-mark">♞</span><span>Sparring<span className="brand-light">Mate</span><small>IL TUO SPAZIO DI ALLENAMENTO</small></span></a>
-      <nav aria-label="Navigazione principale">{([['play','♟','Gioca'],['review','◉','Rivedi'],['drill','◇','Drill'],['train','◎','Puzzle'],['progress','↗','Progressi'],['archive','▤','Partite']] as const).map(([key,icon,label]) => <button key={key} className={tab===key?'nav-item active':'nav-item'} onClick={()=>navigate(key)} aria-current={tab===key?'page':undefined}><span aria-hidden="true">{icon}</span>{label}{key==='train'&&!!profile?.due&&<b>{profile.due}</b>}</button>)}</nav>
+      <nav aria-label="Navigazione principale">{([['play','♟','Gioca'],['review','◉','Rivedi'],['drill','◇','Drill'],['train','◎','Puzzle'],['prevention','◇','Blunder prevention'],['progress','↗','Progressi'],['archive','▤','Partite']] as const).map(([key,icon,label]) => <button key={key} className={tab===key?'nav-item active':'nav-item'} onClick={()=>navigate(key)} aria-current={tab===key?'page':undefined}><span aria-hidden="true">{icon}</span>{label}{key==='train'&&!!profile?.due&&<b>{profile.due}</b>}</button>)}</nav>
       <div className="sidebar-note"><span className="eyebrow">IL METODO</span><p>Gioca. Comprendi.<br/>Riprova.</p><small>Un passo concreto, ogni giorno.</small></div>
       <div className="local-status"><span className="status-dot"/> Spazio personale locale<small>Partite archiviate su questo computer.</small></div>
     </aside>
     <main className={'page-'+tab}>
       <header className="topbar"><span>Il tuo allenamento</span><span className="pill">Maia + Stockfish <span className="status-dot"/></span></header>
-      <section className="page-intro"><div><span className="eyebrow">SparringMate / {tab==='play'?'SPARRING':tab==='review'?'REVISIONE':tab==='train'?'PUZZLE':tab==='drill'?'DRILL':tab==='archive'?'ARCHIVIO':'PERCORSO'}</span><h1>{titles[tab]}</h1><p>{tab==='play'?'Un avversario dal gioco umano. Uno spazio per migliorare.':tab==='review'?'Confronta mosse plausibili e conseguenze sulla scacchiera.':tab==='train'?'Riparti dalle decisioni delle tue partite, senza suggerimenti anticipati.':tab==='drill'?'Metti in pratica un piano contro Maia, poi rivedi le tue decisioni.':tab==='archive'?'Riprendi una partita o torna sulle tue decisioni.':'Osservazioni reali, piccoli obiettivi e ripassi mirati.'}</p></div><button className="quiet" onClick={()=>setShowImport(!showImport)}>↑ Importa PGN</button></section>
+      <section className="page-intro"><div><span className="eyebrow">SparringMate / {tab==='play'?'SPARRING':tab==='review'?'REVISIONE':tab==='prevention'?'BLUNDER PREVENTION':tab==='train'?'PUZZLE':tab==='drill'?'DRILL':tab==='archive'?'ARCHIVIO':'PERCORSO'}</span><h1>{titles[tab]}</h1><p>{tab==='prevention'?'Ritrova i tuoi errori. Scegli una mossa sicura.':tab==='play'?'Un avversario dal gioco umano. Uno spazio per migliorare.':tab==='review'?'Confronta mosse plausibili e conseguenze sulla scacchiera.':tab==='train'?'Riparti dalle decisioni delle tue partite, senza suggerimenti anticipati.':tab==='drill'?'Metti in pratica un piano contro Maia, poi rivedi le tue decisioni.':tab==='archive'?'Riprendi una partita o torna sulle tue decisioni.':'Osservazioni reali, piccoli obiettivi e ripassi mirati.'}</p></div><button className="quiet" onClick={()=>setShowImport(!showImport)}>↑ Importa PGN</button></section>
       {error&&<div className="alert" role="alert">{error}<button onClick={()=>{setError('');setRetry(x=>x+1)}}>Riprova</button></div>}
       {notice&&<div className="notice" role="status">{notice}</div>}
       {showImport&&<section className="panel import-panel"><h2>Importa una partita</h2><p className="muted">Incolla una singola partita PGN e seleziona il colore che vuoi analizzare.</p><textarea aria-label="Partita PGN" value={pgn} onChange={e=>setPgn(e.target.value)} rows={5} placeholder={'[White "Giocatore"]\n[Black "Avversario"]\n\n1. e4 e5 2. Nf3 Nc6 *'}/><div className="row"><label>Il tuo colore <select value={color} onChange={e=>setColor(e.target.value as Color)}><option value="w">Bianco</option><option value="b">Nero</option></select></label><button className="primary" disabled={busy||!pgn.trim()} onClick={importPgn}>Importa partita</button><button onClick={()=>setShowImport(false)}>Chiudi</button></div></section>}
 
-      {tab==='drill'?<Drills startTemplateId={requestedDrill} onStarted={()=>setRequestedDrill(null)} onReview={g=>{keepGame(g);setCursor(g.version);setTab('review');refresh().catch(fail)}}/>:tab==='progress'?<div className="progress-layout">
+      {tab==='prevention'?<BlunderPrevention onArchive={()=>navigate('archive')} onReview={(id,ply)=>void openGame(id,ply)}/>:tab==='drill'?<Drills startTemplateId={requestedDrill} onStarted={()=>setRequestedDrill(null)} onReview={g=>{keepGame(g);setCursor(g.version);setTab('review');refresh().catch(fail)}}/>:tab==='progress'?<div className="progress-layout">
         <section className="panel"><span className="eyebrow">IL TUO PIANO</span><h2>25 minuti per allenarti</h2>{profile?.plan.map((item,i)=><div className="plan-row" key={item.title}><span className="step-number">0{i+1}</span><div><h3>{item.title}</h3><p>{item.description}</p></div><span className="duration">{item.minutes} min</span></div>)}<button className="primary" onClick={()=>navigate(exercises.length?'train':'play')}>Inizia la sessione →</button></section>
         <section className="panel"><span className="eyebrow">LE TUE OSSERVAZIONI</span><h2>{profile?.confidence||'Nessun dato'}</h2><div className="stats"><div><strong>{profile?.games||0}</strong><span>partite salvate</span></div><div><strong>{profile?.attempts||0}</strong><span>tentativi</span></div><div><strong>{profile?.unaidedSuccesses||0}</strong><span>primi tentativi riusciti</span></div></div>{profile?.themes.length?profile.themes.map(t=><div className="theme-row" key={t.theme}><span>{t.theme}</span><span>{t.examples} posizioni</span></div>):<p className="empty-text">Analizza una partita per iniziare a raccogliere le tue posizioni di allenamento.</p>}<p className="footnote">I successi contano solo il primo tentativo senza aiuti, su esercizi nuovi o in scadenza. Le ripetizioni immediate restano pratica. Non sono ancora una misura di padronanza: servono anche verifiche su posizioni nuove.</p></section>
       </div>:tab==='archive'?null:<div className={'training-layout layout-'+tab}>
