@@ -91,7 +91,7 @@ def init_db():
         if 'revision' not in {r[1] for r in con.execute('PRAGMA table_info(games)')}:
             con.execute('ALTER TABLE games ADD COLUMN revision INTEGER NOT NULL DEFAULT 0')
         columns = {r[1] for r in con.execute('PRAGMA table_info(games)')}
-        for name, declaration in {'move_times': "TEXT NOT NULL DEFAULT '[]'", 'pgn_headers': "TEXT NOT NULL DEFAULT '{}'"}.items():
+        for name, declaration in {'move_times': "TEXT NOT NULL DEFAULT '[]'", 'pgn_headers': "TEXT NOT NULL DEFAULT '{}'", 'termination': 'TEXT'}.items():
             if name not in columns:
                 con.execute(f'ALTER TABLE games ADD COLUMN {name} {declaration}')
         columns = {r[1] for r in con.execute("PRAGMA table_info(attempts)")}
@@ -223,6 +223,10 @@ def game_pgn(row, include_times=True):
     pgn.headers['GameId'] = row['id']
     outcome = board.outcome(claim_draw=True)
     pgn.headers['Result'] = outcome.result() if outcome else stored_headers.get('Result', '*')
+    if row['termination'] == 'resign':
+        pgn.headers['Result'] = '0-1' if row['player_color'] == 'w' else '1-0'
+        pgn.headers['Termination'] = 'normal'
+        pgn.headers['Resignation'] = 'White' if row['player_color'] == 'w' else 'Black'
     if include_times:
         for node, timing in zip(pgn.mainline(), json.loads(row['move_times'])):
             if timing:
@@ -255,7 +259,8 @@ def game_view(row):
                  "complete": count >= session["target"] or outcome is not None}
     return {"id": row["id"], "fen": board.fen(), "initialFen": row["initial_fen"],
             "moves": moves, "version": len(moves), "revision": row['revision'], "playerColor": row["player_color"],
-            "canUndo": row['source'] in {'maia', 'drill'} and undo_ply(row, session) is not None,
+            "canUndo": not row['termination'] and row['source'] in {'maia', 'drill'} and undo_ply(row, session) is not None,
+            "termination": row['termination'],
             "rating": json.loads(rating['response']) if rating else None, "analysisJobId": analysis_job,
             "elo": row["elo"], "title": row["title"], "pgn": str(pgn),
             "timedMoves": sum(bool(t) for t in json.loads(row['move_times'])),
@@ -308,7 +313,7 @@ def make_move(game_id: str, body: MoveInput):
         session = con.execute("SELECT * FROM drill_sessions WHERE game_id=?", (game_id,)).fetchone()
         if session and decisions_played(row["initial_fen"], moves, session["start_ply"], row["player_color"]) >= session["target"]:
             raise HTTPException(409, "Drill completato: apri la revisione")
-        if board.is_game_over(claim_draw=True) or len(moves) >= 600:
+        if row['termination'] or board.is_game_over(claim_draw=True) or len(moves) >= 600:
             raise HTTPException(409, "Partita conclusa")
         player_turn = board.turn == (row["player_color"] == "w")
         if player_turn != (body.actor == "human"):
@@ -325,6 +330,26 @@ def make_move(game_id: str, body: MoveInput):
     # Commit the final move before the worker reads it; analysis survives closing the browser.
     board.push(move)
     if board.is_game_over(claim_draw=True):
+        queue_analysis(snapshot, automatic=True)
+    return get_game(game_id)
+
+
+@app.post('/api/games/{game_id}/resign')
+def resign_game(game_id: str, body: UndoInput):
+    with database() as con:
+        con.execute('BEGIN IMMEDIATE')
+        row = find_game(con, game_id)
+        moves = json.loads(row['moves'])
+        board = reconstruct(row['initial_fen'], moves)
+        if row['source'] != 'maia' or row['termination'] or board.is_game_over(claim_draw=True):
+            raise HTTPException(409, 'Questa partita non può essere abbandonata: è già conclusa o disponibile solo in revisione')
+        # A Maia reply may have committed while the player confirmed resignation.
+        bot_reply = len(moves) == body.version + 1 and reconstruct(row['initial_fen'], moves[:body.version]).turn != (row['player_color'] == 'w')
+        if row['revision'] != body.revision or not (len(moves) == body.version or bot_reply):
+            raise HTTPException(409, 'La partita è cambiata: ricaricala prima di abbandonare')
+        con.execute("UPDATE games SET termination='resign',revision=revision+1 WHERE id=?", (game_id,))
+        snapshot = dict(find_game(con, game_id))
+    if moves:
         queue_analysis(snapshot, automatic=True)
     return get_game(game_id)
 
@@ -370,7 +395,7 @@ def undo_move(game_id: str, body: UndoInput):
     with database() as con:
         con.execute('BEGIN IMMEDIATE')
         row = find_game(con, game_id)
-        if row['source'] not in {'maia', 'drill'}:
+        if row['termination'] or row['source'] not in {'maia', 'drill'}:
             raise HTTPException(409, 'Questa partita è disponibile solo in revisione')
         moves = json.loads(row['moves'])
         session = con.execute('SELECT * FROM drill_sessions WHERE game_id=?', (game_id,)).fetchone()

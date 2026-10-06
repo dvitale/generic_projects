@@ -1,0 +1,46 @@
+import {test,expect} from '@playwright/test'
+
+test('resignation requires confirmation, persists defeat and starts review automatically',async({page,request})=>{
+  let g=await(await request.post('/api/games',{data:{color:'w'}})).json()
+  for(const [move,actor] of [['e2e4','human'],['e7e5','maia']])g=await(await request.post(`/api/games/${g.id}/moves`,{data:{move,actor,version:g.version,revision:g.revision}})).json()
+  await page.addInitScript(id=>localStorage.setItem('chess-coach-game',id),g.id)
+  await page.goto('/')
+  await page.getByRole('button',{name:'Continua partita',exact:true}).click()
+  const button=page.getByRole('button',{name:'Abbandona partita',exact:true})
+  await expect(button).toBeVisible()
+  page.once('dialog',dialog=>dialog.dismiss())
+  await button.click()
+  expect((await(await request.get('/api/games/'+g.id)).json()).result).toBeNull()
+  page.once('dialog',dialog=>dialog.accept())
+  await button.click()
+  await expect(page.getByText('Partita conclusa · 0-1 · per abbandono')).toBeVisible()
+  await expect(button).toHaveCount(0)
+  await expect(page.getByRole('button',{name:'Annulla ultima mossa',exact:true})).toBeDisabled()
+  await expect.poll(async()=>(await(await request.get('/api/games/'+g.id)).json()).analysis?.version).toBe(2)
+  await page.reload()
+  await expect(page.getByRole('button',{name:'Continua partita',exact:true})).toHaveCount(0)
+  await page.getByRole('button',{name:'Gioca',exact:true}).click()
+  await expect(page.getByText('Partita conclusa · 0-1 · per abbandono')).toBeVisible()
+})
+
+test('resign while Maia is thinking cancels its move',async({page,request})=>{
+  const g=await(await request.post('/api/games',{data:{color:'w'}})).json()
+  await request.post(`/api/games/${g.id}/moves`,{data:{move:'e2e4',actor:'human',version:0,revision:0}})
+  await page.addInitScript(id=>localStorage.setItem('chess-coach-game',id),g.id)
+  let release!:()=>void
+  const gate=new Promise<void>(resolve=>{release=resolve})
+  await page.route('**/api/games/*/moves',async route=>{
+    if(route.request().postDataJSON()?.actor==='maia')await gate
+    await route.continue()
+  })
+  await page.goto('/')
+  await page.getByRole('button',{name:'Continua partita',exact:true}).click()
+  await expect(page.getByText('Maia sta pensando…',{exact:true})).toBeVisible()
+  page.once('dialog',dialog=>dialog.accept())
+  await page.getByRole('button',{name:'Abbandona partita',exact:true}).click()
+  release()
+  await expect(page.getByText('Partita conclusa · 0-1 · per abbandono')).toBeVisible()
+  const ended=await(await request.get('/api/games/'+g.id)).json()
+  expect(ended.moves).toEqual(['e2e4'])
+  await expect(page.getByText('Maia sta pensando…',{exact:true})).toHaveCount(0)
+})

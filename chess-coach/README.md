@@ -137,3 +137,7 @@ Il tasto **Analizza con Lichess**, sotto la scacchiera in Gioca, Rivedi, Blunder
 Quando una mossa conclude una partita locale (matto o patta), Stockfish avvia automaticamente l'analisi dopo aver salvato la mossa. La schermata finale resta aperta e mostra l'avanzamento; l'analisi prosegue sul server anche chiudendo il browser. Riaprendo la partita si recupera il lavoro in corso, senza avviarne una seconda copia. Al termine, le posizioni adatte alimentano Puzzle e Blunder prevention. L'analisi può essere ricalcolata manualmente; le partite importate o interrotte restano analizzabili con il comando dedicato.
 
 In ogni Puzzle e posizione di Blunder prevention, il riquadro **Dalla tua partita** mostra titolo, data di archiviazione e numero/colore della mossa. **Rivedi questa mossa nella partita** apre la revisione esattamente prima della decisione originale. Il riferimento è disponibile anche per gli esercizi già salvati e segue l'eventuale copia conservata quando si annullano mosse di una partita analizzata.
+
+## Abbandonare una partita
+
+Durante il gioco, **Abbandona partita** è disponibile sotto la scacchiera, anche mentre Maia pensa. Dopo la conferma viene registrata una sconfitta per il tuo colore, viene fermata la risposta di Maia e si avvia l'analisi automatica delle mosse giocate. Risultato e motivo restano salvati al ricaricamento e nel PGN esportato. La partita abbandonata resta consultabile, ma non accetta altre mosse o annullamenti. Se abbandoni prima della prima mossa, viene salvato il risultato senza avviare un'analisi vuota.
