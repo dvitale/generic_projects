@@ -238,6 +238,11 @@ def game_view(row):
     board = reconstruct(row['initial_fen'], moves)
     pgn = game_pgn(row)
     outcome = board.outcome(claim_draw=True)
+    with jobs_lock:
+        analysis_job = next((key for key, job in reversed(list(jobs.items()))
+                             if job['gameId'] == row['id'] and job.get('version') == len(moves)
+                             and job.get('revision') == row['revision']
+                             and (job['status'] == 'running' or row['analysis_version'] != len(moves))), None)
     with database() as con:
         session = con.execute("SELECT * FROM drill_sessions WHERE game_id=?", (row["id"],)).fetchone()
         rating = con.execute('SELECT response FROM game_ratings WHERE game_id=? AND version=? AND revision=?',
@@ -251,7 +256,7 @@ def game_view(row):
     return {"id": row["id"], "fen": board.fen(), "initialFen": row["initial_fen"],
             "moves": moves, "version": len(moves), "revision": row['revision'], "playerColor": row["player_color"],
             "canUndo": row['source'] in {'maia', 'drill'} and undo_ply(row, session) is not None,
-            "rating": json.loads(rating['response']) if rating else None,
+            "rating": json.loads(rating['response']) if rating else None, "analysisJobId": analysis_job,
             "elo": row["elo"], "title": row["title"], "pgn": str(pgn),
             "timedMoves": sum(bool(t) for t in json.loads(row['move_times'])),
             "turn": "w" if board.turn else "b", "legalMoves": [m.uci() for m in board.legal_moves],
@@ -316,7 +321,12 @@ def make_move(game_id: str, body: MoveInput):
         times = (times + [None] * body.version)[:body.version]
         times.append({'emt': round(body.elapsed_seconds, 3)} if body.elapsed_seconds is not None else None)
         con.execute("UPDATE games SET moves=?,move_times=? WHERE id=?", (json.dumps(moves), json.dumps(times), game_id))
-        return game_view(find_game(con, game_id))
+        snapshot = dict(find_game(con, game_id))
+    # Commit the final move before the worker reads it; analysis survives closing the browser.
+    board.push(move)
+    if board.is_game_over(claim_draw=True):
+        queue_analysis(snapshot, automatic=True)
+    return get_game(game_id)
 
 
 @app.get('/api/games/{game_id}/pgn')
@@ -506,16 +516,22 @@ def analyze_game(job_id, snapshot):
 def request_analysis(game_id: str):
     with database() as con:
         row = dict(find_game(con, game_id))
+    return queue_analysis(row)
+
+
+def queue_analysis(row, automatic=False):
+    game_id = row['id']
     if not json.loads(row["moves"]):
         raise HTTPException(422, "Gioca almeno una mossa prima dell'analisi")
     with jobs_lock:
         for key, job in jobs.items():
-            if job["gameId"] == game_id and job["status"] == "running":
+            if job["gameId"] == game_id and job["status"] == "running" and job.get('version') == len(json.loads(row['moves'])) and job.get('revision') == row['revision']:
                 return {"jobId": key}
-        if sum(j["status"] == "running" for j in jobs.values()) >= 4:
+        if not automatic and sum(j["status"] == "running" for j in jobs.values()) >= 4:
             raise HTTPException(429, "Ci sono già analisi in coda")
         job_id = str(uuid.uuid4())
-        jobs[job_id] = {"gameId": game_id, "status": "running", "progress": 0}
+        jobs[job_id] = {"gameId": game_id, "status": "running", "progress": 0,
+                        "version": len(json.loads(row['moves'])), "revision": row['revision'], "automatic": automatic}
     executor.submit(analyze_game, job_id, row)
     return {"jobId": job_id}
 
@@ -531,6 +547,8 @@ def job_status(job_id: str):
 def exercise_view(row):
     board = reconstruct(row["initial_fen"], json.loads(row["history"]))
     return {"id": row["id"], "gameId": row["game_id"], "ply": row["ply"], "theme": row["theme"],
+            "gameTitle": row['game_title'] if 'game_title' in row.keys() else None,
+            "gameCreatedAt": row['game_created_at'] if 'game_created_at' in row.keys() else None,
             "fen": board.fen(), "turn": "w" if board.turn else "b", "dueAt": row["due_at"],
             "streak": row["streak"], "legalMoves": [m.uci() for m in board.legal_moves]}
 
@@ -545,7 +563,7 @@ def find_exercise(con, exercise_id):
 @app.get("/api/exercises")
 def exercises():
     with database() as con:
-        return [exercise_view(r) for r in con.execute("SELECT * FROM exercises ORDER BY due_at LIMIT 100")]
+        return [exercise_view(r) for r in con.execute("SELECT e.*,g.title AS game_title,g.created_at AS game_created_at FROM exercises e JOIN games g ON g.id=e.game_id ORDER BY e.due_at LIMIT 100")]
 
 
 @app.post("/api/exercises/{exercise_id}/sessions")

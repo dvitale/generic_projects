@@ -131,3 +131,9 @@ Cliccando un punto, usando le frecce della tastiera sul grafico o scegliendo una
 ## Analizzare una posizione con Lichess
 
 Il tasto **Analizza con Lichess**, sotto la scacchiera in Gioca, Rivedi, Blunder prevention, Puzzle e Drill, apre una finestra su lichess.org con la posizione attualmente mostrata e lo stesso orientamento. Funziona anche quando si rivede una mossa precedente, la soluzione di un esercizio o il vecchio errore in Blunder prevention. Trasferisce la posizione FEN completa, non l'intera cronologia della partita; le mosse provate su Lichess non modificano la partita locale. Il browser può aprire una scheda invece di una finestra; se blocca la popup è disponibile un collegamento alternativo per la posizione richiesta.
+
+## Analisi automatica e origine degli esercizi
+
+Quando una mossa conclude una partita locale (matto o patta), Stockfish avvia automaticamente l'analisi dopo aver salvato la mossa. La schermata finale resta aperta e mostra l'avanzamento; l'analisi prosegue sul server anche chiudendo il browser. Riaprendo la partita si recupera il lavoro in corso, senza avviarne una seconda copia. Al termine, le posizioni adatte alimentano Puzzle e Blunder prevention. L'analisi può essere ricalcolata manualmente; le partite importate o interrotte restano analizzabili con il comando dedicato.
+
+In ogni Puzzle e posizione di Blunder prevention, il riquadro **Dalla tua partita** mostra titolo, data di archiviazione e numero/colore della mossa. **Rivedi questa mossa nella partita** apre la revisione esattamente prima della decisione originale. Il riferimento è disponibile anche per gli esercizi già salvati e segue l'eventuale copia conservata quando si annullano mosse di una partita analizzata.

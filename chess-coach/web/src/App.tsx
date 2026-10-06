@@ -15,6 +15,7 @@ import ChessInsights,{ThinkingGuide} from './ChessInsights'
 import EvaluationChart from './EvaluationChart'
 import PgnExport from './PgnExport'
 import LichessAnalysis from './LichessAnalysis'
+import ExerciseSource from './ExerciseSource'
 import {useMoveTime} from './useMoveTime'
 import { api } from './api'
 import { maia, type Prediction } from './engine/maia'
@@ -68,6 +69,7 @@ export default function App() {
   const [retry, setRetry] = useState(0)
   const [requestedDrill,setRequestedDrill] = useState<string|null>(null)
   const currentGame = useRef<Game | null>(null)
+  const watchedJobs=useRef(new Set<string>())
   const botController = useRef<AbortController | null>(null)
   currentGame.current = game
   const moveTime=useMoveTime(game,tab==='play'&&!!game&&!game.result&&!jobId)
@@ -102,8 +104,17 @@ export default function App() {
     return () => { cancelled = true; controller.abort(); setBotThinking(false) }
   }, [game?.id, game?.version, game?.revision, tab, retry, jobId, busy])
 
+  useEffect(()=>{
+    const id=game?.analysisJobId
+    if(id&&!jobId&&!watchedJobs.current.has(id)){
+      watchedJobs.current.add(id);setJobId(id);setProgress(0)
+      setNotice(game?.result?'Partita conclusa: analisi automatica in corso. Gli esercizi saranno disponibili al termine.':'Analisi della partita in corso. Gli esercizi saranno disponibili al termine.')
+    }
+  },[game?.analysisJobId,jobId])
+
   useEffect(() => {
     if (!jobId) return
+    watchedJobs.current.add(jobId)
     let stopped = false
     let timer: ReturnType<typeof setTimeout>
     async function poll() {
@@ -114,7 +125,7 @@ export default function App() {
         if (job.status === 'complete') {
           const updated = await api<Game>('/games/'+job.gameId)
           if (currentGame.current?.id === updated.id) { keepGame(updated); setCursor(job.result?.moves?.[0]?.ply ?? job.result?.decisions[0]?.ply ?? updated.version) }
-          setJobId(null); setNotice('Revisione pronta. Gli esercizi personali sono nella sezione Puzzle.'); await refresh()
+          setJobId(null); setNotice('Revisione pronta. Le posizioni adatte sono disponibili in Puzzle e Blunder prevention.'); await refresh()
         } else if (job.status === 'failed') { throw new Error(job.error || 'Analisi non riuscita') }
         else timer = setTimeout(poll, 500)
       } catch (e) { if (!stopped) { fail(e); setJobId(null) } }
@@ -206,7 +217,7 @@ export default function App() {
   }
   async function openGame(id: string, ply?:number) {
     setBusy(true); setError('')
-    try {const next = await api<Game>('/games/'+id); keepGame(next); setCursor(ply??next.version); setTab('review')}
+    try {const next = await api<Game>('/games/'+id); keepGame(next); setCursor(ply??next.version); if(ply!==undefined)setReviewTab('moves'); setTab('review')}
     catch(e){fail(e)} finally {setBusy(false)}
   }
   async function importPgn() {
@@ -263,6 +274,8 @@ export default function App() {
           {((tab==='play'||tab==='review')&&game||tab==='train'&&exercise)&&<LichessAnalysis key={tab==='train'?exercise!.id:game!.id+':'+tab} fen={boardFen} orientation={orientation}/>}
         </section>
         <aside className="coach-column">
+          {tab==='train'&&exercise&&<ExerciseSource title={exercise.gameTitle} createdAt={exercise.gameCreatedAt} fen={exercise.fen} disabled={busy} onReview={()=>void openGame(exercise.gameId,exercise.ply)}/>}
+          {tab==='play'&&jobId&&<section className="panel" role="status"><p>Analisi automatica della partita… {progress}%</p><progress value={progress} max={100}/></section>}
           {tab==='review'&&<>
             <div className="review-toolbar"><div className="row"><button className="primary" onClick={analyze} disabled={!game?.version||busy||!!jobId}>{game?.analysis?'Ricalcola analisi':'Analizza partita'}</button>{game?.source==='maia'&&!game.result&&<button disabled={!!jobId} onClick={()=>setTab('play')}>Continua partita</button>}</div>{jobId&&<div role="status"><p>Stockfish analizza la partita… {progress}%</p><progress value={progress} max={100}/></div>}</div>
             {game&&<PgnExport game={game}/>}
