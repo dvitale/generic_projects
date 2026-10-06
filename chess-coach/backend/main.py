@@ -25,6 +25,7 @@ from . import tutor
 from . import prevention
 from . import mistakes
 from . import insights
+from . import training_schedule, pgn_import
 from .rating import rating_plan, summarize_rating, RATING_LEVELS, RATING_METHOD
 
 DB_PATH = Path(os.environ.get("CHESS_COACH_DATA", str(ROOT / "data"))) / "coach.sqlite3"
@@ -100,6 +101,7 @@ def init_db():
                 con.execute(f"ALTER TABLE attempts ADD COLUMN {name} {declaration}")
         prevention.init_schema(con)
         mistakes.init_schema(con)
+        training_schedule.init_schema(con)
         for row in con.execute('SELECT * FROM games WHERE analysis IS NOT NULL').fetchall():
             if row['analysis_version'] == len(json.loads(row['moves'])):
                 prevention.seed_game(con, row, json.loads(row['analysis']), now())
@@ -455,11 +457,26 @@ def import_game(body: ImportInput):
             raise ValueError("Importa una sola partita alla volta")
     except (ValueError, IndexError) as exc:
         raise HTTPException(422, str(exc)) from exc
-    game_id = hashlib.sha256((initial + json.dumps(moves) + body.color).encode()).hexdigest()[:32]
+    identity = initial + json.dumps(moves) + body.color
+    if pgn_import.origin(dict(pgn.headers)) == 'Maia online' and pgn.headers.get('ID'):
+        identity = 'maiachess:' + pgn.headers['ID'] + ':' + body.color
+    game_id = hashlib.sha256(identity.encode()).hexdigest()[:32]
+    opponent = pgn.headers.get('Black' if body.color == 'w' else 'White', '')
+    reference_elo = pgn_import.maia_level(opponent) or 1500
     with database() as con:
+        # Older imports used the move sequence as identity. Reuse them only when the
+        # original Maia ID and player's color agree; identical distinct games stay distinct.
+        if pgn_import.origin(dict(pgn.headers)) == 'Maia online' and pgn.headers.get('ID'):
+            for previous in con.execute("SELECT * FROM games WHERE source='pgn' AND player_color=?",(body.color,)):
+                headers=json.loads(previous['pgn_headers'])
+                if pgn_import.origin(headers)=='Maia online' and headers.get('ID')==pgn.headers['ID']:
+                    game_id=previous['id'];break
+        previous=con.execute('SELECT initial_fen,moves FROM games WHERE id=?',(game_id,)).fetchone()
+        if previous and (previous['initial_fen']!=initial or json.loads(previous['moves'])!=moves):
+            raise HTTPException(409,'Questo ID Maia è già presente con mosse diverse: conserva i due PGN e verifica quale è completo.')
         title = f"{pgn.headers.get('White', 'Bianco')} – {pgn.headers.get('Black', 'Nero')}"[:120]
         con.execute("INSERT OR IGNORE INTO games(id,initial_fen,moves,player_color,elo,title,created_at,analysis,analysis_version,source) VALUES(?,?,?,?,?,?,?,?,?,?)",
-                    (game_id, initial, json.dumps(moves), body.color, 1500, title, now(), None, None, "pgn"))
+                    (game_id, initial, json.dumps(moves), body.color, reference_elo, title, now(), None, None, "pgn"))
         times = [{k: v for k, v in {'emt': n.emt(), 'clk': n.clock()}.items() if v is not None} or None for n in pgn.mainline()]
         # Reimporting the same line can enrich its metadata without replacing analysis.
         existing = find_game(con, game_id)
@@ -591,6 +608,15 @@ def exercises():
         return [exercise_view(r) for r in con.execute("SELECT e.*,g.title AS game_title,g.created_at AS game_created_at FROM exercises e JOIN games g ON g.id=e.game_id ORDER BY e.due_at LIMIT 100")]
 
 
+@app.get("/api/exercises/{exercise_id}")
+def exercise_detail(exercise_id: str):
+    with database() as con:
+        row = con.execute("SELECT e.*,g.title AS game_title,g.created_at AS game_created_at FROM exercises e JOIN games g ON g.id=e.game_id WHERE e.id=?", (exercise_id,)).fetchone()
+        if row is None:
+            raise HTTPException(404, "Esercizio non trovato")
+        return exercise_view(row)
+
+
 @app.post("/api/exercises/{exercise_id}/sessions")
 def puzzle_session(exercise_id: str):
     session_id = str(uuid.uuid4())
@@ -601,7 +627,7 @@ def puzzle_session(exercise_id: str):
         active = con.execute("SELECT * FROM puzzle_sessions WHERE exercise_id=? AND status='active' ORDER BY created_at DESC LIMIT 1", (exercise_id,)).fetchone()
         if active:
             return {"id": active["id"], "version": active["guesses"], "exposure": active["exposure"]}
-        exposure = "new" if not seen else "review" if ex["due_at"] <= now() else "practice"
+        exposure = "practice" if not training_schedule.eligible(con,"puzzle",exercise_id,now()) else "new" if not seen else "review" if ex["due_at"] <= now() else "practice"
         con.execute("INSERT INTO puzzle_sessions(id,exercise_id,created_at,exposure) VALUES(?,?,?,?)", (session_id, exercise_id, now(), exposure))
     return {"id": session_id, "version": 0, "exposure": exposure}
 
@@ -642,14 +668,8 @@ def attempt(exercise_id: str, body: AttemptInput):
         assisted = session["hints"] > 0
         first = session["guesses"] == 0
         due = current["due_at"]
-        # Immediate retries and early practice never increase the independent streak.
-        if first and session["exposure"] != "practice":
-            streak = current["streak"] + 1 if success and not assisted else 0
-            if success and not assisted:
-                interval = [1, 3, 7, 14, 30][min(max(streak - 1, 0), 4)]
-                due = (datetime.now(timezone.utc) + timedelta(days=interval)).isoformat()
-            # Errors and hints leave the exercise due, including after later success.
-            con.execute("UPDATE exercises SET streak=?,due_at=? WHERE id=?", (streak, due, exercise_id))
+        scheduled = training_schedule.record(con,"puzzle",current,session,success,assisted,now())
+        due = find_exercise(con,exercise_id)["due_at"]
         inserted = con.execute("INSERT INTO attempts(exercise_id,move,success,assisted,created_at,session_id,is_first,exposure) VALUES(?,?,?,?,?,?,?,?)",
                     (exercise_id, body.move, int(success), int(assisted), now(), body.session_id, int(first), session["exposure"]))
         if not success:
@@ -658,7 +678,7 @@ def attempt(exercise_id: str, body: AttemptInput):
     return {"success": success, "assisted": assisted, "loss": loss, "best": best if success else None, "actual": actual,
             "insight": insights.public(insights.compare(board.fen(), body.move, best, actual)),
             "dueAt": due, "version": body.version + 1, "closed": success,
-            "firstTry": first, "scheduled": first and success and not assisted and session["exposure"] != "practice",
+            "firstTry": first, "scheduled": scheduled,
             "message": "Mossa valida: mantiene la qualità della posizione." if success else "C'è un'alternativa migliore. Puoi riprovare: il primo tentativo è già registrato."}
 
 
@@ -675,8 +695,8 @@ def reveal(exercise_id: str, body: SessionInput):
             con.execute("INSERT INTO attempts(exercise_id,move,success,assisted,created_at,session_id,is_first,exposure) VALUES(?,?,0,1,?,?,1,?)",
                         (exercise_id, "reveal", now(), body.session_id, session["exposure"]))
         due = find_exercise(con, exercise_id)["due_at"]
-        if session["exposure"] != "practice":
-            con.execute("UPDATE exercises SET streak=0 WHERE id=?", (exercise_id,))
+        training_schedule.record(con,"puzzle",find_exercise(con,exercise_id),session,False,True,now())
+        due = find_exercise(con,exercise_id)["due_at"]
         con.execute("UPDATE puzzle_sessions SET status='revealed',hints=hints+1 WHERE id=?", (body.session_id,))
     return {"success": False, "assisted": True, "best": best, "actual": None, "loss": None, "dueAt": due,
             "version": session["guesses"], "closed": True, "message": "Soluzione mostrata. Riprova dopo una pausa per verificare cosa ricordi."}
@@ -824,5 +844,12 @@ prevention.install(app, database, reconstruct, now)
 mistakes.install(app, database, tutor_lock)
 
 DIST = ROOT / "web" / "dist"
+@app.get('/api/training-guide')
+def training_guide():
+    return FileResponse(ROOT/'docs'/'training-guide.md',media_type='text/markdown',filename='SparringMate-tutorial-allenamento.md')
+
+training_schedule.install(app,database,lambda:now())
+pgn_import.install(app,import_game,ImportInput,database,find_game,queue_analysis)
+
 if DIST.exists():
     app.mount("/", StaticFiles(directory=DIST, html=True), name="web")

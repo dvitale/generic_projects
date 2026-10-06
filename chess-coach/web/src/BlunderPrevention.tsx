@@ -15,7 +15,7 @@ interface Session {id:string;version:number;exposure:string;excluded?:boolean;me
 interface Result {success:boolean;assisted:boolean;closed:boolean;version:number;firstTry:boolean;move:string;san:string;actual:Evaluation;example:Evaluation|null;original:{move:string;san:string;evaluation:Evaluation}|null;message:string;insight?:Insight}
 const evaluation=(e:Evaluation)=>e.mate!==null?(e.mate>0?`Matto a tuo favore in ${e.mate}`:`Matto contro di te in ${Math.abs(e.mate)}`):`${e.cp>=0?'+':''}${(e.cp/100).toFixed(2)}`
 
-export default function BlunderPrevention({onArchive,onReview}:{onArchive:()=>void;onReview:(id:string,ply:number)=>void}) {
+export default function BlunderPrevention({onArchive,onReview,startPositionId,onStarted}:{onArchive:()=>void;onReview:(id:string,ply:number)=>void;startPositionId?:string|null;onStarted?:()=>void}) {
   const [catalog,setCatalog]=useState<Catalog|null>(null)
   const [position,setPosition]=useState<Position|null>(null)
   const [session,setSession]=useState<Session|null>(null)
@@ -29,6 +29,7 @@ export default function BlunderPrevention({onArchive,onReview}:{onArchive:()=>vo
   const motion=useTrainingMove(position?.id+':'+(session?.id??''))
   async function refresh(){const next=await api<Catalog>('/prevention');setCatalog(next);return next}
   useEffect(()=>{let stale=false;api<Catalog>('/prevention').then(c=>{if(!stale)setCatalog(c)}).catch(e=>{if(!stale)setError(e.message)});return()=>{stale=true;operation.current++}},[])
+  useEffect(()=>{if(startPositionId&&catalog&&!busy){const p=catalog.positions.find(p=>p.id===startPositionId);onStarted?.();if(p)void open(p);else setError('Posizione non disponibile: aggiorna il piano.')}},[startPositionId,catalog])
   const remaining=catalog?.positions.filter(p=>!done.includes(p.id)&&p.id!==position?.id)||[]
   async function open(p:Position){
     const token=++operation.current

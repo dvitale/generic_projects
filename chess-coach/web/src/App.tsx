@@ -9,6 +9,8 @@ import MoveReview from './MoveReview'
 import MoveHistory from './MoveHistory'
 import PanelTabs from './PanelTabs'
 import PuzzleFeedback from './PuzzleFeedback'
+import TrainingPlan from './TrainingPlan'
+import ImportGames from './ImportGames'
 import {usePuzzleComparison} from './usePuzzleComparison'
 import MistakeHistory from './MistakeHistory'
 import {useTrainingMove} from './useTrainingMove'
@@ -23,10 +25,10 @@ import { maia, type Prediction } from './engine/maia'
 import { chooseMaiaMove } from './engine/play'
 import type { Game, Color, Exercise, Attempt, Profile, Analysis, Evaluation, PuzzleSession } from './types'
 
-type Tab = 'play' | 'review' | 'drill' | 'train' | 'progress' | 'archive' | 'prevention'
+type Tab = 'schedule' | 'play' | 'review' | 'drill' | 'train' | 'progress' | 'archive' | 'prevention'
 type Saved = {id:string; title:string; createdAt:string; plies:number; source:string}
 const initialFen = new Chess().fen()
-const titles: Record<Tab, string> = {prevention:'Blunder prevention',play:'Una mossa alla volta.',review:'Capisci le tue scelte.',drill:'Allena una sequenza.',train:'Trasforma gli errori in pratica.',progress:'Il tuo percorso, nel tempo.',archive:'Le tue partite.'}
+const titles: Record<Tab, string> = {schedule:'Il tuo allenamento di oggi.',prevention:'Blunder prevention',play:'Una mossa alla volta.',review:'Capisci le tue scelte.',drill:'Allena una sequenza.',train:'Trasforma gli errori in pratica.',progress:'Il tuo percorso, nel tempo.',archive:'Le tue partite.'}
 function position(game: Game, ply: number) {
   const board = new Chess(game.initialFen)
   for (const move of game.moves.slice(0, ply)) board.move({from:move.slice(0,2),to:move.slice(2,4),promotion:move[4]})
@@ -67,7 +69,7 @@ export default function App() {
   const [predictionKey,setPredictionKey] = useState('')
   const [predictionError,setPredictionError] = useState('')
   const [reviewElo,setReviewElo] = useState(1500)
-  const [pgn, setPgn] = useState('')
+  const [requestedPrevention,setRequestedPrevention]=useState<string|null>(null)
   const [showImport, setShowImport] = useState(false)
   const [retry, setRetry] = useState(0)
   const [requestedDrill,setRequestedDrill] = useState<string|null>(null)
@@ -242,10 +244,9 @@ export default function App() {
     try {const next = await api<Game>('/games/'+id); keepGame(next); setCursor(ply??next.version); if(ply!==undefined)setReviewTab('moves'); setTab('review')}
     catch(e){fail(e)} finally {setBusy(false)}
   }
-  async function importPgn() {
-    setBusy(true); setError('')
-    try {const next=await api<Game>('/import',{pgn,color}); keepGame(next); setCursor(next.version); setTab('review'); setShowImport(false); setPgn(''); await refresh()}
-    catch(e){fail(e)} finally {setBusy(false)}
+  async function openTraining(kind:'puzzle'|'prevention',id:string){
+    if(kind==='prevention'){setRequestedPrevention(id);setTab('prevention');return}
+    try{const ex=await api<Exercise>('/exercises/'+encodeURIComponent(id));await pickExercise(ex)}catch(e){fail(e)}
   }
   function recordPuzzleResult(result:Attempt,move?:string){
     setAttempt(result)
@@ -269,7 +270,7 @@ export default function App() {
   return <div className="app-shell">
     <aside className="sidebar">
       <a className="brand" href="#" onClick={e=>{e.preventDefault();navigate('play')}}><span className="brand-mark">♞</span><span>Sparring<span className="brand-light">Mate</span><small>IL TUO SPAZIO DI ALLENAMENTO</small></span></a>
-      <nav aria-label="Navigazione principale">{([['play','♟','Gioca'],['review','◉','Rivedi'],['drill','◇','Drill'],['train','◎','Puzzle'],['prevention','◇','Blunder prevention'],['progress','↗','Progressi'],['archive','▤','Partite']] as const).map(([key,icon,label]) => <button key={key} disabled={busy} className={tab===key?'nav-item active':'nav-item'} onClick={()=>navigate(key)} aria-current={tab===key?'page':undefined}><span aria-hidden="true">{icon}</span>{label}{key==='train'&&!!profile?.due&&<b>{profile.due}</b>}</button>)}</nav>
+      <nav aria-label="Navigazione principale">{([['schedule','◷','Allenamento'],['play','♟','Gioca'],['review','◉','Rivedi'],['drill','◇','Drill'],['train','◎','Puzzle'],['prevention','◇','Blunder prevention'],['progress','↗','Progressi'],['archive','▤','Partite']] as const).map(([key,icon,label]) => <button key={key} disabled={busy} className={tab===key?'nav-item active':'nav-item'} onClick={()=>navigate(key)} aria-current={tab===key?'page':undefined}><span aria-hidden="true">{icon}</span>{label}{key==='train'&&!!profile?.due&&<b>{profile.due}</b>}</button>)}</nav>
       <div className="sidebar-note"><span className="eyebrow">IL METODO</span><p>Gioca. Comprendi.<br/>Riprova.</p><small>Un passo concreto, ogni giorno.</small></div>
       <div className="local-status"><span className="status-dot"/> Spazio personale locale<small>Partite archiviate su questo computer.</small></div>
     </aside>
@@ -278,9 +279,10 @@ export default function App() {
       <section className="page-intro"><div><span className="eyebrow">SparringMate / {tab==='play'?'SPARRING':tab==='review'?'REVISIONE':tab==='prevention'?'BLUNDER PREVENTION':tab==='train'?'PUZZLE':tab==='drill'?'DRILL':tab==='archive'?'ARCHIVIO':'PERCORSO'}</span><h1>{titles[tab]}</h1><p>{tab==='prevention'?'Ritrova i tuoi errori. Scegli una mossa sicura.':tab==='play'?'Un avversario dal gioco umano. Uno spazio per migliorare.':tab==='review'?'Confronta mosse plausibili e conseguenze sulla scacchiera.':tab==='train'?'Riparti dalle decisioni delle tue partite, senza suggerimenti anticipati.':tab==='drill'?'Metti in pratica un piano contro Maia, poi rivedi le tue decisioni.':tab==='archive'?'Riprendi una partita o torna sulle tue decisioni.':'Osservazioni reali, piccoli obiettivi e ripassi mirati.'}</p></div><button className="quiet" onClick={()=>setShowImport(!showImport)}>↑ Importa PGN</button></section>
       {error&&<div className="alert" role="alert">{error}<button onClick={()=>{setError('');setRetry(x=>x+1)}}>Riprova</button></div>}
       {notice&&<div className="notice" role="status">{notice}</div>}
-      {showImport&&<section className="panel import-panel"><h2>Importa una partita</h2><p className="muted">Incolla una singola partita PGN e seleziona il colore che vuoi analizzare.</p><textarea aria-label="Partita PGN" value={pgn} onChange={e=>setPgn(e.target.value)} rows={5} placeholder={'[White "Giocatore"]\n[Black "Avversario"]\n\n1. e4 e5 2. Nf3 Nc6 *'}/><div className="row"><label>Il tuo colore <select value={color} onChange={e=>setColor(e.target.value as Color)}><option value="w">Bianco</option><option value="b">Nero</option></select></label><button className="primary" disabled={busy||!pgn.trim()} onClick={importPgn}>Importa partita</button><button onClick={()=>setShowImport(false)}>Chiudi</button></div></section>}
+      {showImport&&<ImportGames onImported={()=>void refresh().catch(fail)} onOpen={id=>void openGame(id)}/>}
 
-      {tab==='prevention'?<BlunderPrevention onArchive={()=>navigate('archive')} onReview={(id,ply)=>void openGame(id,ply)}/>:tab==='drill'?<Drills startTemplateId={requestedDrill} onStarted={()=>setRequestedDrill(null)} onReview={g=>{keepGame(g);setCursor(g.version);setTab('review');refresh().catch(fail)}}/>:tab==='progress'?<div className="progress-layout">
+
+      {tab==='schedule'?<TrainingPlan onOpen={(kind,id)=>void openTraining(kind,id)} onImport={()=>setShowImport(true)}/>:tab==='prevention'?<BlunderPrevention startPositionId={requestedPrevention} onStarted={()=>setRequestedPrevention(null)} onArchive={()=>navigate('archive')} onReview={(id,ply)=>void openGame(id,ply)}/>:tab==='drill'?<Drills startTemplateId={requestedDrill} onStarted={()=>setRequestedDrill(null)} onReview={g=>{keepGame(g);setCursor(g.version);setTab('review');refresh().catch(fail)}}/>:tab==='progress'?<div className="progress-layout">
         <section className="panel"><span className="eyebrow">IL TUO PIANO</span><h2>25 minuti per allenarti</h2>{profile?.plan.map((item,i)=><div className="plan-row" key={item.title}><span className="step-number">0{i+1}</span><div><h3>{item.title}</h3><p>{item.description}</p></div><span className="duration">{item.minutes} min</span></div>)}<button className="primary" onClick={()=>navigate(exercises.length?'train':'play')}>Inizia la sessione →</button></section>
         <section className="panel"><span className="eyebrow">LE TUE OSSERVAZIONI</span><h2>{profile?.confidence||'Nessun dato'}</h2><div className="stats"><div><strong>{profile?.games||0}</strong><span>partite salvate</span></div><div><strong>{profile?.attempts||0}</strong><span>tentativi</span></div><div><strong>{profile?.unaidedSuccesses||0}</strong><span>primi tentativi riusciti</span></div></div>{profile?.themes.length?profile.themes.map(t=><div className="theme-row" key={t.theme}><span>{t.theme}</span><span>{t.examples} posizioni</span></div>):<p className="empty-text">Analizza una partita per iniziare a raccogliere le tue posizioni di allenamento.</p>}<p className="footnote">I successi contano solo il primo tentativo senza aiuti, su esercizi nuovi o in scadenza. Le ripetizioni immediate restano pratica. Non sono ancora una misura di padronanza: servono anche verifiche su posizioni nuove.</p></section>
         <section className="panel"><h2>Tattica e posizione nelle tue decisioni</h2><ThinkingGuide/>{profile?.domains?.map(d=><div className="theme-row" key={d.kind}><span>{d.label}</span><span>{d.examples} posizioni</span></div>)}<p className="footnote">Conteggi di decisioni con peggioramento: le posizioni ripetute sono contate una volta. Indicano cosa rivedere, non una diagnosi di carenze. La categoria posizionale segnala indizi, non una causa dimostrata.</p></section>

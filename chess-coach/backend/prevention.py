@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from .engine import evaluator
 from . import mistakes
 from . import insights
+from . import training_schedule
 
 SAFE_CP = -100
 BLUNDER_CP = -200
@@ -146,7 +147,7 @@ def install(app, database, reconstruct, now):
             if previous:
                 return {'id': previous['id'], 'version': previous['guesses'], 'exposure': previous['exposure']}
             seen = con.execute('SELECT 1 FROM prevention_sessions WHERE position_id=? LIMIT 1', (position_id,)).fetchone()
-            exposure = 'new' if not seen else 'review' if row['due_at'] <= now() else 'practice'
+            exposure = 'practice' if not training_schedule.eligible(con,'prevention',position_id,now()) else 'new' if not seen else 'review' if row['due_at'] <= now() else 'practice'
             sid = str(uuid.uuid4())
             con.execute('INSERT INTO prevention_sessions(id,position_id,created_at,exposure) VALUES(?,?,?,?)', (sid, position_id, now(), exposure))
         return {'id': sid, 'version': 0, 'exposure': exposure}
@@ -154,17 +155,13 @@ def install(app, database, reconstruct, now):
     def finish(con, row, body, move, success, assisted):
         s = active(con, row['id'], body.session_id, body.version)
         first = s['guesses'] == 0
-        if first and s['exposure'] != 'practice':
-            streak = row['streak'] + 1 if success and not assisted else 0
-            interval = [1, 3, 7, 14, 30][min(max(streak - 1, 0), 4)]
-            due = (datetime.now(timezone.utc) + timedelta(days=interval)).isoformat()
-            con.execute('UPDATE prevention_positions SET streak=?,due_at=? WHERE id=?', (streak, due, row['id']))
+        promoted=training_schedule.record(con,'prevention',row,s,success,assisted,now())
         inserted = con.execute('INSERT INTO prevention_attempts(session_id,move,success,assisted,is_first,created_at) VALUES(?,?,?,?,?,?)',
                     (body.session_id, move, int(success), int(assisted), int(first), now()))
         closed = success or assisted
         con.execute('UPDATE prevention_sessions SET guesses=guesses+1,status=? WHERE id=?',
                     ('revealed' if assisted else 'complete' if success else 'active', body.session_id))
-        return {'attemptId': inserted.lastrowid, 'closed': closed, 'version': s['guesses'] + 1, 'firstTry': first and s['exposure'] != 'practice' and not assisted}
+        return {'scheduled':promoted,'dueAt':find(con,row['id'])['due_at'],'attemptId': inserted.lastrowid, 'closed': closed, 'version': s['guesses'] + 1, 'firstTry': first and s['exposure'] != 'practice' and not assisted}
 
     @app.post('/api/prevention/{position_id}/attempts')
     def attempt(position_id: str, body: AttemptBody):

@@ -144,6 +144,18 @@ Durante il gioco, **Abbandona partita** è disponibile sotto la scacchiera, anch
 
 ### Puzzle: ripasso e confronto dopo la soluzione
 
-La lista e il contatore dei puzzle da ripassare diminuiscono solo dopo un primo tentativo corretto senza indizi. Errori, soluzioni mostrate e successi dopo tentativi sbagliati mantengono il puzzle in scadenza. Una nuova sessione permette di riprovarlo; un successo indipendente programma il ripasso successivo senza cancellare lo storico. Prossimo puzzle evita quelli già conclusi nella sessione di navigazione.
+La lista e il contatore dei puzzle da ripassare diminuiscono solo dopo un primo tentativo corretto senza indizi. Errori, soluzioni mostrate e successi dopo tentativi sbagliati mantengono il puzzle in scadenza. Una nuova sessione permette di riprovarlo; dopo un errore occorre attendere quattro ore per una nuova verifica indipendente. La pratica anticipata non promuove il ripasso e non cancella lo storico. Prossimo puzzle evita quelli già conclusi nella sessione di navigazione.
 
 Dopo una risposta corretta, la propria mossa rimane visibile brevemente, poi viene mostrata la posizione iniziale: freccia bianca per la mossa della partita originale, rossa per la prima scelta di Maia al livello della partita. Il pulsante consente di tornare alla propria soluzione. Il confronto non anticipa suggerimenti durante il tentativo.
+
+## Importare Maia e pianificare gli allenamenti
+
+**Importa PGN** accetta testo con più partite o più file, fino a 20 partite e 1 MB per operazione. Riconosce il colore umano contro Maia, conserva intestazioni e tempi presenti, distingue i duplicati tramite ID Maia e può avviare automaticamente l’analisi delle nuove partite. Gli errori vengono mostrati per singola partita. Non è una sincronizzazione dell’account: lo storico Maia provato senza autenticazione restituisce 403; usa Export → PGN sul sito e incolla il testo qui.
+
+**Allenamento** propone prima i richiami scaduti, poi un numero limitato di posizioni nuove. Imposta minuti, limite delle nuove posizioni e giorni della settimana. La durata è stimata a due minuti per posizione. Puzzle e Blunder prevention usano intervalli di 4 ore, 1, 3, 7, 14, 30, 90 e 180 giorni; errori o aiuti azzerano la progressione. Un puzzle sbagliato resta in scadenza, ma il richiamo indipendente successivo attende quattro ore. Riaprirlo prima è pratica e non aumenta la padronanza. La lista giornaliera evita di proporre due volte la stessa posizione come puzzle e prevenzione.
+
+Impostazioni, verifiche e scadenze sono salvate in SQLite; il calendario usa Europe/Rome e non invia notifiche esterne. Le prove anticipate non fanno avanzare l’obiettivo giornaliero. Il calendario misura il richiamo di posizioni già viste, non ancora il trasferimento delle abilità alle nuove partite.
+
+La [guida pratica](docs/training-guide.md), scaricabile da Allenamento, spiega importazione e calendario e contiene tutorial adattati al lavoro contro Maia per Aimchess, MoveTrainer e Noctie. Documentazione ufficiale verificata il 6 ottobre 2026; le aree personali dei servizi esterni non sono state provate con l’account dell’utente.
+
+Verifiche dedicate: `tests/test_batch_import.py`, `tests/test_training_schedule.py` e `web/tests/training-plan.spec.ts`, oltre alle regressioni di Puzzle, Blunder prevention, analisi automatica e collegamenti Lichess.
