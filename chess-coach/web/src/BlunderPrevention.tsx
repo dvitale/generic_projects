@@ -2,13 +2,14 @@ import {useEffect,useRef,useState} from 'react'
 import {Chess} from 'chess.js'
 import Board from './Board'
 import LichessAnalysis from './LichessAnalysis'
+import ExerciseSource from './ExerciseSource'
 import MistakeHistory from './MistakeHistory'
 import {useTrainingMove} from './useTrainingMove'
 import ChessInsights,{ThinkingGuide,type Insight} from './ChessInsights'
 import {api} from './api'
 import type {Color,Evaluation} from './types'
 
-interface Position {id:string;gameId:string;title:string;ply:number;fen:string;turn:Color;moveNumber:number;legalMoves:string[];dueAt:string;streak:number}
+interface Position {id:string;gameId:string;title:string;gameCreatedAt?:string;ply:number;fen:string;turn:Color;moveNumber:number;legalMoves:string[];dueAt:string;streak:number}
 interface Catalog {positions:Position[];stats:{firstAttempts:number;firstSuccesses:number};analyzedGames:number;rule:{description:string}}
 interface Session {id:string;version:number;exposure:string;excluded?:boolean;message?:string}
 interface Result {success:boolean;assisted:boolean;closed:boolean;version:number;firstTry:boolean;move:string;san:string;actual:Evaluation;example:Evaluation|null;original:{move:string;san:string;evaluation:Evaluation}|null;message:string;insight?:Insight}
@@ -81,6 +82,7 @@ export default function BlunderPrevention({onArchive,onReview}:{onArchive:()=>vo
         <LichessAnalysis key={position.id} fen={board!.fen()} orientation={position.turn}/>
       </section>
       <aside className="coach-column">
+        <ExerciseSource title={position.title} createdAt={position.gameCreatedAt} fen={position.fen} disabled={busy} onReview={()=>onReview(position.gameId,position.ply)}/>
         <section className="panel"><ThinkingGuide/><p className="footnote">La mossa può perdere per una tattica o compromettere una posizione difendibile. Stockfish decide l’esito; la spiegazione distingue fatti e ipotesi.</p></section>
         <section className="panel"><span className="eyebrow">PRIMA DI MUOVERE</span><h2>Controlla entrambi i colori.</h2><ol><li>Il re è al sicuro?</li><li>Quali pezzi sono attaccati o indifesi?</li><li>Quali scacchi e catture avrà l’avversario?</li></ol><p className="muted">Una mossa semplice che evita la perdita è sufficiente.</p>
           {!result?.closed&&<div className="row"><button disabled={busy||!session} onClick={()=>void submit()}>Mostra una mossa sicura</button><button disabled={busy||!remaining.length} onClick={()=>{setDone(d=>[...d,position.id]);next()}}>Salta posizione</button></div>}

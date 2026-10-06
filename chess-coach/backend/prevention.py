@@ -109,12 +109,13 @@ def install(app, database, reconstruct, now):
     @app.get('/api/prevention')
     def catalog():
         with database() as con:
-            rows = con.execute('''SELECT p.*,g.title FROM prevention_positions p JOIN games g ON g.id=p.game_id
+            rows = con.execute('''SELECT p.*,g.title,g.created_at AS game_created_at FROM prevention_positions p JOIN games g ON g.id=p.game_id
                 WHERE p.enabled=1 ORDER BY p.due_at,p.id''').fetchall()
             items = []
             for row in rows:
                 board = board_for(row)
                 items.append({'id': row['id'], 'gameId': row['game_id'], 'title': row['title'], 'ply': row['ply'],
+                              'gameCreatedAt': row['game_created_at'],
                               'fen': board.fen(), 'turn': 'w' if board.turn else 'b', 'moveNumber': board.fullmove_number,
                               'legalMoves': [m.uci() for m in board.legal_moves], 'dueAt': row['due_at'], 'streak': row['streak']})
             stats = con.execute('''SELECT count(*) AS firstAttempts,coalesce(sum(a.success),0) AS firstSuccesses
