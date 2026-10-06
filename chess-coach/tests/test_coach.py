@@ -65,7 +65,8 @@ def test_puzzle_first_attempt_retry_hint_and_early_practice(client):
     p = client.get('/api/profile').json()
     assert p['independentAttempts'] == 1 and p['unaidedSuccesses'] == 0
     practice = client.post(path + '/sessions').json()
-    assert practice['exposure'] == 'practice'
+    assert practice['exposure'] == 'review'
+    assert client.get('/api/profile').json()['due'] == 1
     assert client.post(path+'/hint',json={'session_id':practice['id']}).status_code == 200
     assisted = client.post(path+'/attempts',json={'move':'g6g7','session_id':practice['id'],'version':0}).json()
     assert assisted['success'] and assisted['assisted']

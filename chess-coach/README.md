@@ -141,3 +141,9 @@ In ogni Puzzle e posizione di Blunder prevention, il riquadro **Dalla tua partit
 ## Abbandonare una partita
 
 Durante il gioco, **Abbandona partita** è disponibile sotto la scacchiera, anche mentre Maia pensa. Dopo la conferma viene registrata una sconfitta per il tuo colore, viene fermata la risposta di Maia e si avvia l'analisi automatica delle mosse giocate. Risultato e motivo restano salvati al ricaricamento e nel PGN esportato. La partita abbandonata resta consultabile, ma non accetta altre mosse o annullamenti. Se abbandoni prima della prima mossa, viene salvato il risultato senza avviare un'analisi vuota.
+
+### Puzzle: ripasso e confronto dopo la soluzione
+
+La lista e il contatore dei puzzle da ripassare diminuiscono solo dopo un primo tentativo corretto senza indizi. Errori, soluzioni mostrate e successi dopo tentativi sbagliati mantengono il puzzle in scadenza. Una nuova sessione permette di riprovarlo; un successo indipendente programma il ripasso successivo senza cancellare lo storico. Prossimo puzzle evita quelli già conclusi nella sessione di navigazione.
+
+Dopo una risposta corretta, la propria mossa rimane visibile brevemente, poi viene mostrata la posizione iniziale: freccia bianca per la mossa della partita originale, rossa per la prima scelta di Maia al livello della partita. Il pulsante consente di tornare alla propria soluzione. Il confronto non anticipa suggerimenti durante il tentativo.

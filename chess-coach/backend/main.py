@@ -645,8 +645,10 @@ def attempt(exercise_id: str, body: AttemptInput):
         # Immediate retries and early practice never increase the independent streak.
         if first and session["exposure"] != "practice":
             streak = current["streak"] + 1 if success and not assisted else 0
-            interval = [1, 3, 7, 14, 30][min(max(streak - 1, 0), 4)]
-            due = (datetime.now(timezone.utc) + timedelta(days=interval)).isoformat()
+            if success and not assisted:
+                interval = [1, 3, 7, 14, 30][min(max(streak - 1, 0), 4)]
+                due = (datetime.now(timezone.utc) + timedelta(days=interval)).isoformat()
+            # Errors and hints leave the exercise due, including after later success.
             con.execute("UPDATE exercises SET streak=?,due_at=? WHERE id=?", (streak, due, exercise_id))
         inserted = con.execute("INSERT INTO attempts(exercise_id,move,success,assisted,created_at,session_id,is_first,exposure) VALUES(?,?,?,?,?,?,?,?)",
                     (exercise_id, body.move, int(success), int(assisted), now(), body.session_id, int(first), session["exposure"]))
@@ -656,6 +658,7 @@ def attempt(exercise_id: str, body: AttemptInput):
     return {"success": success, "assisted": assisted, "loss": loss, "best": best if success else None, "actual": actual,
             "insight": insights.public(insights.compare(board.fen(), body.move, best, actual)),
             "dueAt": due, "version": body.version + 1, "closed": success,
+            "firstTry": first, "scheduled": first and success and not assisted and session["exposure"] != "practice",
             "message": "Mossa valida: mantiene la qualità della posizione." if success else "C'è un'alternativa migliore. Puoi riprovare: il primo tentativo è già registrato."}
 
 
@@ -673,8 +676,7 @@ def reveal(exercise_id: str, body: SessionInput):
                         (exercise_id, "reveal", now(), body.session_id, session["exposure"]))
         due = find_exercise(con, exercise_id)["due_at"]
         if session["exposure"] != "practice":
-            due = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
-            con.execute("UPDATE exercises SET streak=0,due_at=? WHERE id=?", (due, exercise_id))
+            con.execute("UPDATE exercises SET streak=0 WHERE id=?", (exercise_id,))
         con.execute("UPDATE puzzle_sessions SET status='revealed',hints=hints+1 WHERE id=?", (body.session_id,))
     return {"success": False, "assisted": True, "best": best, "actual": None, "loss": None, "dueAt": due,
             "version": session["guesses"], "closed": True, "message": "Soluzione mostrata. Riprova dopo una pausa per verificare cosa ricordi."}
