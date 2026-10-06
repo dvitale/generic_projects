@@ -1,6 +1,7 @@
 import {useEffect,useRef,useState} from 'react'
 import {Chess} from 'chess.js'
 import Board from './Board'
+import LichessAnalysis from './LichessAnalysis'
 import MistakeHistory from './MistakeHistory'
 import {useTrainingMove} from './useTrainingMove'
 import ChessInsights,{ThinkingGuide,type Insight} from './ChessInsights'
@@ -77,6 +78,7 @@ export default function BlunderPrevention({onArchive,onReview}:{onArchive:()=>vo
         <div className="player-row"><span className="avatar">◇</span><div><strong>{position.turn==='w'?'Muove il Bianco':'Muove il Nero'}</strong><small>Mossa {position.moveNumber} · {position.title}</small></div></div>
         <Board fen={board!.fen()} orientation={position.turn} legalMoves={position.legalMoves} interactive={!busy&&!!session&&!result?.closed} onMove={move=>void submit(move)} lastMove={showOriginal?displayedMove:motion.lastMove} animateMove reverseMove={!showOriginal&&motion.reverse}/>
         <p className="footnote">{showOriginal?'Scacchiera dopo il tuo errore originale.':result?.closed?'Scacchiera dopo la mossa verificata.':'Scacchiera prima del tuo errore: trascina un pezzo o usa due clic.'}</p>
+        <LichessAnalysis key={position.id} fen={board!.fen()} orientation={position.turn}/>
       </section>
       <aside className="coach-column">
         <section className="panel"><ThinkingGuide/><p className="footnote">La mossa può perdere per una tattica o compromettere una posizione difendibile. Stockfish decide l’esito; la spiegazione distingue fatti e ipotesi.</p></section>

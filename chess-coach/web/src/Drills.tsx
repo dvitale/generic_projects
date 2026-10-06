@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import Board from './Board'
+import LichessAnalysis from './LichessAnalysis'
 import PanelTabs from './PanelTabs'
 import PgnExport from './PgnExport'
 import {useMoveTime} from './useMoveTime'
@@ -73,6 +74,7 @@ export default function Drills({onReview,startTemplateId,onStarted}:{onReview:(g
     {game?.drill&&<div className="training-layout">
       <section className="board-column"><div className="player-row"><span className="avatar">♞</span><div><strong>{game.drill.name}</strong><small>Maia {game.elo} · {thinking?'Maia sta pensando…':game.drill.complete?'Sessione completata':game.turn===game.playerColor?'Tocca a te':'Attendi Maia'}</small></div></div>
         <Board animateMove={game.turn===game.playerColor} fen={game.fen} orientation={game.playerColor} legalMoves={game.legalMoves} interactive={!busy&&!thinking&&!game.drill.complete&&game.turn===game.playerColor} onMove={move} lastMove={game.moves.at(-1)}/>
+        <LichessAnalysis key={game.id} fen={game.fen} orientation={game.playerColor}/>
       </section>
       <aside className="coach-column"><section className="panel"><span className="eyebrow">PRATICA DI UNA SEQUENZA</span><h2>{game.drill.theme}</h2><p>{game.drill.goal}</p><p className="drill-count">{game.drill.decisions} / {game.drill.target} decisioni</p><progress value={game.drill.decisions} max={game.drill.target}/><button className="full" disabled={busy||!game.canUndo} onClick={undo}>Annulla ultima mossa</button><p className="muted">La revisione valuta solo le tue decisioni dopo la posizione iniziale del drill.</p><button className="primary full" disabled={busy||thinking||game.version===game.drill.startPly} onClick={()=>onReview(game)}>{game.drill.complete?'Rivedi il drill':'Rivedi fin qui'} →</button>{game.drill.complete&&<p role="status">Drill completato. Verifica le tue scelte prima di ripartire.</p>}</section><PgnExport game={game}/></aside>
     </div>}
