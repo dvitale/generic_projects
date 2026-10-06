@@ -35,7 +35,7 @@ test('prevention exports current board before, after solution and after original
 })
 
 test('puzzle and drill expose their displayed positions even without a normal game selected',async({page,request})=>{
-  await page.route('**/api/exercises',r=>r.fulfill({json:[{id:'lichess',gameId:'test',ply:0,theme:'Test',fen,turn:'w',legalMoves:['g6g7'],streak:0}]}))
+  await page.route('**/api/exercises',r=>r.fulfill({json:[{id:'lichess',gameId:'test',ply:0,theme:'Test',fen,turn:'w',legalMoves:['g6g7'],streak:0,dueAt:'2000-01-01T00:00:00+00:00'}]}))
   await page.route('**/api/exercises/lichess/sessions',r=>r.fulfill({json:{id:'s',version:0,exposure:'new'}}))
   await page.route('**/api/training/puzzle/lichess/mistakes',r=>r.fulfill({json:[]}))
   await page.route('**/api/exercises/lichess/reveal',r=>r.fulfill({json:{success:false,assisted:true,closed:true,version:1,best:{cp:100000,mate:1,pv:['g6g7'],san:['Qg7#']},actual:null,message:'Soluzione mostrata'}}))

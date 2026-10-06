@@ -9,6 +9,7 @@ import MoveReview from './MoveReview'
 import MoveHistory from './MoveHistory'
 import PanelTabs from './PanelTabs'
 import PuzzleFeedback from './PuzzleFeedback'
+import {usePuzzleComparison} from './usePuzzleComparison'
 import MistakeHistory from './MistakeHistory'
 import {useTrainingMove} from './useTrainingMove'
 import ChessInsights,{ThinkingGuide} from './ChessInsights'
@@ -47,6 +48,8 @@ export default function App() {
   const [hint, setHint] = useState('')
   const puzzleMotion=useTrainingMove((exercise?.id??'')+':'+(session?.id??''))
   const puzzleMove=puzzleMotion.move
+  const puzzleComparison=usePuzzleComparison(exercise,session?.id,tab==='train'&&!!attempt?.success)
+  const dueExercises=exercises.filter(ex=>new Date(ex.dueAt).getTime()<=Date.now())
   const [completedPuzzles,setCompletedPuzzles]=useState<string[]>([])
   const [color, setColor] = useState<Color>('w')
   const [elo, setElo] = useState(1500)
@@ -139,8 +142,8 @@ export default function App() {
   function showPlayPosition(ply:number){if(game)setPlayPosition(ply>=game.moves.length?null:{id:game.id,ply:Math.max(0,ply)})}
   const reviewBoard = game ? position(game, cursor) : new Chess()
   const puzzleBoard=exercise?new Chess(exercise.fen):null
-  if(puzzleBoard&&puzzleMove)puzzleBoard.move({from:puzzleMove.slice(0,2),to:puzzleMove.slice(2,4),promotion:puzzleMove[4]})
-  const nextPuzzle=exercises.find(ex=>ex.id!==exercise?.id&&!completedPuzzles.includes(ex.id))
+  if(puzzleBoard&&puzzleMove&&!puzzleComparison.visible)puzzleBoard.move({from:puzzleMove.slice(0,2),to:puzzleMove.slice(2,4),promotion:puzzleMove[4]})
+  const nextPuzzle=dueExercises.find(ex=>ex.id!==exercise?.id&&!completedPuzzles.includes(ex.id))
   const boardFen = tab === 'train' && puzzleBoard ? puzzleBoard.fen() : tab === 'review' ? reviewBoard.fen() : browsingHistory && game ? position(game,playPly).fen() : game?.fen || initialFen
   const orientation: Color = tab === 'train' && exercise ? exercise.turn : game?.playerColor || color
   const legal = tab === 'train' ? exercise?.legalMoves || [] : game?.legalMoves || []
@@ -149,6 +152,10 @@ export default function App() {
   const visiblePrediction = predictionKey===boardFen+':'+reviewElo?prediction:null
   const reviewedMove=(game?.analysis?.moves||game?.analysis?.decisions)?.find(d=>d.ply===cursor)
   const analysisArrows:AnalysisArrow[]=[]
+  if(tab==='train'&&puzzleComparison.visible){
+    if(puzzleComparison.data?.played)analysisArrows.push({move:puzzleComparison.data.played,source:'played',rank:1})
+    if(puzzleComparison.data?.maia)analysisArrows.push({move:puzzleComparison.data.maia,source:'maia',rank:1})
+  }
   if(tab==='review'&&reviewedMove?.fen===boardFen){
     if(arrowSources.stockfish)(reviewedMove.stockfishCandidates||[reviewedMove.best]).slice(0,1).forEach((choice,index)=>{if(choice.pv[0])analysisArrows.push({move:choice.pv[0],source:'stockfish',rank:index+1})})
     if(arrowSources.maia)visiblePrediction?.moves.slice(0,1).forEach((choice,index)=>analysisArrows.push({move:choice.uci,source:'maia',rank:index+1}))
@@ -257,7 +264,7 @@ export default function App() {
       else{const result=await api<{hint:string}>(`/exercises/${exercise.id}/hint`,{session_id:session.id});setHint(result.hint)}
     }catch(e){fail(e)}finally{setBusy(false)}
   }
-  function navigate(next: Tab) {if(busy)return;setTab(next); setError(''); setNotice(''); if(next==='review'&&game)setCursor(game.version); if(next==='train'&&!exercise&&exercises[0])pickExercise(exercises[0]); refresh().catch(fail)}
+  function navigate(next: Tab) {if(busy)return;setTab(next); setError(''); setNotice(''); if(next==='review'&&game)setCursor(game.version); if(next==='train'&&!exercise&&dueExercises[0])pickExercise(dueExercises[0]); refresh().catch(fail)}
 
   return <div className="app-shell">
     <aside className="sidebar">
@@ -279,13 +286,21 @@ export default function App() {
         <section className="panel"><h2>Tattica e posizione nelle tue decisioni</h2><ThinkingGuide/>{profile?.domains?.map(d=><div className="theme-row" key={d.kind}><span>{d.label}</span><span>{d.examples} posizioni</span></div>)}<p className="footnote">Conteggi di decisioni con peggioramento: le posizioni ripetute sono contate una volta. Indicano cosa rivedere, non una diagnosi di carenze. La categoria posizionale segnala indizi, non una causa dimostrata.</p></section>
       </div>:tab==='archive'?null:<div className={'training-layout layout-'+tab}>
         <section className="board-column">
-          {tab==='train'&&exercise&&<PuzzleFeedback motionMessage={puzzleMotion.message} attempt={attempt} busy={busy} ready={!!session} hasNext={!!nextPuzzle} onNext={()=>{if(nextPuzzle)void pickExercise(nextPuzzle)}} onRestart={()=>{setCompletedPuzzles([]);if(exercises[0])void pickExercise(exercises[0])}}/>}
+          {tab==='train'&&exercise&&<PuzzleFeedback canRestart={dueExercises.length>0} comparing={puzzleComparison.visible} motionMessage={puzzleMotion.message} attempt={attempt} busy={busy} ready={!!session} hasNext={!!nextPuzzle} onNext={()=>{if(nextPuzzle)void pickExercise(nextPuzzle)}} onRestart={()=>{setCompletedPuzzles([]);if(dueExercises[0])void pickExercise(dueExercises[0])}}/>}
           <div className="player-row"><span className="avatar">{tab==='train'?'◎':'♞'}</span><div><strong>{tab==='train'?'Posizione di allenamento':orientation==='w'?'Maia':'Tu'}</strong><small>{tab==='train'?exercise?.theme||'Scegli un esercizio':orientation==='w'?`Livello ${game?.elo||elo} · gioco umano`:'Il tuo colore: Nero'}</small></div>{tab==='play'&&botThinking&&<span className="thinking" role="status">Maia sta pensando…</span>}</div>
-          <Board analysisArrows={analysisArrows} reverseMove={tab==='train'&&puzzleMotion.reverse} animateMove={tab==='train'||tab==='play'&&!browsingHistory&&!!game&&game.turn===game.playerColor} fen={boardFen} orientation={orientation} interactive={canMove} legalMoves={legal} onMove={submitMove} lastMove={tab==='train'?puzzleMotion.lastMove:tab==='play'?game?.moves[playPly-1]:tab==='review'&&game&&cursor>0?game.moves[cursor-1]:undefined}/>
+          <Board analysisArrows={analysisArrows} reverseMove={tab==='train'&&puzzleMotion.reverse} animateMove={tab==='train'||tab==='play'&&!browsingHistory&&!!game&&game.turn===game.playerColor} fen={boardFen} orientation={orientation} interactive={canMove} legalMoves={legal} onMove={submitMove} lastMove={tab==='train'?(puzzleComparison.visible?undefined:puzzleMotion.lastMove):tab==='play'?game?.moves[playPly-1]:tab==='review'&&game&&cursor>0?game.moves[cursor-1]:undefined}/>
           <div className="player-row lower"><span className="avatar light">{orientation==='w'?'♙':'♞'}</span><div><strong>{tab==='train'?(attempt?.closed?(attempt.success?'Puzzle risolto':'Soluzione del puzzle'):exercise?.turn==='b'?'Muove il Nero':'Muove il Bianco'):orientation==='w'?'Tu':'Maia'}</strong><small>{tab==='play'?(browsingHistory?`Stai rivedendo la posizione dopo ${playPly} semimosse`:game?.result?`Partita conclusa · ${game.result}${game.termination==='resign'?' · per abbandono':''}`:canMove?'Tocca a te · trascina un pezzo o usa due clic':game?'Attendi la risposta':'Pronto per iniziare'):tab==='review'?`Posizione dopo ${cursor} semimosse`:attempt?.closed?'Esercizio concluso':'Cerca una buona mossa'}</small></div><span className="mode-label">{tab==='play'?'PARTITA LIBERA':tab==='review'?'ANALISI':'ESERCIZIO'}</span></div>
           {browsingHistory&&<div className="play-history-notice"><span>Posizione precedente · {playPly} / {game!.moves.length}</span><button className="primary" onClick={()=>setPlayPosition(null)}>Torna alla posizione corrente</button></div>}
           {tab==='review'&&game&&<div className="review-controls"><button aria-label="Posizione iniziale" onClick={()=>setCursor(0)} disabled={cursor===0}>⏮</button><button aria-label="Mossa precedente" onClick={()=>setCursor(c=>Math.max(0,c-1))} disabled={cursor===0}>←</button><span>{cursor} / {game.version}</span><button aria-label="Mossa successiva" onClick={()=>setCursor(c=>Math.min(game.version,c+1))} disabled={cursor===game.version}>→</button><button aria-label="Ultima posizione" onClick={()=>setCursor(game.version)} disabled={cursor===game.version}>⏭</button></div>}
           {tab==='review'&&game&&<div className="analysis-arrow-controls" role="group" aria-label="Frecce di analisi">{([['stockfish','Stockfish · blu'],['maia','Maia · rosso'],['played','Giocata · bianco']] as const).map(([source,label])=><label key={source}><input type="checkbox" checked={arrowSources[source]} onChange={e=>setArrowSources(current=>({...current,[source]:e.target.checked}))}/><span className={'arrow-swatch source-'+source}/>{label}</label>)}</div>}
+          {tab==='train'&&attempt?.success&&<div className="panel" aria-label="Confronto del puzzle">
+            <p>{puzzleComparison.visible?'Confronto dalla posizione iniziale del puzzle.':'La scacchiera mostra la tua soluzione.'}</p>
+            <div className="analysis-arrow-controls"><span><i className="arrow-swatch source-played"/> Giocata in partita · bianco</span><span><i className="arrow-swatch source-maia"/> Maia {puzzleComparison.data?.elo??''} · rosso</span></div>
+            {puzzleComparison.data?.loading&&<p role="status">Calcolo della prima scelta di Maia…</p>}
+            {puzzleComparison.data?.error&&<p role="status">{puzzleComparison.data.error} <button onClick={puzzleComparison.retry}>Riprova confronto</button></p>}
+            {puzzleComparison.data?.played&&<button onClick={puzzleComparison.toggle}>{puzzleComparison.visible?'Mostra la tua soluzione':'Mostra confronto con frecce'}</button>}
+            <p className="footnote">La freccia rossa indica la mossa più probabile al livello della partita, non necessariamente la migliore.</p>
+          </div>}
           {((tab==='play'||tab==='review')&&game||tab==='train'&&exercise)&&<LichessAnalysis key={tab==='train'?exercise!.id:game!.id+':'+tab} fen={boardFen} orientation={orientation}/>}
           {tab==='play'&&game?.source==='maia'&&!game.result&&<div className="review-controls"><button disabled={busy||!!jobId} onClick={resign}>Abbandona partita</button></div>}
         </section>
@@ -314,7 +329,7 @@ export default function App() {
           </>}
           {tab==='train'&&exercise&&<MistakeHistory key={exercise.id} kind="puzzle" targetId={exercise.id} revision={session?.version??0}/>}
           {tab==='train'&&<section className="panel"><ThinkingGuide/>{attempt?.closed&&<ChessInsights insight={attempt.insight} compact/>}</section>}
-          {tab==='train'&&<section className="panel"><span className="eyebrow">DALLE TUE PARTITE</span><h2>{exercise?exercise.theme:'Il tuo primo esercizio'}</h2>{!exercise?<p className="empty-text">Gli esercizi nasceranno dalla revisione delle tue partite. Gioca o importa un PGN, poi avvia l'analisi.</p>:<><p className="muted">{attempt?.closed?'Confronta la posizione sulla scacchiera con la variante di riferimento.':'Muovi sulla scacchiera. Sono accettate anche alternative che mantengono la qualità della posizione.'}</p>{!attempt?.closed&&session&&<div className="row"><button disabled={busy} onClick={()=>puzzleHelp()}>Chiedi un indizio</button><button disabled={busy} onClick={()=>puzzleHelp(true)}>Mostra soluzione</button></div>}{hint&&<p className="hint">{hint}</p>}{attempt?.closed&&<div className="puzzle-solution"><h3>Variante di riferimento</h3><p className="variation">{attempt.best?.san.join(' ')}</p><small>{attempt.assisted?'Esercizio con aiuto.':'Esercizio senza aiuti.'} Ripasso: {new Date(attempt.dueAt).toLocaleDateString('it-IT')}.</small></div>}</>}<div className="exercise-list">{exercises.map(ex=><button key={ex.id} className={exercise?.id===ex.id?'exercise-link chosen':'exercise-link'} disabled={busy} onClick={()=>pickExercise(ex)}><span>{ex.theme}</span><small>Mossa {Math.floor(ex.ply/2)+1} · {new Date(ex.dueAt).getTime()<=Date.now()?'da ripassare':'programmato'}</small></button>)}</div></section>}
+          {tab==='train'&&<section className="panel"><span className="eyebrow">DALLE TUE PARTITE</span><h2>{exercise?exercise.theme:'Il tuo primo esercizio'}</h2>{!exercise?<p className="empty-text">Gli esercizi nasceranno dalla revisione delle tue partite. Gioca o importa un PGN, poi avvia l'analisi.</p>:<><p className="muted">{attempt?.closed?'Confronta la posizione sulla scacchiera con la variante di riferimento.':'Muovi sulla scacchiera. Sono accettate anche alternative che mantengono la qualità della posizione.'}</p>{!attempt?.closed&&session&&<div className="row"><button disabled={busy} onClick={()=>puzzleHelp()}>Chiedi un indizio</button><button disabled={busy} onClick={()=>puzzleHelp(true)}>Mostra soluzione</button></div>}{hint&&<p className="hint">{hint}</p>}{attempt?.closed&&<div className="puzzle-solution"><h3>Variante di riferimento</h3><p className="variation">{attempt.best?.san.join(' ')}</p><small>{attempt.assisted?'Esercizio con aiuto.':'Esercizio senza aiuti.'} Ripasso: {new Date(attempt.dueAt).toLocaleDateString('it-IT')}.</small></div>}</>}<p className="footnote">Da ripassare: {profile?.due??dueExercises.length}. Escono dalla lista solo i puzzle risolti al primo tentativo senza aiuti; torneranno alla scadenza del ripasso.</p><div className="exercise-list">{dueExercises.map(ex=><button key={ex.id} className={exercise?.id===ex.id?'exercise-link chosen':'exercise-link'} disabled={busy} onClick={()=>pickExercise(ex)}><span>{ex.theme}</span><small>Mossa {Math.floor(ex.ply/2)+1} · {new Date(ex.dueAt).getTime()<=Date.now()?'da ripassare':'programmato'}</small></button>)}</div></section>}
         </aside>
       </div>}
       {tab==='archive'&&<section className="archive"><div className="section-head"><h2>Le tue partite</h2><span>{saved.length} salvate</span></div>{saved.length?<div className="game-list">{saved.map(item=><button key={item.id} onClick={()=>openGame(item.id)} disabled={!!jobId||busy}><span className="archive-icon">♟</span><span><strong>{item.title}</strong><small>{new Date(item.createdAt).toLocaleDateString('it-IT')} · {item.plies} semimosse · {item.source==='pgn'?'Importata':'Maia'}</small></span><span className="arrow">↗</span></button>)}</div>:<p className="empty-text">Le partite vengono salvate automaticamente, mossa dopo mossa.</p>}</section>}
