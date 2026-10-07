@@ -2,7 +2,7 @@
 $guideRoot = Split-Path -Parent $PSScriptRoot
 $guideBody = (ConvertFrom-Markdown -Path (Join-Path $guideRoot 'docs/training-guide.md')).Html
 $guideLinks = [regex]::Matches($guideBody, '<h2 id="([^"]+)">(.*?)</h2>') | ForEach-Object { '<a href="#' + $_.Groups[1].Value + '">' + $_.Groups[2].Value + '</a>' }
-$guideBody = [regex]::Replace($guideBody, '<a href="(https://[^"]+)"', '<a target="_blank" rel="noopener noreferrer" href="$1"')
+$guideBody = [regex]::Replace($guideBody, '<a href="(https?://[^"]+)"', '<a target="_blank" rel="noopener noreferrer" href="$1"')
 $guideTemplate = @'
 <!doctype html>
 <html lang="it">
@@ -31,4 +31,5 @@ main{min-width:0;background:#fff;padding:36px 44px;border:1px solid #dfe5da;bord
 </body>
 </html>
 '@
-$guideTemplate.Replace('{{NAV}}', ($guideLinks -join "`n")).Replace('{{CONTENT}}', $guideBody) | Set-Content -LiteralPath (Join-Path $guideRoot 'docs/training-guide.html') -Encoding utf8
+$guideHtml = $guideTemplate.Replace('{{NAV}}', ($guideLinks -join "`n")).Replace('{{CONTENT}}', $guideBody).Replace("`r`n", "`n")
+[System.IO.File]::WriteAllText((Join-Path $guideRoot 'docs/training-guide.html'), $guideHtml.TrimEnd()+"`n", [System.Text.UTF8Encoding]::new($false))

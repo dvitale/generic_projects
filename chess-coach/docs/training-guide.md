@@ -2,6 +2,10 @@
 
 Aggiornata il 6 ottobre 2026. I tutorial esterni si basano sulla documentazione ufficiale consultata in questa data: le aree personali a pagamento non sono state provate con il tuo account. Nomi e disponibilità possono variare. Le routine proposte sono consigli per il tuo obiettivo, non prescrizioni ufficiali dei servizi.
 
+**Passa subito alla pratica:** [importa i PGN Maia](http://localhost:8033/?section=schedule&import=pgn) · [apri Allenamento](http://localhost:8033/?section=schedule) · [apri Blunder prevention](http://localhost:8033/?section=prevention) · [rivedi le tue partite](http://localhost:8033/?section=archive).
+
+I collegamenti a SparringMate aprono l’app locale in una nuova scheda e richiedono che sia avviata su questo PC. I rimandi ai capitoli restano nella guida; quelli ai servizi esterni aprono una nuova scheda.
+
 ## Il tuo obiettivo di lavoro
 
 Nelle partite esaminate, i temi da allenare per primi sono il controllo delle minacce avversarie, gli scacchi dopo una cattura e le occasioni di recupero. Per iniziare, scegli una domanda da usare sempre: **«Dopo la mia mossa, quali scacchi e catture avrà l'avversario?»**
@@ -14,10 +18,10 @@ Non serve aprire quattro programmi ogni giorno. Usa SparringMate come archivio d
 
 1. Accedi a [Maia Chess](https://www.maiachess.com/) e apri la partita terminata, oppure ritrovala nella sezione Analysis.
 2. Cerca il pannello **Export** e il campo **PGN**. Nel componente ufficiale attuale l'icona di copia, o il riquadro del PGN, copia il testo negli appunti. Non copiare il campo FEN: descrive una sola posizione.
-3. In SparringMate premi **Importa PGN**, quindi incolla il testo in **Partite PGN**.
+3. In SparringMate [apri **Importa PGN**](http://localhost:8033/?section=schedule&import=pgn), quindi incolla il testo in **Partite PGN**.
 4. Lascia **Automatico contro Maia**. Il programma riconosce il lato umano quando l'altro giocatore si chiama, per esempio, Maia 600. Per altri PGN inserisci il tuo nome esattamente come appare nelle intestazioni oppure scegli Bianco/Nero.
 5. Lascia selezionato **Analizza e prepara gli esercizi dopo l'importazione**, quindi premi **Importa partite**.
-6. Attendi **Esercizi pronti** e apri **Allenamento**. Puoi anche aprire subito la partita dal riepilogo dell'importazione.
+6. Attendi **Esercizi pronti** e apri **Allenamento**. Puoi anche aprire subito la partita dal riepilogo dell'importazione. Prosegui con la [configurazione del calendario](#prima-configurazione).
 
 La copia PGN è verificata nel [componente ExportGame ufficiale](https://github.com/CSSLab/maia-platform-frontend/blob/a6e52f5c811ee18863cb2f0e81f2433a5b9905de/src/components/Common/ExportGame.tsx). Maia descrive le funzioni di esportazione anche nell'[annuncio della piattaforma](https://www.maiachess.com/blog/platform-v1).
 
@@ -37,7 +41,7 @@ Il codice pubblico Maia usa un endpoint per lo storico. Il tentativo di lettura 
 
 ### Prima configurazione
 
-1. Apri **Allenamento** nella barra laterale.
+1. Apri [**Allenamento**](http://localhost:8033/?section=schedule) nella barra laterale.
 2. Imposta inizialmente **10–15 minuti** e **2–3 posizioni nuove al giorno**. È una proposta di partenza: abbassa il limite se accumuli ripassi.
 3. Seleziona i giorni in cui vuoi allenarti e premi **Salva piano**.
 4. Premi **Inizia il prossimo ripasso**. Il piano propone prima i ripassi, poi le nuove posizioni, evitando la stessa decisione sia come puzzle sia come prevenzione nella medesima lista.
@@ -63,15 +67,21 @@ I giorni di pausa non cancellano gli arretrati. Il calendario mostra le scadenze
 
 Questo sistema si ispira alla ripetizione dilazionata; non è il prodotto MoveTrainer e non è collegato a Chessable. Misura il ricordo delle posizioni ripassate, non ancora il trasferimento dell'abilità alle partite nuove.
 
+Per approfondire: [come funzionano le scadenze](#come-cambiano-le-scadenze), [esempio di settimana](#una-settimana-sostenibile) e [richiamo con MoveTrainer](#movetrainer-ricordare-lidea-dopo-una-pausa).
+
 ### La tua routine consigliata
 
 Prima di ogni risposta, cerca uno scacco avversario, una cattura e una minaccia al re. Dopo un errore guarda la sequenza prima di chiedere una spiegazione; poi prova a descrivere il meccanismo con una frase. Alla fine scegli una sola regola da portare nella partita successiva, per esempio: «Prima di prendere un cavallo controllo gli scacchi contro il mio re».
+
+Passa alla pratica: [Blunder prevention](http://localhost:8033/?section=prevention) per evitare una mossa perdente, [Drill](http://localhost:8033/?section=drill) per continuare a giocare e [Progressi](http://localhost:8033/?section=progress) per rivedere gli indicatori.
 
 ## 3. Aimchess: scegliere cosa allenare
 
 ### A cosa ti serve
 
 [Aimchess](https://aimchess.com/) presenta lezioni personalizzate dalle partite, tra cui **Retry Mistakes**, **Blunder Preventer**, **Defender** e allenamento alla conversione del vantaggio. Il Blunder Preventer descritto dal servizio propone due alternative da confrontare; il 360 Trainer mescola tipi diversi di posizione. Queste sono le funzioni pertinenti al tuo problema. Non è stata verificata una connessione diretta con Maia Chess: non basare l'acquisto sull'aspettativa che legga automaticamente le tue partite Maia.
+
+Collegamenti utili: [apri Aimchess](https://aimchess.com/) · [ripassa la routine sulle minacce](#la-tua-routine-consigliata) · [torna al calendario locale](#il-calendario-di-sparringmate).
 
 ### Sessione pratica proposta: 10 minuti
 
@@ -91,6 +101,8 @@ Per ora darei priorità a prevenzione e difesa. Il lavoro esteso sulle aperture 
 ### Che cosa stai usando
 
 MoveTrainer è la tecnologia di studio interattivo dei corsi, presente anche nei [Courses di Chess.com](https://support.chess.com/en/articles/10318195-what-are-movetrainer-courses). Le mosse studiate ritornano secondo un calendario; nella [documentazione della ripetizione](https://support.chess.com/en/articles/10319322-how-does-the-spaced-repetition-scheduling-work), una risposta corretta allunga l'intervallo e un errore lo riduce. È adatto al richiamo di materiale già appreso; il numero di ripassi non certifica da solo la forza di gioco.
+
+Collegamenti utili: [guida ufficiale ai corsi MoveTrainer](https://support.chess.com/en/articles/10318195-what-are-movetrainer-courses) · [intervalli di ripasso ufficiali](https://support.chess.com/en/articles/10319322-how-does-the-spaced-repetition-scheduling-work) · [confronta le scadenze di SparringMate](#come-cambiano-le-scadenze).
 
 ### Preparazione proposta
 
@@ -115,6 +127,8 @@ Non è verificato un flusso diretto “Maia → corso personale MoveTrainer” p
 ### Funzioni pertinenti
 
 La [FAQ ufficiale](https://noctie.ai/faq/) descrive un avversario adattivo, feedback sulle mosse e flashcard ricavate dagli errori, con ripetizione dilazionata. Il giudizio sulle mosse deriva dalla prospettiva del modello umano e non equivale alla valutazione Stockfish. L'adattamento non garantisce vittorie facili: la stessa FAQ avverte che anche un principiante può trovare impegnative le prime partite.
+
+Collegamenti utili: [apri Noctie](https://app.noctie.ai/) · [FAQ ufficiale](https://noctie.ai/faq/) · [come trasferire una posizione Maia](#usare-una-posizione-delle-tue-partite-maia).
 
 ### Sessione proposta
 
@@ -151,4 +165,8 @@ Esempio organizzativo, modificabile:
 | Sabato | Una partita Maia online e revisione di un episodio |
 | Domenica | Pausa o breve bilancio, secondo il calendario scelto |
 
+Per iniziare questa settimana: [importa le partite Maia](#da-maia-chess-a-sparringmate), [imposta il calendario](http://localhost:8033/?section=schedule) e scegli un solo supporto tra [Aimchess](#aimchess-scegliere-cosa-allenare), [MoveTrainer](#movetrainer-ricordare-lidea-dopo-una-pausa) e [Noctie](#noctie-provare-le-idee-durante-il-gioco).
+
 Prima della settimana successiva chiediti: ho evitato almeno una minaccia che prima non vedevo? Ho riconosciuto uno scacco dopo una cattura? Ho sfruttato un'occasione di recupero? Registra tutte le partite di verifica, non soltanto quelle frustranti. Un campione piccolo può oscillare: conta soprattutto la riduzione degli stessi errori in posizioni nuove.
+
+[Torna all’inizio della guida](#allenarsi-per-perdere-meno-contro-maia-guida-pratica).

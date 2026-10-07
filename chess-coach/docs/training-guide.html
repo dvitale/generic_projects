@@ -29,6 +29,8 @@ main{min-width:0;background:#fff;padding:36px 44px;border:1px solid #dfe5da;bord
 <a href="#una-settimana-sostenibile">6. Una settimana sostenibile</a></nav></aside>
 <main id="contenuto"><h1 id="allenarsi-per-perdere-meno-contro-maia-guida-pratica">Allenarsi per perdere meno contro Maia: guida pratica</h1>
 <p>Aggiornata il 6 ottobre 2026. I tutorial esterni si basano sulla documentazione ufficiale consultata in questa data: le aree personali a pagamento non sono state provate con il tuo account. Nomi e disponibilità possono variare. Le routine proposte sono consigli per il tuo obiettivo, non prescrizioni ufficiali dei servizi.</p>
+<p><strong>Passa subito alla pratica:</strong> <a target="_blank" rel="noopener noreferrer" href="http://localhost:8033/?section=schedule&amp;import=pgn">importa i PGN Maia</a> · <a target="_blank" rel="noopener noreferrer" href="http://localhost:8033/?section=schedule">apri Allenamento</a> · <a target="_blank" rel="noopener noreferrer" href="http://localhost:8033/?section=prevention">apri Blunder prevention</a> · <a target="_blank" rel="noopener noreferrer" href="http://localhost:8033/?section=archive">rivedi le tue partite</a>.</p>
+<p>I collegamenti a SparringMate aprono l’app locale in una nuova scheda e richiedono che sia avviata su questo PC. I rimandi ai capitoli restano nella guida; quelli ai servizi esterni aprono una nuova scheda.</p>
 <h2 id="il-tuo-obiettivo-di-lavoro">Il tuo obiettivo di lavoro</h2>
 <p>Nelle partite esaminate, i temi da allenare per primi sono il controllo delle minacce avversarie, gli scacchi dopo una cattura e le occasioni di recupero. Per iniziare, scegli una domanda da usare sempre: <strong>«Dopo la mia mossa, quali scacchi e catture avrà l'avversario?»</strong></p>
 <p>Non serve aprire quattro programmi ogni giorno. Usa SparringMate come archivio delle partite Maia e calendario principale; prova eventualmente uno degli altri strumenti per un compito preciso. Valuta il risultato nelle nuove partite senza aiuti, non soltanto dal numero di puzzle completati.</p>
@@ -37,10 +39,10 @@ main{min-width:0;background:#fff;padding:36px 44px;border:1px solid #dfe5da;bord
 <ol>
 <li>Accedi a <a target="_blank" rel="noopener noreferrer" href="https://www.maiachess.com/">Maia Chess</a> e apri la partita terminata, oppure ritrovala nella sezione Analysis.</li>
 <li>Cerca il pannello <strong>Export</strong> e il campo <strong>PGN</strong>. Nel componente ufficiale attuale l'icona di copia, o il riquadro del PGN, copia il testo negli appunti. Non copiare il campo FEN: descrive una sola posizione.</li>
-<li>In SparringMate premi <strong>Importa PGN</strong>, quindi incolla il testo in <strong>Partite PGN</strong>.</li>
+<li>In SparringMate <a target="_blank" rel="noopener noreferrer" href="http://localhost:8033/?section=schedule&amp;import=pgn">apri <strong>Importa PGN</strong></a>, quindi incolla il testo in <strong>Partite PGN</strong>.</li>
 <li>Lascia <strong>Automatico contro Maia</strong>. Il programma riconosce il lato umano quando l'altro giocatore si chiama, per esempio, Maia 600. Per altri PGN inserisci il tuo nome esattamente come appare nelle intestazioni oppure scegli Bianco/Nero.</li>
 <li>Lascia selezionato <strong>Analizza e prepara gli esercizi dopo l'importazione</strong>, quindi premi <strong>Importa partite</strong>.</li>
-<li>Attendi <strong>Esercizi pronti</strong> e apri <strong>Allenamento</strong>. Puoi anche aprire subito la partita dal riepilogo dell'importazione.</li>
+<li>Attendi <strong>Esercizi pronti</strong> e apri <strong>Allenamento</strong>. Puoi anche aprire subito la partita dal riepilogo dell'importazione. Prosegui con la <a href="#prima-configurazione">configurazione del calendario</a>.</li>
 </ol>
 <p>La copia PGN è verificata nel <a target="_blank" rel="noopener noreferrer" href="https://github.com/CSSLab/maia-platform-frontend/blob/a6e52f5c811ee18863cb2f0e81f2433a5b9905de/src/components/Common/ExportGame.tsx">componente ExportGame ufficiale</a>. Maia descrive le funzioni di esportazione anche nell'<a target="_blank" rel="noopener noreferrer" href="https://www.maiachess.com/blog/platform-v1">annuncio della piattaforma</a>.</p>
 <h3 id="piu-partite-e-conservazione-dei-dati">Più partite e conservazione dei dati</h3>
@@ -52,7 +54,7 @@ main{min-width:0;background:#fff;padding:36px 44px;border:1px solid #dfe5da;bord
 <h2 id="il-calendario-di-sparringmate">2. Il calendario di SparringMate</h2>
 <h3 id="prima-configurazione">Prima configurazione</h3>
 <ol>
-<li>Apri <strong>Allenamento</strong> nella barra laterale.</li>
+<li>Apri <a target="_blank" rel="noopener noreferrer" href="http://localhost:8033/?section=schedule"><strong>Allenamento</strong></a> nella barra laterale.</li>
 <li>Imposta inizialmente <strong>10–15 minuti</strong> e <strong>2–3 posizioni nuove al giorno</strong>. È una proposta di partenza: abbassa il limite se accumuli ripassi.</li>
 <li>Seleziona i giorni in cui vuoi allenarti e premi <strong>Salva piano</strong>.</li>
 <li>Premi <strong>Inizia il prossimo ripasso</strong>. Il piano propone prima i ripassi, poi le nuove posizioni, evitando la stessa decisione sia come puzzle sia come prevenzione nella medesima lista.</li>
@@ -94,11 +96,14 @@ main{min-width:0;background:#fff;padding:36px 44px;border:1px solid #dfe5da;bord
 <p>Un esercizio corretto esce dalla lista in scadenza soltanto se il primo tentativo è riuscito senza aiuti ed è un richiamo valido, non una ripetizione anticipata. Torna quando scade. La lista dei puzzle da ripassare e il numero di attività proposte oggi possono quindi differire.</p>
 <p>I giorni di pausa non cancellano gli arretrati. Il calendario mostra le scadenze attuali, che cambiano dopo le risposte; gli orari sono in Europe/Rome. Il piano limita il carico quotidiano ma non impedisce di aprire altri esercizi come pratica. Non invia notifiche esterne e non richiede che il browser rimanga aperto per conservare le scadenze.</p>
 <p>Questo sistema si ispira alla ripetizione dilazionata; non è il prodotto MoveTrainer e non è collegato a Chessable. Misura il ricordo delle posizioni ripassate, non ancora il trasferimento dell'abilità alle partite nuove.</p>
+<p>Per approfondire: <a href="#come-cambiano-le-scadenze">come funzionano le scadenze</a>, <a href="#una-settimana-sostenibile">esempio di settimana</a> e <a href="#movetrainer-ricordare-lidea-dopo-una-pausa">richiamo con MoveTrainer</a>.</p>
 <h3 id="la-tua-routine-consigliata">La tua routine consigliata</h3>
 <p>Prima di ogni risposta, cerca uno scacco avversario, una cattura e una minaccia al re. Dopo un errore guarda la sequenza prima di chiedere una spiegazione; poi prova a descrivere il meccanismo con una frase. Alla fine scegli una sola regola da portare nella partita successiva, per esempio: «Prima di prendere un cavallo controllo gli scacchi contro il mio re».</p>
+<p>Passa alla pratica: <a target="_blank" rel="noopener noreferrer" href="http://localhost:8033/?section=prevention">Blunder prevention</a> per evitare una mossa perdente, <a target="_blank" rel="noopener noreferrer" href="http://localhost:8033/?section=drill">Drill</a> per continuare a giocare e <a target="_blank" rel="noopener noreferrer" href="http://localhost:8033/?section=progress">Progressi</a> per rivedere gli indicatori.</p>
 <h2 id="aimchess-scegliere-cosa-allenare">3. Aimchess: scegliere cosa allenare</h2>
 <h3 id="a-cosa-ti-serve">A cosa ti serve</h3>
 <p><a target="_blank" rel="noopener noreferrer" href="https://aimchess.com/">Aimchess</a> presenta lezioni personalizzate dalle partite, tra cui <strong>Retry Mistakes</strong>, <strong>Blunder Preventer</strong>, <strong>Defender</strong> e allenamento alla conversione del vantaggio. Il Blunder Preventer descritto dal servizio propone due alternative da confrontare; il 360 Trainer mescola tipi diversi di posizione. Queste sono le funzioni pertinenti al tuo problema. Non è stata verificata una connessione diretta con Maia Chess: non basare l'acquisto sull'aspettativa che legga automaticamente le tue partite Maia.</p>
+<p>Collegamenti utili: <a target="_blank" rel="noopener noreferrer" href="https://aimchess.com/">apri Aimchess</a> · <a href="#la-tua-routine-consigliata">ripassa la routine sulle minacce</a> · <a href="#il-calendario-di-sparringmate">torna al calendario locale</a>.</p>
 <h3 id="sessione-pratica-proposta-10-minuti">Sessione pratica proposta: 10 minuti</h3>
 <ol>
 <li>Accedi al tuo account e controlla quali lezioni sono disponibili nel tuo piano.</li>
@@ -113,6 +118,7 @@ main{min-width:0;background:#fff;padding:36px 44px;border:1px solid #dfe5da;bord
 <h2 id="movetrainer-ricordare-lidea-dopo-una-pausa">4. MoveTrainer: ricordare l'idea dopo una pausa</h2>
 <h3 id="che-cosa-stai-usando">Che cosa stai usando</h3>
 <p>MoveTrainer è la tecnologia di studio interattivo dei corsi, presente anche nei <a target="_blank" rel="noopener noreferrer" href="https://support.chess.com/en/articles/10318195-what-are-movetrainer-courses">Courses di Chess.com</a>. Le mosse studiate ritornano secondo un calendario; nella <a target="_blank" rel="noopener noreferrer" href="https://support.chess.com/en/articles/10319322-how-does-the-spaced-repetition-scheduling-work">documentazione della ripetizione</a>, una risposta corretta allunga l'intervallo e un errore lo riduce. È adatto al richiamo di materiale già appreso; il numero di ripassi non certifica da solo la forza di gioco.</p>
+<p>Collegamenti utili: <a target="_blank" rel="noopener noreferrer" href="https://support.chess.com/en/articles/10318195-what-are-movetrainer-courses">guida ufficiale ai corsi MoveTrainer</a> · <a target="_blank" rel="noopener noreferrer" href="https://support.chess.com/en/articles/10319322-how-does-the-spaced-repetition-scheduling-work">intervalli di ripasso ufficiali</a> · <a href="#come-cambiano-le-scadenze">confronta le scadenze di SparringMate</a>.</p>
 <h3 id="preparazione-proposta">Preparazione proposta</h3>
 <ol>
 <li>Apri un corso a cui hai accesso nella piattaforma che utilizzi. Controlla anteprima, contenuto e condizioni prima di acquistare materiale nuovo.</li>
@@ -132,6 +138,7 @@ main{min-width:0;background:#fff;padding:36px 44px;border:1px solid #dfe5da;bord
 <h2 id="noctie-provare-le-idee-durante-il-gioco">5. Noctie: provare le idee durante il gioco</h2>
 <h3 id="funzioni-pertinenti">Funzioni pertinenti</h3>
 <p>La <a target="_blank" rel="noopener noreferrer" href="https://noctie.ai/faq/">FAQ ufficiale</a> descrive un avversario adattivo, feedback sulle mosse e flashcard ricavate dagli errori, con ripetizione dilazionata. Il giudizio sulle mosse deriva dalla prospettiva del modello umano e non equivale alla valutazione Stockfish. L'adattamento non garantisce vittorie facili: la stessa FAQ avverte che anche un principiante può trovare impegnative le prime partite.</p>
+<p>Collegamenti utili: <a target="_blank" rel="noopener noreferrer" href="https://app.noctie.ai/">apri Noctie</a> · <a target="_blank" rel="noopener noreferrer" href="https://noctie.ai/faq/">FAQ ufficiale</a> · <a href="#usare-una-posizione-delle-tue-partite-maia">come trasferire una posizione Maia</a>.</p>
 <h3 id="sessione-proposta">Sessione proposta</h3>
 <ol>
 <li>Apri <a target="_blank" rel="noopener noreferrer" href="https://app.noctie.ai/">app.noctie.ai</a> e accedi. Verifica il piano richiesto per giocare e salvare: la documentazione corrente indica funzioni di allenamento legate a Club Noctie.</li>
@@ -187,7 +194,9 @@ main{min-width:0;background:#fff;padding:36px 44px;border:1px solid #dfe5da;bord
 </tr>
 </tbody>
 </table>
+<p>Per iniziare questa settimana: <a href="#da-maia-chess-a-sparringmate">importa le partite Maia</a>, <a target="_blank" rel="noopener noreferrer" href="http://localhost:8033/?section=schedule">imposta il calendario</a> e scegli un solo supporto tra <a href="#aimchess-scegliere-cosa-allenare">Aimchess</a>, <a href="#movetrainer-ricordare-lidea-dopo-una-pausa">MoveTrainer</a> e <a href="#noctie-provare-le-idee-durante-il-gioco">Noctie</a>.</p>
 <p>Prima della settimana successiva chiediti: ho evitato almeno una minaccia che prima non vedevo? Ho riconosciuto uno scacco dopo una cattura? Ho sfruttato un'occasione di recupero? Registra tutte le partite di verifica, non soltanto quelle frustranti. Un campione piccolo può oscillare: conta soprattutto la riduzione degli stessi errori in posizioni nuove.</p>
+<p><a href="#allenarsi-per-perdere-meno-contro-maia-guida-pratica">Torna all’inizio della guida</a>.</p>
 <footer>Guida personale SparringMate · Disponibile anche offline dopo il download. I collegamenti ai servizi esterni richiedono Internet.</footer></main></div>
 </body>
 </html>

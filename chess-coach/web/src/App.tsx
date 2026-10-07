@@ -37,7 +37,11 @@ function position(game: Game, ply: number) {
 function score(evaluation: Evaluation) { return evaluation.mate !== null ? `Matto ${evaluation.mate > 0 ? '+' : ''}${evaluation.mate}` : (evaluation.cp / 100).toFixed(2) }
 
 export default function App() {
-  const [tab, setTab] = useState<Tab>('play')
+  const [entrySection] = useState<Tab|null>(()=>{
+    const section=new URLSearchParams(window.location.search).get('section')
+    return section&&['schedule','prevention','archive','drill','progress'].includes(section)?section as Tab:null
+  })
+  const [tab, setTab] = useState<Tab>(entrySection??'play')
   const [reviewTab,setReviewTab] = useState('moves')
   const [arrowSources,setArrowSources]=useState({stockfish:true,maia:true,played:true})
   const [game, setGame] = useState<Game | null>(null)
@@ -70,7 +74,7 @@ export default function App() {
   const [predictionError,setPredictionError] = useState('')
   const [reviewElo,setReviewElo] = useState(1500)
   const [requestedPrevention,setRequestedPrevention]=useState<string|null>(null)
-  const [showImport, setShowImport] = useState(false)
+  const [showImport, setShowImport] = useState(()=>new URLSearchParams(window.location.search).get('import')==='pgn')
   const [retry, setRetry] = useState(0)
   const [requestedDrill,setRequestedDrill] = useState<string|null>(null)
   const currentGame = useRef<Game | null>(null)
@@ -89,7 +93,7 @@ export default function App() {
     maia.onStatus = setMaiaStatus
     Promise.all([refresh(), api<{stockfish:string}>('/health').then(h => setStockfish(h.stockfish))]).catch(fail)
     const id = localStorage.getItem('chess-coach-game')
-    if (id) api<Game>('/games/' + id).then(g => { keepGame(g); setCursor(g.version); setTab('review') }).catch(()=>localStorage.removeItem('chess-coach-game'))
+    if (id) api<Game>('/games/' + id).then(g => { keepGame(g); setCursor(g.version); if(!entrySection)setTab('review') }).catch(()=>localStorage.removeItem('chess-coach-game'))
     return () => { maia.onStatus = () => {} }
   }, [])
 
