@@ -848,6 +848,11 @@ DIST = ROOT / "web" / "dist"
 def training_guide():
     return FileResponse(ROOT/'docs'/'training-guide.md',media_type='text/markdown',filename='SparringMate-tutorial-allenamento.md')
 
+@app.get('/api/training-guide/html')
+def training_guide_html(download: bool = False):
+    return FileResponse(ROOT/'docs'/'training-guide.html', media_type='text/html',
+                        filename='SparringMate-tutorial-allenamento.html' if download else None)
+
 training_schedule.install(app,database,lambda:now())
 pgn_import.install(app,import_game,ImportInput,database,find_game,queue_analysis)
 

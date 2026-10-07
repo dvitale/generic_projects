@@ -8,10 +8,20 @@ const days=['Lun','Mar','Mer','Gio','Ven','Sab','Dom']
 export default function TrainingPlan({onOpen,onImport}:{onOpen:(kind:Item['kind'],id:string)=>void;onImport:()=>void}){
   const [plan,setPlan]=useState<Plan|null>(null),[settings,setSettings]=useState<Settings|null>(null)
   const [error,setError]=useState(''),[saving,setSaving]=useState(false)
+  const [guideOpened,setGuideOpened]=useState(false)
+  function openGuide(){
+    window.open('/api/training-guide/html','_blank','popup=yes,width=1120,height=820,resizable=yes,scrollbars=yes,noopener,noreferrer')
+    setGuideOpened(true)
+  }
   useEffect(()=>{let stale=false;const refresh=()=>api<Plan>('/training-plan').then(p=>{if(!stale){setPlan(p);setSettings(s=>s??p.settings)}}).catch(e=>{if(!stale)setError(e.message)});void refresh();const timer=setInterval(refresh,30000);return()=>{stale=true;clearInterval(timer)}},[])
   async function save(){if(!settings)return;setSaving(true);setError('');try{const p=await api<Plan>('/training-plan/settings',settings);setPlan(p);setSettings(p.settings)}catch(e){setError((e as Error).message)}finally{setSaving(false)}}
   return <div className="schedule-layout">
-    <p style={{gridColumn:'1 / -1'}}><a href="/api/training-guide" download>Scarica la guida: Maia, ripassi, Aimchess, MoveTrainer e Noctie</a></p>
+    <section className="panel" style={{gridColumn:'1 / -1'}} aria-label="Guida di allenamento">
+      <h2>La tua guida di allenamento</h2>
+      <p>Importare da Maia, organizzare i ripassi e usare Aimchess, MoveTrainer e Noctie.</p>
+      <div className="actions"><button onClick={openGuide}>Apri la guida ↗</button><a href="/api/training-guide/html?download=true" download>Scarica HTML</a></div>
+      {guideOpened&&<p className="footnote">Se la finestra non si apre, <a href="/api/training-guide/html" target="_blank" rel="noopener noreferrer">apri la guida in una nuova scheda</a>.</p>}
+    </section>
     {error&&<p className="alert" role="alert">{error}</p>}
     <section className="panel"><span className="eyebrow">IL TUO PIANO</span><h2>Un ripasso alla volta</h2>
       {!plan?<p role="status">Preparazione del piano…</p>:<>
