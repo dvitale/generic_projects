@@ -1,8 +1,9 @@
 from test_coach import client, seed_exercise
 from backend import main
+from datetime import datetime,timedelta,timezone
 
 
-def test_only_unassisted_first_success_removes_due_puzzle(client):
+def test_only_unassisted_first_success_removes_due_puzzle(client,monkeypatch):
     seed_exercise()
     path = '/api/exercises/ex'
     def session():
@@ -29,6 +30,8 @@ def test_only_unassisted_first_success_removes_due_puzzle(client):
     s = session()
     client.post(path+'/reveal',json={'session_id':s['id']})
     assert due() == 1
+    later=(datetime.now(timezone.utc)+timedelta(hours=5)).isoformat()
+    monkeypatch.setattr(main,'now',lambda:later)
     s = session()
     good = attempt(s, 'g6g7')
     assert good['scheduled'] and good['firstTry'] and due() == 0

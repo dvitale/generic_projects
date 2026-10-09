@@ -65,7 +65,7 @@ def test_puzzle_first_attempt_retry_hint_and_early_practice(client):
     p = client.get('/api/profile').json()
     assert p['independentAttempts'] == 1 and p['unaidedSuccesses'] == 0
     practice = client.post(path + '/sessions').json()
-    assert practice['exposure'] == 'review'
+    assert practice['exposure'] == 'practice'
     assert client.get('/api/profile').json()['due'] == 1
     assert client.post(path+'/hint',json={'session_id':practice['id']}).status_code == 200
     assisted = client.post(path+'/attempts',json={'move':'g6g7','session_id':practice['id'],'version':0}).json()
@@ -82,6 +82,7 @@ def test_reveal_and_review_schedule(client):
     assert client.post('/api/exercises/ex/reveal',json={'session_id':s['id']}).status_code == 409
     with main.database() as con:
         con.execute("UPDATE exercises SET due_at='2000-01-01' WHERE id='ex'")
+        con.execute("UPDATE training_memory SET review_after='2000-01-01T00:00:00+00:00'")
     s = client.post('/api/exercises/ex/sessions').json()
     assert s['exposure'] == 'review'
     result = client.post('/api/exercises/ex/attempts',json={'session_id':s['id'],'version':0,'move':'g6g7'}).json()

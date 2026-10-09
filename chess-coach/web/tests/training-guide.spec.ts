@@ -1,0 +1,47 @@
+import {test,expect} from '@playwright/test'
+
+test('training guide opens in a popup, navigates chapters and downloads offline HTML',async({page,request,baseURL})=>{
+  // Offline HTML targets the user's local app; keep the test on its isolated server.
+  await page.context().route('http://localhost:8033/**',route=>{
+    const url=new URL(route.request().url())
+    return route.fulfill({status:302,headers:{location:baseURL+url.pathname+url.search}})
+  })
+  await page.goto('/')
+  await page.getByRole('button',{name:'Allenamento',exact:true}).click()
+  const popupReady=page.waitForEvent('popup')
+  await page.getByRole('button',{name:'Apri la guida ↗',exact:true}).click()
+  const guide=await popupReady
+  await expect(guide).toHaveTitle('Guida di allenamento · SparringMate')
+  await expect(guide.getByRole('heading',{level:1})).toContainText('Allenarsi per perdere meno contro Maia')
+  const chapter=guide.getByRole('navigation').getByRole('link',{name:/Noctie/})
+  const href=await chapter.getAttribute('href')
+  await chapter.click()
+  await expect(guide.locator(href!)).toBeInViewport()
+  await expect(guide.getByRole('button',{name:'Stampa / Salva PDF'})).toBeVisible()
+  await guide.goto('/api/training-guide/html')
+  expect(await guide.evaluate(()=>Array.from(document.querySelectorAll('a[href^="#"]')).filter(a=>!document.getElementById(a.getAttribute('href')!.slice(1))).map(a=>a.getAttribute('href')))).toEqual([])
+  await expect(guide.getByRole('link',{name:'apri Noctie',exact:true})).toHaveAttribute('href','https://app.noctie.ai/')
+  // Opening a guide shortcut must not be redirected by recovery of the saved game.
+  const savedGame=await(await request.post('/api/games',{data:{color:'w',elo:600}})).json()
+  await page.evaluate(id=>localStorage.setItem('chess-coach-game',id),savedGame.id)
+  const appReady=guide.waitForEvent('popup')
+  await guide.getByRole('link',{name:'importa i PGN Maia',exact:true}).click()
+  const app=await appReady
+  await expect(app.getByRole('heading',{name:'Il tuo allenamento di oggi.'})).toBeVisible()
+  await expect(app.getByRole('region',{name:'Importazione partite'})).toBeVisible()
+  await expect.poll(async()=>app.evaluate(()=>localStorage.getItem('chess-coach-game'))).toBe(savedGame.id)
+  await app.close()
+  await guide.setViewportSize({width:1120,height:820})
+  await guide.screenshot({path:'test-results/training-guide-desktop.png'})
+  await guide.setViewportSize({width:390,height:844})
+  expect(await guide.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
+  await guide.screenshot({path:'test-results/training-guide-mobile.png'})
+  const download=await request.get('/api/training-guide/html?download=true')
+  expect(download.headers()['content-disposition']).toContain('attachment;')
+  expect(download.headers()['content-type']).toContain('text/html')
+  expect(await download.text()).toContain('<table>')
+  await guide.close()
+  await page.evaluate(()=>{window.open=()=>null})
+  await page.getByRole('button',{name:'Apri la guida ↗',exact:true}).click()
+  await expect(page.getByRole('link',{name:'apri la guida in una nuova scheda'})).toHaveAttribute('href','/api/training-guide/html')
+})
