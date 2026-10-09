@@ -25,7 +25,7 @@ from . import tutor
 from . import prevention
 from . import mistakes
 from . import insights
-from . import training_schedule, pgn_import
+from . import training_schedule, pgn_import, learning
 from .rating import rating_plan, summarize_rating, RATING_LEVELS, RATING_METHOD
 
 DB_PATH = Path(os.environ.get("CHESS_COACH_DATA", str(ROOT / "data"))) / "coach.sqlite3"
@@ -102,6 +102,7 @@ def init_db():
         prevention.init_schema(con)
         mistakes.init_schema(con)
         training_schedule.init_schema(con)
+        learning.init_schema(con)
         for row in con.execute('SELECT * FROM games WHERE analysis IS NOT NULL').fetchall():
             if row['analysis_version'] == len(json.loads(row['moves'])):
                 prevention.seed_game(con, row, json.loads(row['analysis']), now())
@@ -162,6 +163,14 @@ class UndoInput(BaseModel):
 class RatingInput(UndoInput):
     method: Literal['maia3-drill-match-v2']
     log_scores: list[FiniteFloat] = Field(min_length=21, max_length=21)
+
+
+class JudgmentInput(BaseModel):
+    assessment: Literal['much_worse','worse','equal','better','much_better']
+    confidence: Literal['uncertain','moderate','confident']
+    threat: str = Field(default='', max_length=1000)
+    fearedLost: bool = False
+    familiar: bool = False
 
 
 class ImportInput(BaseModel):
@@ -390,6 +399,7 @@ def preserve_review(con, row, session):
     con.execute('UPDATE tutor_reviews SET game_id=? WHERE game_id=?', (archive_id, row['id']))
     con.execute('UPDATE game_ratings SET game_id=? WHERE game_id=?', (archive_id, row['id']))
     con.execute('UPDATE prevention_positions SET game_id=? WHERE game_id=?', (archive_id, row['id']))
+    con.execute('UPDATE position_judgments SET game_id=? WHERE game_id=?', (archive_id, row['id']))
 
 
 @app.post('/api/games/{game_id}/undo')
@@ -410,6 +420,32 @@ def undo_move(game_id: str, body: UndoInput):
                     (json.dumps(moves[:ply]), json.dumps(json.loads(row['move_times'])[:ply]), game_id))
         con.execute('DELETE FROM game_ratings WHERE game_id=?', (game_id,))
     return get_game(game_id)
+
+
+@app.get('/api/games/{game_id}/decision-quality')
+def decision_quality(game_id: str):
+    with database() as con:
+        return learning.game_quality(con, find_game(con, game_id))
+
+
+@app.get('/api/learning-progress')
+def learning_progress():
+    with database() as con:
+        return learning.progress(con)
+
+
+@app.post('/api/position-judgments/next')
+def next_position_judgment():
+    with database() as con:
+        con.execute('BEGIN IMMEDIATE')
+        return learning.next_judgment(con, now())
+
+
+@app.post('/api/position-judgments/{identity}')
+def save_position_judgment(identity: str, body: JudgmentInput):
+    with database() as con:
+        con.execute('BEGIN IMMEDIATE')
+        return learning.answer_judgment(con, identity, body.model_dump(), now())
 
 
 @app.get('/api/games/{game_id}/rating-positions')
@@ -808,13 +844,17 @@ def request_tutor(game_id: str, body: TutorInput):
                 raise HTTPException(422, 'Non ci sono decisioni analizzate da discutere.')
             selected_plies = {d['ply'] for d in decisions}
             exercise_rows = [dict(r) for r in con.execute('SELECT id,ply,theme,due_at FROM exercises WHERE game_id=?', (game_id,)) if r['ply'] in selected_plies]
+            decision_summary = learning.game_quality(con, row)
+            judgments = [learning.public_judgment(r) for r in con.execute(
+                'SELECT * FROM position_judgments WHERE game_id=? AND answer IS NOT NULL', (game_id,)) if r['ply'] in selected_plies]
         stats = profile()
         exercise_context = [{'id': e['id'], 'ply': e['ply'], 'theme': e['theme'], 'dueAt': e['due_at']} for e in exercise_rows]
         drills = [{'id': t['id'], 'name': t['name'], 'goal': t['goal']} for t in CATALOG]
         drills += [{'id': 'personal:' + e['id'], 'name': 'Continua dalla tua decisione', 'goal': e['theme']} for e in exercise_rows]
         context = {'playerColor': row['player_color'], 'referenceElo': row['elo'], 'source': row['source'],
                    'engine': analysis['engine'], 'analysisNote': analysis['note'], 'analyzedDecisions': len(analysis['decisions']),
-                   'decisions': decisions, 'reflection': body.reflection.strip(), 'exercises': exercise_context, 'drills': drills,
+                   'decisions': decisions, 'decisionQuality': decision_summary, 'positionJudgments': judgments,
+                   'reflection': body.reflection.strip(), 'exercises': exercise_context, 'drills': drills,
                    'practice': {k: stats[k] for k in ('games', 'attempts', 'independentAttempts', 'unaidedSuccesses', 'due', 'themes','domains')}}
         fingerprint = hashlib.sha256(row['analysis'].encode()).hexdigest()
         cache_key = hashlib.sha256(json.dumps([tutor.PROMPT_VERSION, game_id, fingerprint, model, context], sort_keys=True).encode()).hexdigest()

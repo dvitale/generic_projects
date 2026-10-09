@@ -1,6 +1,6 @@
-# Punteggio della partita: metodo dei Drill Maia
+# Somiglianza con Maia: confronto facoltativo
 
-Alla conclusione della partita il calcolo parte automaticamente e compare in **Gioca**. Riaprendo una partita conclusa in **Rivedi** si avvia il calcolo se manca un risultato aggiornato. Per le partite in corso c’è **Stima Elo della partita**. Gioca e Rivedi condividono il calcolo; uscire da queste sezioni lo interrompe. Il risultato viene salvato in SQLite.
+Dal 9 ottobre 2026 il riepilogo principale è **Rivedi → Decisioni**: qualità Stockfish, errori e vantaggi conservati. La **Somiglianza con Maia** è in un pannello secondario chiuso e parte soltanto premendo **Confronta con i profili Maia**. Non vengono assegnate etichette come principiante o intermedio. Il confronto non serve a ordinare le prestazioni: un profilo 1300 può accompagnare una partita peggiore di un profilo 600. I risultati precedenti restano conservati in SQLite e si leggono aprendo il pannello.
 
 Il numero è il **profilo Maia più compatibile con le mosse**, sulla scala di riferimento Lichess. Non è un rating FIDE o Chess.com, né una misura calibrata della forza individuale. Mostrare un valore puntuale non dimostra di aver ridotto l’incertezza reale.
 
@@ -44,7 +44,7 @@ Non sono stati scaricati nuovi pesi o addestrati modelli: viene usato il modello
 
 Il metodo locale v1 usava 11 livelli a passi di 200, avversario fisso, limite di probabilità `1e-12` e includeva nella fascia ogni livello entro 2 unità di log-score dal migliore. Su una curva piatta la fascia copriva tutta la griglia e il numero centrale era nascosto. La soglia 2 era una scelta del prototipo, **non una regola documentata di Maia**. Presentarla come valutazione utile della partita era inadeguato.
 
-La versione `maia3-drill-match-v2` sostituisce quel metodo. Un risultato v1 non viene presentato come aggiornato: sulle partite concluse si ricalcola automaticamente; sulle altre rimane il pulsante. Il server verifica anche la versione del metodo, impedendo a un vecchio frontend di salvare un risultato con parametri diversi.
+La versione `maia3-drill-match-v2` sostituisce quel metodo. Un risultato v1 non viene presentato come aggiornato: si può ricalcolare soltanto su richiesta tramite il pulsante. Il server verifica anche la versione del metodo, impedendo a un vecchio frontend di salvare un risultato con parametri diversi.
 
 ## Salvataggio e precisione futura
 

@@ -1,14 +1,17 @@
-import {useEffect,useState} from 'react'
+import {useEffect,useState,useRef,type ReactNode} from 'react'
 import {api} from './api'
 
 type Item={kind:'puzzle'|'prevention';id:string;title:string;theme:string;stage:number;new:boolean;readyAt:string}
 type Settings={minutes:number;newLimit:number;weekdays:number[];timezone:string}
 type Plan={settings:Settings;today:string;activeDay:boolean;target:number;completed:number;successful:number;practice:number;ready:number;waiting:number;total:number;queue:Item[];calendar:{date:string;planned:boolean;due:number}[];nextDue:string|null}
 const days=['Lun','Mar','Mer','Gio','Ven','Sab','Dom']
-export default function TrainingPlan({onOpen,onImport}:{onOpen:(kind:Item['kind'],id:string)=>void;onImport:()=>void}){
+export default function TrainingPlan({onOpen,onImport,judgment,focusJudgment,onFocused}:{onOpen:(kind:Item['kind'],id:string)=>void;onImport:()=>void;judgment:ReactNode;focusJudgment:boolean;onFocused:()=>void}){
   const [plan,setPlan]=useState<Plan|null>(null),[settings,setSettings]=useState<Settings|null>(null)
   const [error,setError]=useState(''),[saving,setSaving]=useState(false)
   const [guideOpened,setGuideOpened]=useState(false)
+  const [judgmentOpen,setJudgmentOpen]=useState(false)
+  const judgmentRef=useRef<HTMLDetailsElement>(null)
+  useEffect(()=>{if(focusJudgment){setJudgmentOpen(true);judgmentRef.current?.scrollIntoView({block:'start'});onFocused()}},[focusJudgment])
   function openGuide(){
     window.open('/api/training-guide/html','_blank','popup=yes,width=1120,height=820,resizable=yes,scrollbars=yes,noopener,noreferrer')
     setGuideOpened(true)
@@ -44,5 +47,6 @@ export default function TrainingPlan({onOpen,onImport}:{onOpen:(kind:Item['kind'
     </>}</section>
     <section className="panel"><h2>Scadenze dei prossimi sette giorni</h2><div className="schedule-calendar">{plan?.calendar.map(day=><div key={day.date}><strong>{new Date(day.date+'T12:00:00').toLocaleDateString('it-IT',{weekday:'short',day:'numeric',month:'short'})}</strong><span>{day.due} scadenze</span><small>{day.planned?'Allenamento':'Pausa'}</small></div>)}</div><p className="footnote">Scadenze attuali: cambiano dopo ogni verifica. Gli arretrati compaiono oggi; nei giorni di pausa il piano non propone attività.</p></section>
     <section className="panel"><h2>Come funziona il ripasso</h2><p>Primo successo senza aiuti: richiamo dopo 4 ore. Poi 1, 3, 7, 14, 30, 90 e 180 giorni, se riesci ancora al primo tentativo.</p><p>Errore o soluzione mostrata: il livello riparte e la verifica successiva attende 4 ore. Puoi esercitarti subito, ma la ripetizione anticipata non fa avanzare il calendario. Un puzzle sbagliato resta nella lista da ripassare.</p><p className="footnote">Il calendario misura il ricordo di queste posizioni, non dimostra ancora che riconosci lo stesso pericolo in una partita nuova. Sistema ispirato alla ripetizione dilazionata, indipendente da MoveTrainer.</p></section>
+    <details ref={judgmentRef} open={judgmentOpen} className="judgment-entry panel" onToggle={e=>setJudgmentOpen(e.currentTarget.open)}><summary>Valuta la posizione · allena il giudizio prima del motore</summary>{judgmentOpen&&judgment}</details>
   </div>
 }

@@ -1,6 +1,6 @@
 # Allenarsi per perdere meno contro Maia: guida pratica
 
-Aggiornata il 6 ottobre 2026. I tutorial esterni si basano sulla documentazione ufficiale consultata in questa data: le aree personali a pagamento non sono state provate con il tuo account. Nomi e disponibilità possono variare. Le routine proposte sono consigli per il tuo obiettivo, non prescrizioni ufficiali dei servizi.
+Funzioni SparringMate aggiornate il 9 ottobre 2026. Tutorial esterni verificati il 6 ottobre 2026. I tutorial esterni si basano sulla documentazione ufficiale consultata il 6 ottobre: le aree personali a pagamento non sono state provate con il tuo account. Nomi e disponibilità possono variare. Le routine proposte sono consigli per il tuo obiettivo, non prescrizioni ufficiali dei servizi.
 
 **Passa subito alla pratica:** [importa i PGN Maia](http://localhost:8033/?section=schedule&import=pgn) · [apri Allenamento](http://localhost:8033/?section=schedule) · [apri Blunder prevention](http://localhost:8033/?section=prevention) · [rivedi le tue partite](http://localhost:8033/?section=archive).
 
@@ -11,6 +11,22 @@ I collegamenti a SparringMate aprono l’app locale in una nuova scheda e richie
 Nelle partite esaminate, i temi da allenare per primi sono il controllo delle minacce avversarie, gli scacchi dopo una cattura e le occasioni di recupero. Per iniziare, scegli una domanda da usare sempre: **«Dopo la mia mossa, quali scacchi e catture avrà l'avversario?»**
 
 Non serve aprire quattro programmi ogni giorno. Usa SparringMate come archivio delle partite Maia e calendario principale; prova eventualmente uno degli altri strumenti per un compito preciso. Valuta il risultato nelle nuove partite senza aiuti, non soltanto dal numero di puzzle completati.
+
+## Misurare il progresso senza inseguire un numero Elo
+
+In **Rivedi → Decisioni**, guarda quante tue scelte non hanno perso valutazione in modo rilevante e quante hanno conservato un vantaggio. Gli errori del bot non entrano nel tuo conteggio. Un profilo Maia 1300 non premia una partita più di un profilo 600: **Somiglianza con Maia** resta un confronto facoltativo, separato dalla qualità.
+
+In [**Progressi**](http://localhost:8033/?section=progress), confronta partite con partite e drill con drill. I conteggi mostrano quanti casi sono stati osservati: poche decisioni non dimostrano una tendenza stabile e cambiare avversario o difficoltà può cambiare i risultati.
+
+### Esercitarti a valutare prima di rinunciare
+
+1. Apri [**Allenamento**](http://localhost:8033/?section=schedule), quindi **Valuta la posizione**.
+2. Indica se il lato che muove è in vantaggio, equilibrio o svantaggio, senza consultare il motore. Scrivi la minaccia concreta che temi e una risorsa difensiva o offensiva.
+3. Indica quanto sei sicuro e, se è la tua impressione, **Mi sembra già persa**. Se ricordi la posizione o il punteggio, segnala la familiarità: resterà pratica.
+4. Premi **Salva e confronta con Stockfish**. Confronta le risorse della variante con quello che temevi; puoi aprire la partita di origine o approfondire su Lichess.
+5. Nei Progressi osserva quando l'impressione di sconfitta non è confermata dal motore. Non devi pensare positivo a tutti i costi: alcune posizioni sono davvero sfavorevoli.
+
+Le posizioni derivano dalle tue partite analizzate e possono essere favorevoli, equilibrate o sfavorevoli. Non sono selezionate soltanto fra i tuoi blunder. Una posizione ricordata non prova un miglioramento del giudizio in una partita nuova. Queste verifiche non incrementano i successi dei puzzle né il calendario dei ripassi.
 
 ## 1. Da Maia Chess a SparringMate
 
@@ -35,7 +51,7 @@ L'identificativo Maia, quando presente, distingue partite diverse anche con moss
 
 ### Limite della sincronizzazione
 
-Il codice pubblico Maia usa un endpoint per lo storico. Il tentativo di lettura senza autenticazione ha restituito HTTP 403. Questa versione di SparringMate usa quindi il passaggio PGN, senza promettere una sincronizzazione dell'account, chiedere cookie o conservare credenziali Maia. Non è stata verificata un'API pubblica stabile per sincronizzare lo storico completo dal solo nome utente.
+La verifica del 7 ottobre ha restituito la lista dello storico senza autenticazione (HTTP 200), ma il dettaglio delle partite richiede accesso (HTTP 401). La verifica della risposta autenticata è ancora incompleta. Questa versione di SparringMate usa quindi il passaggio PGN, senza promettere una sincronizzazione dell'account, chiedere cookie o conservare credenziali Maia. Non è stata verificata un'API pubblica stabile per sincronizzare lo storico completo dal solo nome utente.
 
 ## 2. Il calendario di SparringMate
 
