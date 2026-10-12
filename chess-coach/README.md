@@ -10,10 +10,27 @@ Applicazione personale locale: Maia3 come sparring partner, Stockfish come verif
 
 ```bash
 cd /opt/generic_projects/chess-coach
-./start.sh
+make start
+make status
 ```
 
-Aprire http://localhost:8033 nel browser Windows. Per fermare il server in primo piano: Ctrl+C. Per un'altra porta: `PORT=8001 ./start.sh`.
+Aprire http://localhost:8033 nel browser Windows. Il server resta in background dopo la chiusura del terminale, finché WSL rimane attivo.
+
+| Comando | Funzione |
+|---|---|
+| `make start` | Avvia il server; se è già pronto non crea un secondo processo. |
+| `make status` | Mostra stato, indirizzo, PID quando presente e percorso del log. |
+| `make restart` | Attende l'arresto, poi riavvia. |
+| `make stop` | Arresta conservando partite e allenamenti. Ripetibile a server già fermo. |
+| `make logs` | Mostra le ultime 60 righe del log. |
+| `make build` | Ricompila l'interfaccia dopo modifiche al frontend. |
+| `make` | Mostra l'aiuto. |
+
+Per un'altra porta usa, per esempio, `make start PORT=8001` e lo stesso `PORT` per status/stop/restart. PID e log sono separati per porta in `.run/`; una seconda porta usa comunque gli stessi dati, salvo `CHESS_COACH_DATA` esplicito. All'avvio l'interfaccia viene compilata solo se manca `web/dist/index.html`: dopo modifiche esegui `make build`.
+
+L'arresto invia SIGTERM solo a un processo Uvicorn verificato per questa cartella e porta. I comandi sono serializzati; un PID vecchio non autorizza ad arrestare altri processi. Una porta occupata da un servizio diverso impedisce l'avvio. Se un'analisi richiede oltre 60 secondi per terminare, l'arresto segnala l'attesa e il riavvio non parte: controlla `make status` oppure aumenta l'attesa con `make restart STOP_TIMEOUT=180`. Non viene usato SIGKILL.
+
+Alternativa in primo piano: `./start.sh`, arresto con Ctrl+C; altra porta: `PORT=8001 ./start.sh`. `make start` non configura un avvio automatico al riavvio di Windows/WSL. Esegui i comandi con lo stesso utente che ha avviato il server. Serve GNU Make (`sudo apt install make` su Debian se manca).
 
 ## Funzioni
 
@@ -87,7 +104,7 @@ Questo è un prototipo funzionante ed estendibile. Non include ancora un modello
 
 Progetto indipendente, senza affiliazione a Maia Chess. Attribuzioni e licenze in `THIRD_PARTY.md`; sorgenti applicativi GPL-3.0, artefatti esterni con le rispettive condizioni.
 
-Per fermare l'istanza avviata in background da questa sessione: `python3 scripts/stop.py`. L'arresto attende le eventuali analisi in corso.
+Per fermare l'istanza in background: `make stop`. Il vecchio `python3 scripts/stop.py` resta disponibile per compatibilità.
 
 
 
