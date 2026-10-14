@@ -203,7 +203,7 @@ def generate(context, model):
     return {'coaching': coaching.model_dump(), 'usage': tokens, 'model': model, 'provider': 'DeepSeek'}
 
 
-MISTAKE_PROMPT_VERSION = 'mistake-3-decision-quality'
+MISTAKE_PROMPT_VERSION = 'mistake-4-verified-checks'
 MISTAKE_SYSTEM = '''Sei un tutor di scacchi. Spiega in italiano semplice perché la
 mossa indicata peggiora la posizione, dal punto di vista del giocatore (turn).
 Ricevi una posizione e due varianti Stockfish con SAN, valutazioni e fatti verificati
@@ -220,7 +220,35 @@ non la valutazione assoluta. Se è null, spiega il matto senza inventare perdite
 pedoni. Le varianti sono esempi con risposte forti, non mosse obbligatorie per
 l'avversario. Se la linea breve non chiarisce il motivo, dichiaralo esplicitamente.
 Non promettere certezza oltre la ricerca Stockfish disponibile.
+Il giocatore può trovare le due mosse apparentemente equivalenti. Spiega il
+CONTRASTO, non due commenti generici separati. sharedIdea descrive solo la
+somiglianza osservabile (senza attribuire un'intenzione al giocatore); difference
+nomina il dettaglio decisivo con pezzi e case; alternative spiega come best cambia
+la risposta avversaria o le risorse disponibili. Salvare una posizione o evitare
+il matto è un beneficio concreto anche se best vale 0,00: non inventare un guadagno.
+sameReply, se presente, verifica la STESSA risposta avversaria dopo best: usa la
+SAN specifica di ciascun ramo, che può passare da matto a semplice scacco. La sua
+linea ha punteggio dal punto di vista turn. È una risposta forzata per confronto,
+NON la migliore risposta avversaria e NON la valutazione complessiva di best.
+Se non è legale dopo best dillo senza inventare il perché. Non inventare altre
+repliche per spiegare la differenza. Se manca il nesso, dichiaralo in difference.
+verification riporta una ricerca più approfondita rispetto al tentativo storico.
+Se acceptedNow è true, NON insistere che la scelta sia sbagliata: spiega che il
+giudizio iniziale non è confermato dalla nuova ricerca e confronta senza colpevolizzare.
+Per spiegare uno scacco usa checkFacts: legalReplies è l'elenco COMPLETO delle
+risposte legali; checkingPieces sono gli scaccanti; movedPieceDefenders elenca i
+difensori geometrici del pezzo appena mosso (non prova che possano ricatturare).
+Non inventare pezzi che difendono una casa, occupazioni o motivi di illegalità.
+Evita enumerazioni di tutte le case vietate al re: mostra la risposta legale
+verificata che esiste in una linea e manca nell'altra. Non mescolare i due rami:
+se la torre si sposta in g1 solo in best, non descriverla in g1 dopo actual.
+Non usare il numero di case attaccate come misura del vantaggio posizionale.
+Non presentare profondità/nodi come percentuale di affidabilità. Se entrambe le
+mosse restano favorevoli, distinguere vantaggio ridotto da posizione persa.
 Restituisci solo JSON: {"reason":"Motivo comprensibile, massimo 1800 caratteri",
+"sharedIdea":"Perché le mosse possono sembrare simili, massimo 700 caratteri",
+"difference":"Il dettaglio concreto che le distingue o evidenza insufficiente, massimo 1200 caratteri",
+"alternative":"Perché l'alternativa funziona diversamente, massimo 1200 caratteri",
 "continuation":"Come la variante dimostra il problema, massimo 1800 caratteri",
 "lesson":"Una domanda o controllo concreto prima di muovere, massimo 600 caratteri",
 "tactical":"Conseguenze concrete o evidenza insufficiente, massimo 1400 caratteri",
@@ -233,6 +261,9 @@ Restituisci solo JSON: {"reason":"Motivo comprensibile, massimo 1800 caratteri",
 class MistakeExplanation(BaseModel):
     model_config = ConfigDict(extra='forbid')
     reason: str = Field(min_length=1, max_length=1800)
+    sharedIdea: str = Field(min_length=1, max_length=700)
+    difference: str = Field(min_length=1, max_length=1200)
+    alternative: str = Field(min_length=1, max_length=1200)
     continuation: str = Field(min_length=1, max_length=1800)
     lesson: str = Field(min_length=1, max_length=600)
     tactical: str = Field(min_length=1, max_length=1400)

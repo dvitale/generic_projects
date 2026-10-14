@@ -34,6 +34,7 @@ test('DeepSeek explanations show tactics, position, plan and uncertainty separat
   await page.route('**/api/training/prevention/explain/mistakes/1/explain',route=>route.fulfill({json:{explanation:{reason:'La scelta perde la donna.',continuation:'Segue la cattura del re.',lesson:'Controlla le risposte.',tactical:'Il re può catturare la donna.',positional:'Il re rimane esposto: osservazione da verificare.',strategicPlan:'Metti al sicuro la donna prima di attaccare.',uncertainty:'La linea non esaurisce tutte le possibilità.'}}}))
   await page.goto('/');await page.getByRole('button',{name:'Blunder prevention',exact:true}).click();await page.getByRole('button',{name:'Inizia Blunder prevention'}).click()
   await page.getByRole('button',{name:'Spiega motivo',exact:true}).click()
+  await page.getByText('Tattica, posizione e piano',{exact:true}).click()
   await expect(page.getByRole('heading',{name:'Tattica · conseguenze concrete'})).toBeVisible()
   await expect(page.getByRole('heading',{name:'Posizione · che cosa cambia'})).toBeVisible()
   await expect(page.getByRole('heading',{name:'Strategia · piano da verificare'})).toBeVisible()

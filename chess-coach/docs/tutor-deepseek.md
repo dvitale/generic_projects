@@ -1,5 +1,17 @@
 # Tutor DeepSeek
 
+## Confrontare un tentativo con la soluzione
+
+In Puzzle e Blunder prevention, **Spiega motivo** confronta esplicitamente le mosse: perché possono sembrare simili, quale dettaglio le distingue e perché l’alternativa funziona. Prima della spiegazione, Stockfish ripete il confronto con 320.000 nodi per linea. Quando possibile verifica anche la stessa risposta avversaria dopo l’alternativa (160.000 nodi): uno scacco matto può diventare un semplice scacco, oppure quella risposta può non essere più legale.
+
+Quando la stessa risposta dà matto dopo il tentativo e lascia risposte legali dopo l’alternativa, la spiegazione viene costruita direttamente con le regole degli scacchi e le valutazioni Stockfish, senza chiamare DeepSeek. Negli altri casi il tutor riceve anche gli elenchi delle risposte legali agli scacchi.
+
+Le due varianti e le valutazioni sono mostrate insieme. **Rivedi le due idee sulla scacchiera** permette di scegliere il tentativo, l’alternativa o il confronto con la stessa risposta e avanzare passo passo. Le valutazioni riguardano la scelta iniziale, dal punto di vista del giocatore, non ogni posizione intermedia. Il ramo con risposta imposta non rappresenta necessariamente la migliore difesa avversaria.
+
+Se la ricerca più approfondita non conferma il rifiuto originale, compare un avviso e il tutor deve riconoscerlo. Il tentativo storico e il calendario dei ripassi non vengono riscritti. Nodi e profondità descrivono la ricerca, non una garanzia di correttezza. Quando il motivo non emerge dalle varianti disponibili, il tutor deve dichiararlo.
+
+Esempio: nel puzzle con torre bianca f1, re g2 e minaccia nera …Qh2#, **Rg1** libera f1 per **Kf1**. La differenza può essere salvare la partita, anche se la valutazione dell’alternativa è soltanto 0,00. Non ogni soluzione mira a guadagnare materiale.
+
 ## Uso
 
 Nella sezione **Rivedi**, analizza una partita con Stockfish. Nel pannello **Tutor DeepSeek** puoi descrivere cosa avevi in mente e premere **Chiedi al tutor DeepSeek**. La riflessione è facoltativa. Il tutor spiega le decisioni e propone fino a tre attività, per un massimo di 25 minuti; i pulsanti aprono i Puzzle o avviano i Drill effettivamente disponibili.
