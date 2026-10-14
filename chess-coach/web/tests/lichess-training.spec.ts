@@ -6,7 +6,11 @@ async function checkLink(page:Page,expected:string){
   await page.getByRole('button',{name:/Analizza con Lichess/}).click()
   const href=await page.getByRole('link',{name:'apri Lichess in una nuova scheda'}).getAttribute('href')
   const url=new URL(href!)
-  expect(decodeURIComponent(url.pathname.slice('/analysis/standard/'.length)).replaceAll('_',' ')).toBe(expected)
+  if(url.pathname.startsWith('/analysis/pgn/')){
+    const replay=new Chess();replay.loadPgn(decodeURIComponent(url.pathname.slice('/analysis/pgn/'.length)))
+    expect(replay.history().length).toBeGreaterThan(0)
+    expect(replay.fen()).toBe(expected)
+  }else expect(decodeURIComponent(url.pathname.slice('/analysis/standard/'.length)).replaceAll('_',' ')).toBe(expected)
   expect(url.searchParams.get('color')).toBe('white')
 }
 test.beforeEach(async({page})=>{

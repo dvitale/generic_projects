@@ -311,7 +311,7 @@ export default function App() {
             {puzzleComparison.data?.played&&<button onClick={puzzleComparison.toggle}>{puzzleComparison.visible?'Mostra la tua soluzione':'Mostra confronto con frecce'}</button>}
             <p className="footnote">La freccia rossa indica la mossa più probabile al livello della partita, non necessariamente la migliore.</p>
           </div>}
-          {((tab==='play'||tab==='review')&&game||tab==='train'&&exercise)&&<LichessAnalysis key={tab==='train'?exercise!.id:game!.id+':'+tab} fen={boardFen} orientation={orientation}/>}
+          {((tab==='play'||tab==='review')&&game||tab==='train'&&exercise)&&<LichessAnalysis key={tab==='train'?exercise!.id:game!.id+':'+tab} fen={boardFen} orientation={orientation} game={tab==='train'?undefined:game} ply={tab==='review'?cursor:playPly}/>}
           {tab==='play'&&game?.source==='maia'&&!game.result&&<div className="review-controls"><button disabled={busy||!!jobId} onClick={resign}>Abbandona partita</button></div>}
         </section>
         <aside className="coach-column">
