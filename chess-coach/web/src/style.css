@@ -148,3 +148,5 @@ footer{padding:14px 0;font-size:10px}
 .quality-severity.moment small{color:var(--severity-ink)}
 .quality-severity.moment:hover:not(:disabled),.quality-filters button.severity-error:hover:not(:disabled),.quality-filters button.severity-inaccuracy:hover:not(:disabled){background:var(--severity-hover)}
 .quality-filters button.severity-error[aria-pressed=true],.quality-filters button.severity-inaccuracy[aria-pressed=true]{background:var(--severity-ink);color:#fff}
+
+.final-review-text{white-space:pre-line}.final-review .tutor-step .row{margin-top:10px}

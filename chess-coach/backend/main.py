@@ -21,7 +21,7 @@ from pydantic import BaseModel, Field, FiniteFloat
 
 from .engine import ROOT, evaluator
 from .drills import CATALOG, materialize, decisions_played
-from . import tutor
+from . import tutor, final_review
 from . import prevention
 from . import mistakes
 from . import insights
@@ -103,6 +103,7 @@ def init_db():
         mistakes.init_schema(con)
         training_schedule.init_schema(con)
         learning.init_schema(con)
+        final_review.init_schema(con)
         for row in con.execute('SELECT * FROM games WHERE analysis IS NOT NULL').fetchall():
             if row['analysis_version'] == len(json.loads(row['moves'])):
                 prevention.seed_game(con, row, json.loads(row['analysis']), now())
@@ -397,6 +398,7 @@ def preserve_review(con, row, session):
                     (archive_id, session['template_id'], session['template_name'], session['theme'], session['goal'], session['start_ply'], session['target']))
     con.execute('UPDATE exercises SET game_id=? WHERE game_id=?', (archive_id, row['id']))
     con.execute('UPDATE tutor_reviews SET game_id=? WHERE game_id=?', (archive_id, row['id']))
+    con.execute('UPDATE final_reviews SET game_id=? WHERE game_id=?', (archive_id, row['id']))
     con.execute('UPDATE game_ratings SET game_id=? WHERE game_id=?', (archive_id, row['id']))
     con.execute('UPDATE prevention_positions SET game_id=? WHERE game_id=?', (archive_id, row['id']))
     con.execute('UPDATE position_judgments SET game_id=? WHERE game_id=?', (archive_id, row['id']))
@@ -882,6 +884,7 @@ def request_tutor(game_id: str, body: TutorInput):
 
 prevention.install(app, database, reconstruct, now)
 mistakes.install(app, database, tutor_lock)
+final_review.install(app, database, find_game, game_pgn, now, tutor_lock)
 
 DIST = ROOT / "web" / "dist"
 @app.get('/api/training-guide')
