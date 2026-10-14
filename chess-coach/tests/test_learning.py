@@ -103,3 +103,31 @@ def test_progress_uses_denominators_and_two_windows(client):
     p=client.get('/api/learning-progress').json()['groups'][0]
     assert p['recent']['games']==10 and p['recent']['decisions']==30
     assert p['previous']['games']==2 and p['previous']['decisions']==6
+
+
+def test_all_flagged_moves_match_counts_and_keep_custom_black_move_numbers(client):
+    import chess.pgn
+    board=chess.Board();board.turn=chess.BLACK;board.fullmove_number=41
+    pgn=chess.pgn.Game();pgn.setup(board);node=pgn;items=[]
+    losses=iter([80,180,179,99999])
+    for ply,uci in enumerate(['e7e5','e2e4','b8c6','f1b5','a7a6','b5a4','g8f6']):
+        move=chess.Move.from_uci(uci)
+        if board.turn==chess.BLACK:
+            loss=next(losses)
+            items.append({'ply':ply,'fen':board.fen(),'played':uci,'playedSan':board.san(move),
+                          'best':evaluation(0,'b'),'actual':evaluation(-loss,'b',-1 if loss==99999 else None),'loss':loss})
+        node=node.add_variation(move);board.push(move)
+    game=client.post('/api/import',json={'pgn':str(pgn),'color':'b'}).json()
+    with main.database() as con:
+        con.execute('UPDATE games SET analysis=?,analysis_version=? WHERE id=?',(json.dumps({'decisions':items}),game['version'],game['id']))
+    data=client.get(f"/api/games/{game['id']}/decision-quality").json()
+    assert len(data['flagged'])==data['errors']+data['inaccuracies']==4
+    assert [m['moveNumber'] for m in data['flagged']]==[41,42,43,44]
+    assert [m['ply'] for m in data['flagged']]==[0,2,4,6]
+    assert all(m['color']=='b' for m in data['flagged'])
+    assert [m['kind'] for m in data['flagged']]==['inaccuracy','error','inaccuracy','error']
+    assert data['flagged'][-1]['lossCp'] is None
+    items[0]['forced']=True
+    with main.database() as con:
+        con.execute('UPDATE games SET analysis=? WHERE id=?',(json.dumps({'decisions':items}),game['id']))
+    assert len(client.get(f"/api/games/{game['id']}/decision-quality").json()['flagged'])==3

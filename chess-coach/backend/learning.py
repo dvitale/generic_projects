@@ -43,7 +43,16 @@ def quality(items):
 def game_quality(con, row):
     drill = con.execute('SELECT start_ply FROM drill_sessions WHERE game_id=?', (row['id'],)).fetchone()
     items = decisions(row, drill['start_ply'] if drill else 0)
-    return {**quality(items), 'ready': bool(row['analysis']) and row['analysis_version'] == len(json.loads(row['moves'])),
+    flagged = []
+    for d in sorted(items, key=lambda d: d['ply']):
+        if d['loss'] < 80:
+            continue
+        board = chess.Board(d['fen'])
+        flagged.append({'ply': d['ply'], 'san': d['playedSan'], 'moveNumber': board.fullmove_number,
+                        'color': 'w' if board.turn else 'b',
+                        'kind': 'error' if d['loss'] >= 180 else 'inaccuracy',
+                        'lossCp': d['loss'] if d['best'].get('mate') is None and d['actual'].get('mate') is None else None})
+    return {**quality(items), 'flagged': flagged, 'ready': bool(row['analysis']) and row['analysis_version'] == len(json.loads(row['moves'])),
             'moments': [{'ply':d['ply'],'san':d['playedSan'],'loss':d['loss']} for d in sorted(items,key=lambda d:-d['loss'])[:3] if d['loss']>=80]}
 
 
