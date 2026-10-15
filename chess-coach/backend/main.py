@@ -123,6 +123,9 @@ async def lifespan(app):
 
 
 app = FastAPI(title="SparringMate locale", lifespan=lifespan)
+# Sources whose games are still played move by move in the app.
+PLAYABLE = {"maia", "drill", "stockfish"}
+ENGINE_NODES = 400000
 
 
 @app.middleware("http")
@@ -147,6 +150,9 @@ class NewGame(BaseModel):
     elo: int = Field(default=1500, ge=600, le=2600)
     fen: str = Field(default=chess.STARTING_FEN, max_length=120)
     title: str | None = Field(default=None, max_length=160)
+    # A refutation game starts after the player's rejected training move and is answered by Stockfish.
+    opponent: Literal["maia", "stockfish"] = "maia"
+    moves: list[str] = Field(default_factory=list, max_length=1)
 
 
 class MoveInput(BaseModel):
@@ -281,7 +287,7 @@ def game_view(row):
                  "complete": count >= session["target"] or outcome is not None}
     return {"id": row["id"], "fen": board.fen(), "initialFen": row["initial_fen"],
             "moves": moves, "version": len(moves), "revision": row['revision'], "playerColor": row["player_color"],
-            "canUndo": not row['termination'] and row['source'] in {'maia', 'drill'} and undo_ply(row, session) is not None,
+            "canUndo": not row['termination'] and row['source'] in PLAYABLE and undo_ply(row, session) is not None,
             "termination": row['termination'],
             "rating": json.loads(rating['response']) if rating else None, "analysisJobId": analysis_job,
             "elo": row["elo"], "title": row["title"], "pgn": str(pgn),
@@ -304,10 +310,23 @@ def new_game(body: NewGame):
     board = reconstruct(body.fen, [])
     if board.is_game_over(claim_draw=True):
         raise HTTPException(422, 'La posizione è già conclusa: scegline una precedente')
+    if body.moves and body.opponent != 'stockfish':
+        raise HTTPException(422, 'Le mosse iniziali sono previste solo per la confutazione con Stockfish')
+    for uci in body.moves:
+        try:
+            move = chess.Move.from_uci(uci)
+        except ValueError:
+            move = None
+        if move not in board.legal_moves:
+            raise HTTPException(422, 'Mossa non legale')
+        board.push(move)
+    if board.is_game_over(claim_draw=True):
+        raise HTTPException(422, 'La mossa conclude già la partita: non c’è nulla da confutare')
+    default_title = 'Contro Stockfish' if body.opponent == 'stockfish' else f"Allenamento con Maia {body.elo}"
     game_id = str(uuid.uuid4())
     with database() as con:
         con.execute("INSERT INTO games(id,initial_fen,moves,player_color,elo,title,created_at,analysis,analysis_version,source) VALUES(?,?,?,?,?,?,?,?,?,?)",
-                    (game_id, body.fen, "[]", body.color, body.elo, body.title or f"Allenamento con Maia {body.elo}", now(), None, None, "maia"))
+                    (game_id, body.fen, json.dumps(body.moves), body.color, body.elo, body.title or default_title, now(), None, None, body.opponent))
         return game_view(find_game(con, game_id))
 
 
@@ -352,8 +371,10 @@ def make_move(game_id: str, body: MoveInput):
     with database() as con:
         con.execute("BEGIN IMMEDIATE")
         row = find_game(con, game_id)
-        if row["source"] not in {"maia", "drill"}:
+        if row["source"] not in PLAYABLE:
             raise HTTPException(409, "La partita importata è disponibile in revisione")
+        if row["source"] == "stockfish" and body.actor != "human":
+            raise HTTPException(409, "Le risposte di Stockfish sono calcolate dal server")
         moves = json.loads(row["moves"])
         if len(moves) != body.version or row['revision'] != body.revision:
             raise HTTPException(409, "La posizione è cambiata: ricarica la partita")
@@ -377,8 +398,40 @@ def make_move(game_id: str, body: MoveInput):
         snapshot = dict(find_game(con, game_id))
     # Commit the final move before the worker reads it; analysis survives closing the browser.
     board.push(move)
-    if board.is_game_over(claim_draw=True):
+    if board.is_game_over(claim_draw=True) and snapshot['source'] != 'stockfish':
         queue_analysis(snapshot, automatic=True)
+    return get_game(game_id)
+
+
+@app.post('/api/games/{game_id}/engine-move')
+def engine_move(game_id: str, body: UndoInput):
+    """Stockfish's reply in a refutation game: full strength, so a weak training move is punished."""
+    def opponent_position(con):
+        row = find_game(con, game_id)
+        if row['source'] != 'stockfish' or row['termination']:
+            raise HTTPException(409, 'Stockfish risponde solo nelle partite di confutazione in corso')
+        moves = json.loads(row['moves'])
+        if len(moves) != body.version or row['revision'] != body.revision:
+            raise HTTPException(409, 'La posizione è cambiata: ricarica la partita')
+        board = reconstruct(row['initial_fen'], moves)
+        if board.is_game_over(claim_draw=True) or len(moves) >= 600:
+            raise HTTPException(409, 'Partita conclusa')
+        if board.turn == (row['player_color'] == 'w'):
+            raise HTTPException(409, 'Tocca a te')
+        return moves, board
+    with database() as con:
+        _, board = opponent_position(con)
+    # Search outside the transaction; the position is checked again before committing the reply.
+    reply = evaluator.evaluate(board, nodes=ENGINE_NODES)['pv'][:1]
+    if not reply:
+        raise HTTPException(503, 'Stockfish non ha restituito una mossa: riprova')
+    with database() as con:
+        con.execute('BEGIN IMMEDIATE')
+        moves, board = opponent_position(con)
+        row = find_game(con, game_id)
+        times = json.loads(row['move_times'])
+        times = (times + [None] * len(moves))[:len(moves)] + [None]
+        con.execute('UPDATE games SET moves=?,move_times=? WHERE id=?', (json.dumps(moves + reply), json.dumps(times), game_id))
     return get_game(game_id)
 
 
@@ -389,7 +442,7 @@ def resign_game(game_id: str, body: UndoInput):
         row = find_game(con, game_id)
         moves = json.loads(row['moves'])
         board = reconstruct(row['initial_fen'], moves)
-        if row['source'] != 'maia' or row['termination'] or board.is_game_over(claim_draw=True):
+        if row['source'] not in {'maia', 'stockfish'} or row['termination'] or board.is_game_over(claim_draw=True):
             raise HTTPException(409, 'Questa partita non può essere abbandonata: è già conclusa o disponibile solo in revisione')
         # A Maia reply may have committed while the player confirmed resignation.
         bot_reply = len(moves) == body.version + 1 and reconstruct(row['initial_fen'], moves[:body.version]).turn != (row['player_color'] == 'w')
@@ -397,7 +450,7 @@ def resign_game(game_id: str, body: UndoInput):
             raise HTTPException(409, 'La partita è cambiata: ricaricala prima di abbandonare')
         con.execute("UPDATE games SET termination='resign',revision=revision+1 WHERE id=?", (game_id,))
         snapshot = dict(find_game(con, game_id))
-    if moves:
+    if moves and snapshot['source'] != 'stockfish':
         queue_analysis(snapshot, automatic=True)
     return get_game(game_id)
 
@@ -413,7 +466,8 @@ def export_pgn(game_id: str, include_times: bool = True):
 
 def undo_ply(row, session=None):
     moves = json.loads(row['moves'])
-    start = session['start_ply'] if session else 0
+    # A refutation game keeps the training move that it was created to test.
+    start = session['start_ply'] if session else 1 if row['source'] == 'stockfish' else 0
     initial_turn = chess.Board(row['initial_fen']).turn
     return next((ply for ply in range(len(moves) - 1, start - 1, -1)
                  if (initial_turn if ply % 2 == 0 else not initial_turn) == (row['player_color'] == 'w')), None)
@@ -442,7 +496,7 @@ def preserve_review(con, row, session):
 
 def suggestion_position(con, game_id, body):
     row = find_game(con, game_id)
-    if row['source'] not in {'maia', 'drill'} or row['termination']:
+    if row['source'] not in PLAYABLE or row['termination']:
         raise HTTPException(409, 'Suggerimenti disponibili solo durante una partita in corso')
     moves = json.loads(row['moves'])
     if len(moves) != body.version or row['revision'] != body.revision:
@@ -491,7 +545,7 @@ def undo_move(game_id: str, body: UndoInput):
     with database() as con:
         con.execute('BEGIN IMMEDIATE')
         row = find_game(con, game_id)
-        if row['termination'] or row['source'] not in {'maia', 'drill'}:
+        if row['termination'] or row['source'] not in PLAYABLE:
             raise HTTPException(409, 'Questa partita è disponibile solo in revisione')
         moves = json.loads(row['moves'])
         session = con.execute('SELECT * FROM drill_sessions WHERE game_id=?', (game_id,)).fetchone()
@@ -660,8 +714,10 @@ def analyze_game(job_id, snapshot):
                 raise ValueError('La partita è cambiata: riavvia l’analisi.')
             con.execute("UPDATE games SET analysis=?, analysis_version=? WHERE id=?",
                         (json.dumps(analysis), len(moves), snapshot["id"]))
-            prevention.seed_game(con, snapshot, analysis, now())
-            for item in critical:
+            # Refutation games start from a position already lost on purpose: review only, no new exercises.
+            if snapshot['source'] != 'stockfish':
+                prevention.seed_game(con, snapshot, analysis, now())
+            for item in critical if snapshot['source'] != 'stockfish' else []:
                 if not item["best"]["pv"]:
                     continue
                 ex_id = f"{snapshot['id']}:{snapshot['revision']}:{item['ply']}"
@@ -781,7 +837,7 @@ def attempt(exercise_id: str, body: AttemptInput):
     if move not in board.legal_moves:
         raise HTTPException(422, "Mossa non legale")
     best, actual, loss = evaluator.compare(board, move, nodes=80000)
-    success = loss <= 50
+    success = loss < mistakes.PUZZLE_TOLERANCE_CP
     with database() as con:
         con.execute("BEGIN IMMEDIATE")
         session = active_session(con, exercise_id, body.session_id, body.version)
@@ -876,7 +932,7 @@ def profile():
         themes = [dict(r) for r in con.execute("SELECT theme,count(*) AS examples FROM exercises GROUP BY theme ORDER BY examples DESC")]
         domains = {key:0 for key in ('tactical','positional','mixed','unclear')}
         seen = set()
-        for row in con.execute('SELECT analysis FROM games WHERE analysis IS NOT NULL AND source!=?', ('snapshot',)):
+        for row in con.execute("SELECT analysis FROM games WHERE analysis IS NOT NULL AND source NOT IN ('snapshot','stockfish')"):
             for d in json.loads(row['analysis']).get('decisions',[]):
                 identity=(d['fen'],d['played'])
                 if d['loss']<80 or identity in seen:continue

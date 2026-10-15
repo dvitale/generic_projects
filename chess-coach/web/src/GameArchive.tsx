@@ -28,7 +28,7 @@ export default function GameArchive({games,disabled,onOpen}:{games:Saved[];disab
         const result=outcome(item),q=item.quality
         return <div className="game-row" key={item.id}><button onClick={()=>onOpen(item.id)} disabled={disabled} onPointerEnter={()=>setPreview(item.id)} onPointerLeave={()=>setPreview(p=>p===item.id?null:p)} onFocus={()=>setPreview(item.id)} onBlur={()=>setPreview(p=>p===item.id?null:p)}>
           <span className={`result-badge result-${result}`}>{outcomeLabel[result]}</span>
-          <span className="game-title"><strong>{item.title}</strong><small>{item.source==='pgn'?'Importata da PGN':item.source==='drill'?'Drill':'Contro Maia'}{item.result?` · ${item.result}`:''}</small></span>
+          <span className="game-title"><strong>{item.title}</strong><small>{item.source==='pgn'?'Importata da PGN':item.source==='drill'?'Drill':item.source==='stockfish'?'Contro Stockfish':'Contro Maia'}{item.result?` · ${item.result}`:''}</small></span>
           <span className="game-color">{item.playerColor&&<><i className={`side-dot side-dot-${item.playerColor}`} aria-hidden="true"/>{item.playerColor==='w'?'Bianco':'Nero'}</>}</span>
           <span className="game-quality">{q&&q.decisions?<><b>{Math.round(100*q.sound/q.decisions)}%</b><small>{q.errors===1?'1 errore':q.errors?`${q.errors} errori`:'nessun errore'}</small></>:<small>da analizzare</small>}</span>
           <span className="game-plies">{Math.ceil(item.plies/2)}</span>

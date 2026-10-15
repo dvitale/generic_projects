@@ -45,5 +45,9 @@ def test_resign_tolerates_only_one_late_bot_reply(client):
 def test_cannot_resign_imported_or_board_finished_games(client):
     imported=client.post('/api/import',json={'pgn':'1. e4 e5 *','color':'w'}).json()
     assert client.post(f"/api/games/{imported['id']}/resign",json={'version':2,'revision':0}).status_code==409
-    finished=client.post('/api/games',json={'fen':'7k/6Q1/5K2/8/8/8/8/8 b - - 0 1'}).json()
-    assert client.post(f"/api/games/{finished['id']}/resign",json={'version':0,'revision':0}).status_code==409
+    # A game cannot start from a finished position; it can end on the board and then not be resigned.
+    assert client.post('/api/games',json={'fen':'7k/6Q1/5K2/8/8/8/8/8 b - - 0 1'}).status_code==422
+    finished=client.post('/api/games',json={'fen':'7k/8/5KQ1/8/8/8/8/8 w - - 0 1'}).json()
+    finished=move(client,finished,'g6g7','human')
+    assert finished['result']=='1-0'
+    assert client.post(f"/api/games/{finished['id']}/resign",json={'version':1,'revision':0}).status_code==409

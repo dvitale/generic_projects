@@ -43,7 +43,7 @@ export default function ReviewSummary({game,cursor,onPosition}:{game:Game;cursor
   const sides=(['w','b'] as Color[]).map(color=>{
     const moves=[...byPly.values()].filter(d=>d.ply>=start&&!d.forced&&!assisted.has(d.ply)&&d.fen.split(' ')[1]===color)
     const count=Object.fromEntries(kinds.map(k=>[k,moves.filter(d=>classifyMove(d)===k).length])) as Record<MoveClass,number>
-    return {color,name:color===game.playerColor?'Tu':game.source==='pgn'?(color==='w'?'Bianco':'Nero'):`Maia ${game.elo}`,total:moves.length,count,
+    return {color,name:color===game.playerColor?'Tu':game.source==='pgn'?(color==='w'?'Bianco':'Nero'):game.source==='stockfish'?'Stockfish':`Maia ${game.elo}`,total:moves.length,count,
       sound:moves.length?Math.round(100*(count.best+count.good)/moves.length):null}
   })
   useEffect(()=>{

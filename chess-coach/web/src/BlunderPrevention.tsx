@@ -5,7 +5,7 @@ import Board from './Board'
 import {useBoardOrientation} from './boardFlip'
 import LichessAnalysis from './LichessAnalysis'
 import ExerciseSource from './ExerciseSource'
-import MistakeHistory from './MistakeHistory'
+import MistakeHistory,{type Mistake} from './MistakeHistory'
 import {useTrainingMove} from './useTrainingMove'
 import ChessInsights,{ThinkingGuide,type Insight} from './ChessInsights'
 import {api} from './api'
@@ -17,7 +17,7 @@ interface Session {id:string;version:number;exposure:string;excluded?:boolean;me
 interface Result {success:boolean;assisted:boolean;closed:boolean;version:number;firstTry:boolean;move:string;san:string;actual:Evaluation;example:Evaluation|null;original:{move:string;san:string;evaluation:Evaluation}|null;message:string;insight?:Insight}
 const evaluation=(e:Evaluation)=>e.mate!==null?(e.mate>0?`Matto a tuo favore in ${e.mate}`:`Matto contro di te in ${Math.abs(e.mate)}`):`${e.cp>=0?'+':''}${(e.cp/100).toFixed(2)}`
 
-export default function BlunderPrevention({onArchive,onReview,startPositionId,onStarted}:{onArchive:()=>void;onReview:(id:string,ply:number)=>void;startPositionId?:string|null;onStarted?:()=>void}) {
+export default function BlunderPrevention({onArchive,onReview,onPlayMistake,startPositionId,onStarted}:{onArchive:()=>void;onReview:(id:string,ply:number)=>void;onPlayMistake?:(positionId:string,mistake:Mistake)=>void;startPositionId?:string|null;onStarted?:()=>void}) {
   const [catalog,setCatalog]=useState<Catalog|null>(null)
   const [position,setPosition]=useState<Position|null>(null)
   const boardOrientation=useBoardOrientation(position?.turn??'w')
@@ -96,7 +96,7 @@ export default function BlunderPrevention({onArchive,onReview,startPositionId,on
         {result&&<section className="panel"><span className="eyebrow">LA TUA SCELTA</span><h2>{result.san} · {evaluation(result.actual)}</h2>{!result.closed?<><p>Dopo aver mostrato la mossa, la scacchiera torna alla posizione iniziale per riprovare.</p><p className="variation">Possibile seguito: {result.actual.san.join(' ')}</p></>:<><p>{result.assisted?'Esempio mostrato con aiuto.':result.firstTry?'Riuscito al primo tentativo senza aiuti.':'Mossa accettata. I tentativi precedenti restano registrati.'}</p><p className="variation">Possibile seguito: {result.actual.san.join(' ')}</p></>}</section>}
         {result?.closed&&result.original&&<section className="panel"><span className="eyebrow">IL CONFRONTO CON LA PARTITA</span><h3>Avevi giocato {result.original.san}</h3><p>Valutazione dopo l’errore: {evaluation(result.original.evaluation)}.</p><p className="variation">{result.original.evaluation.san.join(' ')}</p><div className="row"><button onClick={()=>setShowOriginal(v=>!v)}>{showOriginal?'Mostra la mossa sicura':'Mostra il vecchio errore'}</button><button onClick={()=>onReview(position.gameId,position.ply)}>Rivedi nella partita</button></div></section>}
         {result?.closed&&<ChessInsights insight={result.insight} compact/>}
-        <MistakeHistory key={position.id} kind="prevention" targetId={position.id} revision={session?.version??0}/>
+        <MistakeHistory key={position.id} kind="prevention" targetId={position.id} revision={session?.version??0} onPlay={onPlayMistake&&(m=>onPlayMistake(position.id,m))}/>
       </aside>
     </div>}
   </div>

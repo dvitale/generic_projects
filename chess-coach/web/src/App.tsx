@@ -16,7 +16,7 @@ import PuzzleFeedback from './PuzzleFeedback'
 import TrainingPlan from './TrainingPlan'
 import ImportGames from './ImportGames'
 import {usePuzzleComparison} from './usePuzzleComparison'
-import MistakeHistory from './MistakeHistory'
+import MistakeHistory,{type Mistake} from './MistakeHistory'
 import {useTrainingMove} from './useTrainingMove'
 import ChessInsights,{ThinkingGuide} from './ChessInsights'
 import EvaluationChart from './EvaluationChart'
@@ -99,6 +99,8 @@ export default function App() {
   const [retry, setRetry] = useState(0)
   const [focusJudgment,setFocusJudgment]=useState(false)
   const [requestedDrill,setRequestedDrill] = useState<string|null>(null)
+  // Where a Stockfish refutation game was opened from, to offer the way back.
+  const [refutationOrigin,setRefutationOrigin]=useState<{gameId:string;kind:'puzzle'|'prevention';targetId:string;san:string}|null>(null)
   const currentGame = useRef<Game | null>(null)
   const watchedJobs=useRef(new Set<string>())
   const botController = useRef<AbortController | null>(null)
@@ -120,16 +122,20 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (!game || busy || game.result || game.source !== 'maia' || game.turn === game.playerColor || tab !== 'play' || jobId) return
+    if (!game || busy || game.result || (game.source !== 'maia' && game.source !== 'stockfish') || game.turn === game.playerColor || tab !== 'play' || jobId) return
     let cancelled = false
     const controller = new AbortController()
     botController.current = controller
     const snapshot = game
     setBotThinking(true)
     ;(async () => {
-      const move = await chooseMaiaMove(snapshot.fen, snapshot.elo, controller.signal)
-      if (cancelled || controller.signal.aborted || !move) return
-      const updated = await api<Game>(`/games/${snapshot.id}/moves`, {move, version:snapshot.version, revision:snapshot.revision, actor:'maia',elapsed_seconds:moveTime.elapsed(snapshot)})
+      let updated: Game
+      if (snapshot.source === 'stockfish') updated = await api<Game>(`/games/${snapshot.id}/engine-move`, {version:snapshot.version, revision:snapshot.revision})
+      else {
+        const move = await chooseMaiaMove(snapshot.fen, snapshot.elo, controller.signal)
+        if (cancelled || controller.signal.aborted || !move) return
+        updated = await api<Game>(`/games/${snapshot.id}/moves`, {move, version:snapshot.version, revision:snapshot.revision, actor:'maia',elapsed_seconds:moveTime.elapsed(snapshot)})
+      }
       if (!cancelled && !controller.signal.aborted && currentGame.current?.id === snapshot.id) keepGame(updated,true)
     })().catch(e => { if (!cancelled && !controller.signal.aborted) fail(e) }).finally(()=> { if (!cancelled) setBotThinking(false) })
     return () => { cancelled = true; controller.abort(); setBotThinking(false) }
@@ -175,7 +181,7 @@ export default function App() {
   const boardFen = tab === 'train' && puzzleBoard ? puzzleBoard.fen() : tab === 'review' ? reviewBoard.fen() : browsingHistory && game ? position(game,playPly).fen() : game?.fen || initialFen
   const orientation: Color = tab === 'train' && exercise ? exercise.turn : game?.playerColor || (color==='b'?'b':'w')
   const legal = tab === 'train' ? exercise?.legalMoves || [] : game?.legalMoves || []
-  const canMove = !busy && !jobId && (tab === 'train' ? !!exercise && !!session && !attempt?.closed : tab === 'play' && !browsingHistory && !!game && !game.result && game.source === 'maia' && game.turn === game.playerColor && !botThinking)
+  const canMove = !busy && !jobId && (tab === 'train' ? !!exercise && !!session && !attempt?.closed : tab === 'play' && !browsingHistory && !!game && !game.result && (game.source === 'maia' || game.source === 'stockfish') && game.turn === game.playerColor && !botThinking)
   const decision = game?.analysis?.decisions.find(d=>d.ply === cursor)
   const visiblePrediction = predictionKey===boardFen+':'+reviewElo?prediction:null
   const reviewedMove=(game?.analysis?.moves||game?.analysis?.decisions)?.find(d=>d.ply===cursor)
@@ -213,7 +219,7 @@ export default function App() {
     shownGame.moveTimes.slice(0,shownPly).forEach((t,i)=>{if(((i%2===0)===(first==='w')?'w':'b')===side&&t!=null){total+=t;known=true}})
     return known?total:null
   }
-  const opponentName=tab==='train'?'Posizione di allenamento':shownGame?.source==='pgn'?(opponent==='w'?'Bianco':'Nero'):'Maia'
+  const opponentName=tab==='train'?'Posizione di allenamento':shownGame?.source==='pgn'?(opponent==='w'?'Bianco':'Nero'):shownGame?.source==='stockfish'?'Stockfish':'Maia'
 
   useEffect(()=>{
     if(tab!=='review'||!game)return
@@ -245,19 +251,29 @@ export default function App() {
   }, [tab, boardFen, reviewElo, retry, needsPrediction])
 
   async function startGame() {
-    if (game?.source === 'maia' && !game.result && !window.confirm('Vuoi iniziare una nuova partita? La partita attuale resterà salvata e potrai riprenderla dall’archivio.')) return
+    if ((game?.source === 'maia'||game?.source === 'stockfish') && !game.result && !window.confirm('Vuoi iniziare una nuova partita? La partita attuale resterà salvata e potrai riprenderla dall’archivio.')) return
     setBusy(true); setError(''); setNotice('')
     try { const next = await api<Game>('/games',{color:color==='random'?(Math.random()<.5?'w':'b'):color,elo}); keepGame(next,true); setTab('play'); setCursor(0); await refresh(); maia.load().catch(fail) }
     catch (e) {fail(e)} finally {setBusy(false)}
   }
   /** New game against Maia from a position of the shown game; the user plays the side at the bottom of the board. */
   async function playFrom(source:Game,ply:number){
-    if (game?.source === 'maia' && !game.result && game.id !== source.id && !window.confirm('Vuoi iniziare una nuova partita? La partita attuale resterà salvata e potrai riprenderla dall’archivio.')) return
+    if ((game?.source === 'maia'||game?.source === 'stockfish') && !game.result && game.id !== source.id && !window.confirm('Vuoi iniziare una nuova partita? La partita attuale resterà salvata e potrai riprenderla dall’archivio.')) return
     const board=position(source,ply),number=board.moveNumber(),side=board.turn()==='w'?'.':'…'
     setBusy(true); setError(''); setNotice('')
     try {
       const next = await api<Game>('/games',{color:boardOrientation,elo:source.source==='maia'?source.elo:elo,fen:board.fen(),title:`Da ${source.title} · ${number}${side}`.slice(0,160)})
       keepGame(next,true); resetBoardFlip(); setPlayPosition(null); setTab('play'); setCursor(0); await refresh(); maia.load().catch(fail)
+    } catch (e) {fail(e)} finally {setBusy(false)}
+  }
+  /** Defend a rejected training move against full-strength Stockfish, starting right after that move. */
+  async function playMistake(kind:'puzzle'|'prevention',targetId:string,mistake:Mistake){
+    if ((game?.source === 'maia'||game?.source === 'stockfish') && !game.result && !window.confirm('Vuoi iniziare una nuova partita? La partita attuale resterà salvata e potrai riprenderla dall’archivio.')) return
+    const board=new Chess(mistake.fen),number=board.moveNumber(),side=board.turn()==='w'?'.':'…'
+    setBusy(true); setError(''); setNotice('')
+    try {
+      const next = await api<Game>('/games',{color:board.turn(),elo,fen:mistake.fen,opponent:'stockfish',moves:[mistake.move],title:`Confutazione di ${number}${side} ${mistake.san}`})
+      keepGame(next,true); setRefutationOrigin({gameId:next.id,kind,targetId,san:mistake.san}); resetBoardFlip(); setPlayPosition(null); setTab('play'); setCursor(0); await refresh()
     } catch (e) {fail(e)} finally {setBusy(false)}
   }
   async function submitMove(move: string) {
@@ -295,7 +311,7 @@ export default function App() {
     } finally { setBusy(false) }
   }
   async function resign() {
-    if(!game||game.source!=='maia'||game.result||busy)return
+    if(!game||(game.source!=='maia'&&game.source!=='stockfish')||game.result||busy)return
     if(!window.confirm('Vuoi abbandonare la partita? Verrà registrata una sconfitta e, se hai giocato delle mosse, partirà l’analisi automatica.'))return
     botController.current?.abort()
     setBusy(true);setBotThinking(false);setError('')
@@ -349,10 +365,10 @@ export default function App() {
     return <button className="play-from" disabled={busy||!!jobId||botThinking||ended} title={ended?'La partita è già conclusa in questa posizione':'Nuova partita contro Maia da questa posizione: giochi il colore in basso (usa ⇅ per cambiarlo)'}
       onClick={()=>void playFrom(source,ply)}>Gioca da qui col {boardOrientation==='w'?'Bianco':'Nero'}</button>
   }
-  const opponentBar=<PlayerBar key="opponent" lower={flipped} avatar={tab==='train'?'◎':opponent==='w'?'♔':'♚'} name={opponentName} rating={tab!=='train'&&shownGame?.source!=='pgn'?String(game?.elo||elo):undefined}
-    detail={tab==='train'?exercise?.theme||'Scegli un esercizio':shownGame?.source==='pgn'?'Partita importata':`Livello ${game?.elo||elo} · gioco umano`}
+  const opponentBar=<PlayerBar key="opponent" lower={flipped} avatar={tab==='train'?'◎':opponent==='w'?'♔':'♚'} name={opponentName} rating={tab!=='train'&&shownGame?.source!=='pgn'&&shownGame?.source!=='stockfish'?String(game?.elo||elo):undefined}
+    detail={tab==='train'?exercise?.theme||'Scegli un esercizio':shownGame?.source==='pgn'?'Partita importata':shownGame?.source==='stockfish'?'Piena forza · cerca la confutazione':`Livello ${game?.elo||elo} · gioco umano`}
     captured={tab==='train'?[]:balance.captured(opponent)} advantage={balance.advantage(opponent)} time={thinkingTime(opponent)} active={!!shownGame&&!shownGame.result&&sideToMove===opponent}
-    aside={tab==='play'&&botThinking&&<span className="thinking" role="status">Maia sta pensando…</span>}/>
+    aside={tab==='play'&&botThinking&&<span className="thinking" role="status">{opponentName} sta pensando…</span>}/>
   const playerBar=<PlayerBar key="player" lower={!flipped} avatar={orientation==='w'?'♙':'♟'} name={tab==='train'?(attempt?.closed?(attempt.success?'Puzzle risolto':'Soluzione del puzzle'):exercise?.turn==='b'?'Muove il Nero':'Muove il Bianco'):'Tu'}
     detail={tab==='play'?(browsingHistory?`Stai rivedendo la posizione dopo ${playPly} semimosse`:game?.result?`Partita conclusa · ${game.result}${game.termination==='resign'?' · per abbandono':''}`:canMove?'Tocca a te · trascina un pezzo o usa due clic':game?'Attendi la risposta':'Pronto per iniziare'):tab==='review'?`Posizione dopo ${cursor} semimosse`:attempt?.closed?'Esercizio concluso':'Cerca una buona mossa'}
     captured={tab==='train'?[]:balance.captured(orientation)} advantage={balance.advantage(orientation)} time={thinkingTime(orientation)} active={!!shownGame&&!shownGame.result&&sideToMove===orientation}
@@ -373,7 +389,7 @@ export default function App() {
       {showImport&&<ImportGames onImported={()=>void refresh().catch(fail)} onOpen={id=>void openGame(id)}/>}
 
 
-      {tab==='schedule'?<TrainingPlan focusJudgment={focusJudgment} onFocused={()=>setFocusJudgment(false)} onOpen={(kind,id)=>void openTraining(kind,id)} onImport={()=>setShowImport(true)} judgment={<PositionJudgment onReview={(id,ply)=>void openGame(id,ply)}/>}/>:tab==='prevention'?<BlunderPrevention startPositionId={requestedPrevention} onStarted={()=>setRequestedPrevention(null)} onArchive={()=>navigate('archive')} onReview={(id,ply)=>void openGame(id,ply)}/>:tab==='drill'?<Drills startTemplateId={requestedDrill} onStarted={()=>setRequestedDrill(null)} onReview={g=>{keepGame(g);setCursor(g.version);setTab('review');refresh().catch(fail)}}/>:tab==='progress'?<div className="progress-layout"><LearningProgress onPractice={()=>{setFocusJudgment(true);navigate('schedule')}}/>
+      {tab==='schedule'?<TrainingPlan focusJudgment={focusJudgment} onFocused={()=>setFocusJudgment(false)} onOpen={(kind,id)=>void openTraining(kind,id)} onImport={()=>setShowImport(true)} judgment={<PositionJudgment onReview={(id,ply)=>void openGame(id,ply)}/>}/>:tab==='prevention'?<BlunderPrevention startPositionId={requestedPrevention} onStarted={()=>setRequestedPrevention(null)} onArchive={()=>navigate('archive')} onReview={(id,ply)=>void openGame(id,ply)} onPlayMistake={(id,m)=>void playMistake('prevention',id,m)}/>:tab==='drill'?<Drills startTemplateId={requestedDrill} onStarted={()=>setRequestedDrill(null)} onReview={g=>{keepGame(g);setCursor(g.version);setTab('review');refresh().catch(fail)}}/>:tab==='progress'?<div className="progress-layout"><LearningProgress onPractice={()=>{setFocusJudgment(true);navigate('schedule')}}/>
         <section className="panel"><span className="eyebrow">SESSIONE CONSIGLIATA</span><h2>Piano di 25 minuti</h2>{profile?.plan.map((item,i)=><div className="plan-row" key={item.title}><span className="step-number">0{i+1}</span><div><h3>{item.title}</h3><p>{item.description}</p></div><span className="duration">{item.minutes} min</span></div>)}<button className="primary" onClick={()=>navigate(exercises.length?'train':'play')}>Inizia la sessione →</button></section>
         <section className="panel"><span className="eyebrow">DATI RACCOLTI</span><h2>{profile?.confidence||'Nessun dato'}</h2><div className="stat-tiles"><div><strong>{profile?.games||0}</strong><span>partite salvate</span></div><div><strong>{profile?.attempts||0}</strong><span>tentativi</span></div><div><strong>{profile?.unaidedSuccesses||0}</strong><span>primi tentativi riusciti</span></div></div>{profile?.themes.length?<><h3>Posizioni per tema</h3><BarList items={profile.themes.map(t=>({key:t.theme,label:t.theme,value:t.examples}))}/></>:<p className="empty-text">Analizza una partita per iniziare a raccogliere le tue posizioni di allenamento.</p>}<InfoNote>I successi contano solo il primo tentativo senza aiuti, su esercizi nuovi o in scadenza. Le ripetizioni immediate restano pratica. Non sono ancora una misura di padronanza: servono anche verifiche su posizioni nuove.</InfoNote></section>
         <section className="panel"><h2>Tattica e posizione nelle tue decisioni</h2><ThinkingGuide/>{profile?.domains?.length?<BarList items={profile.domains.map(d=>({key:d.kind,label:d.label,value:d.examples}))}/>:null}<InfoNote summary="Come leggere i conteggi">Conteggi di decisioni con peggioramento: le posizioni ripetute sono contate una volta. Indicano cosa rivedere, non una diagnosi di carenze. La categoria posizionale segnala indizi, non una causa dimostrata.</InfoNote></section>
@@ -385,7 +401,7 @@ export default function App() {
             <Board badge={moveBadge} analysisArrows={analysisArrows} reverseMove={tab==='train'&&puzzleMotion.reverse} animateMove={tab==='train'||tab==='play'&&!browsingHistory&&!!game&&game.turn===game.playerColor} fen={boardFen} orientation={boardOrientation} interactive={canMove} legalMoves={legal} onMove={submitMove} lastMove={tab==='train'?(puzzleComparison.visible?undefined:puzzleMotion.lastMove):tab==='play'?game?.moves[playPly-1]:tab==='review'&&game&&cursor>0?game.moves[cursor-1]:undefined}/>
           </div>
           {flipped?opponentBar:playerBar}
-          {tab==='play'&&game&&<div className="board-actions"><button title="Ritorna alla tua ultima scelta e annulla anche la risposta di Maia." disabled={!game.canUndo||busy||!!jobId||browsingHistory} onClick={undo}><span aria-hidden="true">↶</span> Annulla ultima mossa</button>{!game.result&&<button disabled={!canMove||!!moveHint.suggestion?.loading} onClick={()=>void moveHint.request()} title="Prima scelta di Stockfish (blu) e di Maia (rosso) nella posizione attuale"><span aria-hidden="true">💡</span> Suggerisci mossa</button>}{game.source==='maia'&&!game.result&&<button className="danger" disabled={busy||!!jobId} onClick={resign}><span aria-hidden="true">⚑</span> Abbandona partita</button>}</div>}
+          {tab==='play'&&game&&<div className="board-actions"><button title={`Ritorna alla tua ultima scelta e annulla anche la risposta di ${game.source==='stockfish'?'Stockfish':'Maia'}.`} disabled={!game.canUndo||busy||!!jobId||browsingHistory} onClick={undo}><span aria-hidden="true">↶</span> Annulla ultima mossa</button>{!game.result&&<button disabled={!canMove||!!moveHint.suggestion?.loading} onClick={()=>void moveHint.request()} title="Prima scelta di Stockfish (blu) e di Maia (rosso) nella posizione attuale"><span aria-hidden="true">💡</span> Suggerisci mossa</button>}{(game.source==='maia'||game.source==='stockfish')&&!game.result&&<button className="danger" disabled={busy||!!jobId} onClick={resign}><span aria-hidden="true">⚑</span> Abbandona partita</button>}</div>}
           {tab==='play'&&game&&<SuggestionBox suggestion={moveHint.suggestion} elo={game.elo}/>}
           {browsingHistory&&<div className="play-history-notice"><span>Posizione precedente · {playPly} / {game!.moves.length}</span><span className="play-history-actions">{playFromButton(game!,playPly)}<button className="primary" onClick={()=>setPlayPosition(null)}>Torna alla posizione corrente</button></span></div>}
           {tab==='review'&&game&&<div className="review-controls board-toolbar"><button aria-label="Posizione iniziale" onClick={()=>setCursor(0)} disabled={cursor===0}>⏮</button><button aria-label="Mossa precedente" onClick={()=>setCursor(c=>Math.max(0,c-1))} disabled={cursor===0}>◀</button><span>{cursor} / {game.version}</span><button aria-label="Mossa successiva" onClick={()=>setCursor(c=>Math.min(game.version,c+1))} disabled={cursor===game.version}>▶</button><button aria-label="Ultima posizione" onClick={()=>setCursor(game.version)} disabled={cursor===game.version}>⏭</button>{playFromButton(game,cursor)}</div>}
@@ -404,7 +420,7 @@ export default function App() {
           {tab==='train'&&exercise&&<PuzzleFeedback canRestart={dueExercises.length>0} comparing={puzzleComparison.visible} motionMessage={puzzleMotion.message} attempt={attempt} busy={busy} ready={!!session} hasNext={!!nextPuzzle} onNext={()=>{if(nextPuzzle)void pickExercise(nextPuzzle)}} onRestart={()=>{setCompletedPuzzles([]);if(dueExercises[0])void pickExercise(dueExercises[0])}}/>}
           {tab==='play'&&jobId&&<section className="panel" role="status"><p>Analisi automatica della partita… {progress}%</p><progress value={progress} max={100}/></section>}
           {tab==='review'&&<>
-            <div className="review-toolbar"><div className="row"><button className="primary" onClick={analyze} disabled={!game?.version||busy||!!jobId}>{game?.analysis?'Ricalcola analisi':'Analizza partita'}</button>{game?.source==='maia'&&!game.result&&<button disabled={!!jobId} onClick={()=>setTab('play')}>Continua partita</button>}</div>{jobId&&<div role="status"><p>Stockfish analizza la partita… {progress}%</p><progress value={progress} max={100}/></div>}</div>
+            <div className="review-toolbar"><div className="row"><button className="primary" onClick={analyze} disabled={!game?.version||busy||!!jobId}>{game?.analysis?'Ricalcola analisi':'Analizza partita'}</button>{(game?.source==='maia'||game?.source==='stockfish')&&!game.result&&<button disabled={!!jobId} onClick={()=>setTab('play')}>Continua partita</button>}</div>{jobId&&<div role="status"><p>Stockfish analizza la partita… {progress}%</p><progress value={progress} max={100}/></div>}</div>
             {game&&<ReviewSummary game={game} cursor={cursor} onPosition={setCursor}/>}
             {game&&<PgnExport game={game}/>}
             <PanelTabs id="review" label="Pannelli della revisione" value={reviewTab} onChange={setReviewTab} items={[{id:'quality',label:'Decisioni'},{id:'moves',label:'Mosse'},{id:'evaluation',label:'Andamento'},{id:'final',label:'Commento finale'},{id:'tutor',label:'Tutor'},{id:'insights',label:'Approfondimenti'}]}/>
@@ -415,6 +431,7 @@ export default function App() {
           {game&&(tab==='review'||(tab==='play'&&!!game.result))&&<div role={tab==='review'?'tabpanel':undefined} id="review-panel-quality" aria-labelledby={tab==='review'?'review-tab-quality':undefined} hidden={tab==='review'&&reviewTab!=='quality'}><DecisionQuality game={game} disabled={!!jobId||busy} onAnalyze={analyze} onPosition={ply=>{setTab('review');setCursor(ply);setReviewTab('moves')}}/><button className="full" onClick={()=>{setTab('review');setReviewTab('final')}}>Commento finale · andamento e punti da approfondire →</button><details className="panel maia-secondary"><summary>Somiglianza con Maia · facoltativa</summary><RatingPanel key={'rating:'+game.id+':'+game.version+':'+game.revision} game={game} disabled={!!jobId||busy} onRated={rating=>setGame(current=>current?.id===game.id&&current.version===game.version&&current.revision===game.revision?{...current,rating}:current)}/></details></div>}
           {tab==='review'&&!game&&<div role="tabpanel" id="review-panel-quality" aria-labelledby="review-tab-quality" hidden={reviewTab!=='quality'} className="panel">Seleziona una partita per rivedere la qualità delle decisioni.</div>}
           {tab==='play'&&<>
+            {game?.source==='stockfish'&&<section className="panel refutation-panel" aria-label="Confutazione"><span className="eyebrow">IMPARA DAL TENTATIVO</span><h3>Difendi {refutationOrigin?.gameId===game.id?refutationOrigin.san:'la tua mossa'} contro Stockfish</h3><p className="muted">La partita parte dopo la mossa che l’esercizio ha rifiutato. Stockfish gioca a piena forza: la sua prima risposta è di solito ciò che non avevi visto. Annulla e prova altre difese per capire se il problema si può riparare.</p><small className="footnote">Partita di studio: non crea puzzle e non entra nei Progressi.</small>{refutationOrigin?.gameId===game.id&&<button className="full" disabled={busy} onClick={()=>{const origin=refutationOrigin;if(origin.kind==='puzzle'&&exercise?.id===origin.targetId)setTab('train');else void openTraining(origin.kind,origin.targetId)}}>← Torna {refutationOrigin.kind==='puzzle'?'al puzzle':'all’esercizio'}</button>}</section>}
             {game&&<MoveHistory key={game.id} game={game} ply={playPly} onPosition={showPlayPosition} onReview={analyze} reviewDisabled={!game.version||busy||botThinking||!!jobId}/>}
             <section className="panel play-setup"><span className="eyebrow">IL TUO SPARRING PARTNER</span><h2>{game?'Nuova partita':'Gioca contro Maia'}</h2><p className="muted">Mosse e imperfezioni ispirate al gioco umano.</p>
               <div className="field-label">Livello di riferimento <strong>{elo}</strong></div>
@@ -437,7 +454,7 @@ export default function App() {
           {tab==='train'&&<section className="panel puzzle-panel"><span className="eyebrow">DALLE TUE PARTITE</span><h2>{exercise?exercise.theme:'Il tuo primo esercizio'}</h2>{!exercise?<p className="empty-text">Gli esercizi nasceranno dalla revisione delle tue partite. Gioca o importa un PGN, poi avvia l'analisi.</p>:<><p className="muted">{attempt?.closed?'Confronta la posizione sulla scacchiera con la variante di riferimento.':'Muovi sulla scacchiera. Sono accettate anche alternative che mantengono la qualità della posizione.'}</p>{!attempt?.closed&&session&&<div className="row"><button disabled={busy} onClick={()=>puzzleHelp()}><span aria-hidden="true">💡</span> Chiedi un indizio</button><button disabled={busy} onClick={()=>puzzleHelp(true)}>Mostra soluzione</button></div>}{hint&&<p className="hint">{hint}</p>}{attempt?.closed&&<div className="puzzle-solution"><h3>Variante di riferimento</h3><p className="variation">{attempt.best?.san.join(' ')}</p><small>{attempt.assisted?'Esercizio con aiuto.':'Esercizio senza aiuti.'} Ripasso: {new Date(attempt.dueAt).toLocaleDateString('it-IT')}.</small></div>}</>}</section>}
           {tab==='train'&&exercise&&<ExerciseSource title={exercise.gameTitle} createdAt={exercise.gameCreatedAt} fen={exercise.fen} disabled={busy} onReview={()=>void openGame(exercise.gameId,exercise.ply)}/>}
           {tab==='train'&&dueExercises.length>0&&<section className="panel"><div className="section-head"><h3>Da ripassare</h3><span className="count-chip">{profile?.due??dueExercises.length}</span></div><div className="exercise-list">{dueExercises.map(ex=><button key={ex.id} className={exercise?.id===ex.id?'exercise-link chosen':'exercise-link'} disabled={busy} onClick={()=>pickExercise(ex)}><span>{ex.theme}</span><small>Mossa {Math.floor(ex.ply/2)+1} · {new Date(ex.dueAt).getTime()<=Date.now()?'da ripassare':'programmato'}</small></button>)}</div><InfoNote summary="Quando un puzzle esce dalla lista">Escono dalla lista solo i puzzle risolti al primo tentativo senza aiuti; torneranno alla scadenza del ripasso.</InfoNote></section>}
-          {tab==='train'&&exercise&&<MistakeHistory key={exercise.id} kind="puzzle" targetId={exercise.id} revision={session?.version??0}/>}
+          {tab==='train'&&exercise&&<MistakeHistory key={exercise.id} kind="puzzle" targetId={exercise.id} revision={session?.version??0} onPlay={m=>void playMistake('puzzle',exercise.id,m)}/>}
           {tab==='train'&&<section className="panel"><ThinkingGuide/>{attempt?.closed&&<ChessInsights insight={attempt.insight} compact/>}</section>}
         </aside>
       </div>}

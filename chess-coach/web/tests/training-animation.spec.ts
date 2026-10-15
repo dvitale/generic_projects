@@ -85,5 +85,7 @@ test('comparison replays why Qh2 is mate after Qb1 but only check after Rg1',asy
   await comparison.getByRole('button',{name:'Alternativa Stockfish',exact:true}).click()
   await expect(comparison.getByText('Prima della scelta',{exact:true})).toBeVisible()
   await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
-  await page.getByRole('button',{name:'Nascondi spiegazione'}).click();await page.getByRole('button',{name:'Spiega motivo',exact:true}).click();expect(calls).toBe(1)
+  // On a phone the explanation is a bottom sheet over the page: it closes from its own button.
+  await page.getByRole('button',{name:'Chiudi spiegazione'}).click();await expect(page.getByRole('dialog',{name:'Perché Qb1 non va'})).toHaveCount(0)
+  await page.getByRole('button',{name:'Spiega motivo',exact:true}).click();await expect(page.getByRole('dialog',{name:'Perché Qb1 non va'})).toBeVisible();expect(calls).toBe(1)
 })

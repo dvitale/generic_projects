@@ -52,7 +52,7 @@ Maia3 è basato su Transformer/Chessformer. Il riferimento iniziale a una CNN ri
 ### Puzzle
 
 - Generazione dalle posizioni critiche delle proprie partite, senza soluzione nell'elenco iniziale degli esercizi.
-- Nuova valutazione della mossa scelta: accettate alternative con perdita entro 50 centesimi di pedone, a budget limitato. È una regola del prototipo, non quella dichiarata del sito Maia.
+- Nuova valutazione della mossa scelta: accettate alternative che perdono meno di 70 centesimi di pedone rispetto alla migliore mossa di Stockfish, a budget limitato (`PUZZLE_TOLERANCE_CP` in `backend/mistakes.py`). È una regola del prototipo, non quella dichiarata del sito Maia.
 - Nessuna soluzione mostrata automaticamente dopo un errore; sono possibili altri tentativi, indizio generale e richiesta esplicita della soluzione.
 - Sessione persistente e versione del tentativo per evitare doppie registrazioni.
 - Primo tentativo senza aiuti distinto da tentativi successivi, sessioni assistite e pratica anticipata.

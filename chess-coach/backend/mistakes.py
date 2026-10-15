@@ -26,6 +26,10 @@ def init_schema(con):
     ''')
 
 
+# A puzzle move is rejected when it gives up 0.70 or more against Stockfish's best move.
+PUZZLE_TOLERANCE_CP = 70
+
+
 def record(con, kind, target_id, attempt_id, board, move, best, actual, timestamp):
     # Mate scores are not pawn values: never turn engine mate sentinels into a loss.
     loss = max(0, best['cp'] - actual['cp']) if best['mate'] is None and actual['mate'] is None else None
@@ -33,7 +37,7 @@ def record(con, kind, target_id, attempt_id, board, move, best, actual, timestam
                 'move': move.uci(), 'san': board.san(move), 'best': best, 'actual': actual,
                 'lossCp': loss, 'engine': evaluator.name,
                 'criterion': 'Mantieni almeno −1,00, senza matto contro di te.' if kind == 'prevention'
-                else 'Perdi al massimo 0,50 rispetto alla migliore mossa.'}
+                else 'Perdi meno di 0,70 rispetto alla migliore mossa di Stockfish.'}
     con.execute('''INSERT INTO training_mistakes(kind,target_id,attempt_id,created_at,evidence)
                    VALUES(?,?,?,?,?)''', (kind, target_id, attempt_id, timestamp, json.dumps(evidence)))
 
@@ -78,7 +82,7 @@ def verified_context(evidence, kind):
     if move not in board.legal_moves:
         raise HTTPException(409, 'Tentativo salvato non legale per questa posizione.')
     best, actual, loss = evaluator.compare(board, move, nodes=320000)
-    accepted = loss <= 50 if kind == 'puzzle' else (
+    accepted = loss < PUZZLE_TOLERANCE_CP if kind == 'puzzle' else (
         actual['mate'] > 0 if actual['mate'] is not None else actual['cp'] >= -100)
     context = context_for({**evidence, 'best': best, 'actual': actual,
                           'lossCp': loss if best['mate'] is None and actual['mate'] is None else None})

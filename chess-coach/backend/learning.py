@@ -60,7 +60,7 @@ def game_quality(con, row):
 
 def records(con):
     for row in con.execute('''SELECT g.*, COALESCE(d.start_ply,0) AS start_ply FROM games g
-        LEFT JOIN drill_sessions d ON d.game_id=g.id WHERE g.analysis IS NOT NULL AND g.source!='snapshot'
+        LEFT JOIN drill_sessions d ON d.game_id=g.id WHERE g.analysis IS NOT NULL AND g.source NOT IN ('snapshot','stockfish')
         ORDER BY g.created_at DESC,g.id DESC'''):
         items = decisions(row, row['start_ply'])
         if items:
