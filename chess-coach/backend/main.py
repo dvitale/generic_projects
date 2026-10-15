@@ -92,7 +92,7 @@ def init_db():
         if 'revision' not in {r[1] for r in con.execute('PRAGMA table_info(games)')}:
             con.execute('ALTER TABLE games ADD COLUMN revision INTEGER NOT NULL DEFAULT 0')
         columns = {r[1] for r in con.execute('PRAGMA table_info(games)')}
-        for name, declaration in {'move_times': "TEXT NOT NULL DEFAULT '[]'", 'pgn_headers': "TEXT NOT NULL DEFAULT '{}'", 'termination': 'TEXT'}.items():
+        for name, declaration in {'move_times': "TEXT NOT NULL DEFAULT '[]'", 'pgn_headers': "TEXT NOT NULL DEFAULT '{}'", 'termination': 'TEXT', 'assisted_plies': "TEXT NOT NULL DEFAULT '[]'"}.items():
             if name not in columns:
                 con.execute(f'ALTER TABLE games ADD COLUMN {name} {declaration}')
         columns = {r[1] for r in con.execute("PRAGMA table_info(attempts)")}
@@ -219,6 +219,17 @@ def find_game(con, game_id):
     return row
 
 
+def game_result(row, board, stored_headers=None):
+    """PGN result: board outcome, then resignation, then the imported header."""
+    if row['termination'] == 'resign':
+        return '0-1' if row['player_color'] == 'w' else '1-0'
+    outcome = board.outcome(claim_draw=True)
+    if outcome:
+        return outcome.result()
+    headers = json.loads(row['pgn_headers']) if stored_headers is None else stored_headers
+    return headers.get('Result', '*')
+
+
 def game_pgn(row, include_times=True):
     moves = json.loads(row["moves"])
     board = reconstruct(row["initial_fen"], moves)
@@ -233,10 +244,8 @@ def game_pgn(row, include_times=True):
         pgn.headers['Black'] = f"Maia {row['elo']}" if row['player_color'] == 'w' else 'Tu'
         pgn.headers['TimeControl'] = '-'  # Free play, without a countdown clock.
     pgn.headers['GameId'] = row['id']
-    outcome = board.outcome(claim_draw=True)
-    pgn.headers['Result'] = outcome.result() if outcome else stored_headers.get('Result', '*')
+    pgn.headers['Result'] = game_result(row, board, stored_headers)
     if row['termination'] == 'resign':
-        pgn.headers['Result'] = '0-1' if row['player_color'] == 'w' else '1-0'
         pgn.headers['Termination'] = 'normal'
         pgn.headers['Resignation'] = 'White' if row['player_color'] == 'w' else 'Black'
     if include_times:
@@ -276,6 +285,8 @@ def game_view(row):
             "rating": json.loads(rating['response']) if rating else None, "analysisJobId": analysis_job,
             "elo": row["elo"], "title": row["title"], "pgn": str(pgn),
             "timedMoves": sum(bool(t) for t in json.loads(row['move_times'])),
+            "assistedPlies": json.loads(row['assisted_plies']),
+            "moveTimes": [t.get('emt') if t else None for t in json.loads(row['move_times'])],
             "turn": "w" if board.turn else "b", "legalMoves": [m.uci() for m in board.legal_moves],
             "result": pgn.headers['Result'] if pgn.headers['Result'] != '*' else None, "source": row["source"], "drill": drill,
             "analysis": insights.enrich(json.loads(row["analysis"])) if row["analysis"] and row["analysis_version"] == len(moves) else None}
@@ -300,9 +311,19 @@ def new_game(body: NewGame):
 @app.get("/api/games")
 def games():
     with database() as con:
-        rows = con.execute("SELECT * FROM games ORDER BY created_at DESC LIMIT 50").fetchall()
-        return [{"id": r["id"], "title": r["title"], "createdAt": r["created_at"],
-                 "plies": len(json.loads(r["moves"])), "source": r["source"]} for r in rows]
+        rows = con.execute("""SELECT g.*, COALESCE(d.start_ply,0) AS start_ply FROM games g
+                              LEFT JOIN drill_sessions d ON d.game_id=g.id ORDER BY g.created_at DESC LIMIT 50""").fetchall()
+    result = []
+    for r in rows:
+        moves = json.loads(r["moves"])
+        board = reconstruct(r["initial_fen"], moves)
+        outcome = game_result(r, board)
+        analyzed = bool(r["analysis"]) and r["analysis_version"] == len(moves)
+        result.append({"id": r["id"], "title": r["title"], "createdAt": r["created_at"],
+                       "plies": len(moves), "source": r["source"], "playerColor": r["player_color"], "elo": r["elo"],
+                       "result": None if outcome == '*' else outcome, "fen": board.fen(),
+                       "quality": learning.quality(learning.decisions(r, r["start_ply"])) if analyzed else None})
+    return result
 
 
 @app.get("/api/games/{game_id}")
@@ -392,7 +413,7 @@ def preserve_review(con, row, session):
         VALUES(?,?,?,?,?,?,?,?,?,?,?)''',
         (archive_id, row['initial_fen'], row['moves'], row['player_color'], row['elo'],
          row['title'] + ' · prima dell’annullamento', now(), row['analysis'], row['analysis_version'], 'snapshot', row['revision']))
-    con.execute('UPDATE games SET move_times=?,pgn_headers=? WHERE id=?', (row['move_times'], row['pgn_headers'], archive_id))
+    con.execute('UPDATE games SET move_times=?,pgn_headers=?,assisted_plies=? WHERE id=?', (row['move_times'], row['pgn_headers'], row['assisted_plies'], archive_id))
     if session:
         con.execute('INSERT INTO drill_sessions VALUES(?,?,?,?,?,?,?)',
                     (archive_id, session['template_id'], session['template_name'], session['theme'], session['goal'], session['start_ply'], session['target']))
@@ -402,6 +423,33 @@ def preserve_review(con, row, session):
     con.execute('UPDATE game_ratings SET game_id=? WHERE game_id=?', (archive_id, row['id']))
     con.execute('UPDATE prevention_positions SET game_id=? WHERE game_id=?', (archive_id, row['id']))
     con.execute('UPDATE position_judgments SET game_id=? WHERE game_id=?', (archive_id, row['id']))
+
+
+def suggestion_position(con, game_id, body):
+    row = find_game(con, game_id)
+    if row['source'] not in {'maia', 'drill'} or row['termination']:
+        raise HTTPException(409, 'Suggerimenti disponibili solo durante una partita in corso')
+    moves = json.loads(row['moves'])
+    if len(moves) != body.version or row['revision'] != body.revision:
+        raise HTTPException(409, 'La posizione è cambiata: ricarica la partita')
+    board = reconstruct(row['initial_fen'], moves)
+    if board.is_game_over(claim_draw=True) or board.turn != (row['player_color'] == 'w'):
+        raise HTTPException(409, 'Il suggerimento è disponibile quando tocca a te')
+    return row, board
+
+
+@app.post('/api/games/{game_id}/suggestion')
+def suggest_move(game_id: str, body: UndoInput):
+    with database() as con:
+        _, board = suggestion_position(con, game_id, body)
+    # Search outside the transaction; the position is checked again before recording the help.
+    best = evaluator.evaluate(board, nodes=60000)
+    with database() as con:
+        con.execute('BEGIN IMMEDIATE')
+        row, _ = suggestion_position(con, game_id, body)
+        assisted = sorted(set(json.loads(row['assisted_plies'])) | {body.version})
+        con.execute('UPDATE games SET assisted_plies=? WHERE id=?', (json.dumps(assisted), game_id))
+    return {'stockfish': best, 'ply': body.version, 'assistedPlies': assisted}
 
 
 @app.post('/api/games/{game_id}/undo')
@@ -418,8 +466,9 @@ def undo_move(game_id: str, body: UndoInput):
         if row['revision'] != body.revision or len(moves) not in {body.version, body.version + 1} or ply is None or ply >= body.version:
             raise HTTPException(409, 'Nessuna mossa da annullare in questa posizione: ricarica la partita')
         preserve_review(con, row, session)
-        con.execute('UPDATE games SET moves=?,move_times=?,revision=revision+1,analysis=NULL,analysis_version=NULL WHERE id=?',
-                    (json.dumps(moves[:ply]), json.dumps(json.loads(row['move_times'])[:ply]), game_id))
+        con.execute('UPDATE games SET moves=?,move_times=?,assisted_plies=?,revision=revision+1,analysis=NULL,analysis_version=NULL WHERE id=?',
+                    (json.dumps(moves[:ply]), json.dumps(json.loads(row['move_times'])[:ply]),
+                     json.dumps([p for p in json.loads(row['assisted_plies']) if p < ply]), game_id))
         con.execute('DELETE FROM game_ratings WHERE game_id=?', (game_id,))
     return get_game(game_id)
 
@@ -744,7 +793,8 @@ def reveal(exercise_id: str, body: SessionInput):
 def drill_catalog():
     with database() as con:
         history = [json.loads(r[0]) for r in con.execute("SELECT moves FROM games WHERE source IN ('maia','pgn')")]
-        personal = con.execute("SELECT * FROM exercises ORDER BY due_at,loss DESC LIMIT 10").fetchall()
+        personal = con.execute("""SELECT e.*, g.title AS game_title FROM exercises e JOIN games g ON g.id=e.game_id
+                                  ORDER BY e.due_at,e.loss DESC LIMIT 10""").fetchall()
     result = []
     for template in CATALOG:
         _, moves, fen = materialize(template)
@@ -755,7 +805,8 @@ def drill_catalog():
         board = reconstruct(ex["initial_fen"], json.loads(ex["history"]))
         result.insert(0, {"id": "personal:" + ex["id"], "name": "Riparti da una tua decisione", "kind": "personal",
                           "theme": ex["theme"], "goal": "Trova una buona mossa e continua il piano contro Maia.",
-                          "fen": board.fen(), "color": "w" if board.turn else "b", "reason": "Da un momento critico di una tua partita analizzata."})
+                          "fen": board.fen(), "color": "w" if board.turn else "b", "reason": "Da un momento critico di una tua partita analizzata.",
+                          "source": f"{ex['game_title']} · mossa {board.fullmove_number}"})
     return result
 
 
@@ -800,9 +851,9 @@ def profile():
                 kind=(saved if saved and saved.get('version')==insights.VERSION else insights.compare(d['fen'],d['played'],d['best'],d['actual']))['kind']
                 if kind in domains:domains[kind]+=1
     return {"games": game_count, "attempts": attempts_count, "independentAttempts": independent, "unaidedSuccesses": unaided, "due": due,
-            "themes": themes, "domains": [{'kind':key,'label':insights.LABELS[key],'examples':value} for key,value in domains.items()], "confidence": "Osservazioni iniziali",
-            "plan": [{"title": "Ripassa le tue decisioni", "minutes": 5, "description": f"{due} esercizi pronti per il ripasso."},
-                     {"title": "Un drill e una partita consapevole", "minutes": 15, "description": "Riparti da una tua decisione critica contro Maia, poi applica il metodo nel gioco libero."},
+            "themes": themes, "domains": [{'kind':key,'label':insights.LABELS[key],'examples':value} for key,value in domains.items()], "confidence": "Dati raccolti finora",
+            "plan": [{"title": "Ripassa i puzzle in scadenza", "minutes": 5, "description": f"{due} esercizi pronti per il ripasso."},
+                     {"title": "Un drill e una partita", "minutes": 15, "description": "Gioca un drill da una tua posizione critica, poi una partita contro Maia controllando scacchi, catture e minacce a ogni mossa."},
                      {"title": "Rivedi un momento critico", "minutes": 5, "description": "Confronta la tua scelta con una variante verificata da Stockfish."}]}
 
 

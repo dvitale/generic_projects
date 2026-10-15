@@ -27,7 +27,7 @@ test('training guide opens in a popup, navigates chapters and downloads offline 
   const appReady=guide.waitForEvent('popup')
   await guide.getByRole('link',{name:'importa i PGN Maia',exact:true}).click()
   const app=await appReady
-  await expect(app.getByRole('heading',{name:'Il tuo allenamento di oggi.'})).toBeVisible()
+  await expect(app.getByRole('heading',{name:'Allenamento di oggi',level:1})).toBeVisible()
   await expect(app.getByRole('region',{name:'Importazione partite'})).toBeVisible()
   await expect.poll(async()=>app.evaluate(()=>localStorage.getItem('chess-coach-game'))).toBe(savedGame.id)
   await app.close()

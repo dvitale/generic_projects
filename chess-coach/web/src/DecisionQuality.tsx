@@ -14,7 +14,7 @@ export function QualityNumbers({data,onMistakes,expanded=false}:{data:Quality;on
     <div><strong>{data.advantages?`${data.maintained} / ${data.advantages}`:'—'}</strong><span>decisioni che conservano il vantaggio</span></div>
   </div>
 }
-export const qualityMethod='Solo le tue decisioni non obbligate; nei drill escludiamo la sequenza iniziale. Imprecisione: perdita da 0,80 a meno di 1,80 punti; errore rilevante: almeno 1,80. Vantaggio conservato: almeno +1,50 prima e dopo la tua mossa, dalla tua prospettiva. Sono soglie operative, non punti Elo o pezzi necessariamente persi.'
+export const qualityMethod='Solo le tue decisioni non obbligate; nei drill escludiamo la sequenza iniziale e ovunque le mosse giocate dopo un suggerimento. Imprecisione: perdita da 0,80 a meno di 1,80 punti; errore rilevante: almeno 1,80. Vantaggio conservato: almeno +1,50 prima e dopo la tua mossa, dalla tua prospettiva. Sono soglie operative, non punti Elo o pezzi necessariamente persi.'
 export default function DecisionQuality({game,onPosition,onAnalyze,disabled}:{game:Game;onPosition:(ply:number)=>void;onAnalyze:()=>void;disabled:boolean}){
   const [data,setData]=useState<Summary|null>(null),[error,setError]=useState('')
   const [expanded,setExpanded]=useState(false)
@@ -22,7 +22,7 @@ export default function DecisionQuality({game,onPosition,onAnalyze,disabled}:{ga
   useEffect(()=>{let stale=false;setData(null);setError('');setExpanded(false);setFilter('all');api<Summary>(`/games/${game.id}/decision-quality`).then(d=>{if(!stale)setData(d)}).catch(e=>{if(!stale)setError(e.message)});return()=>{stale=true}},[game.id,game.version,game.revision,game.analysis?.createdAt])
   const flagged=(data?.flagged??[]).filter(m=>filter==='all'||m.kind===filter)
   return <section className="panel" aria-label="Qualità delle decisioni">
-    <span className="eyebrow">LE TUE DECISIONI</span><h2>Cosa hai mantenuto, cosa rivedere</h2>
+    <span className="eyebrow">LE TUE DECISIONI</span><h2>Qualità delle tue mosse</h2>
     {game.result&&<p><strong>{game.result==='1/2-1/2'?'Partita patta':game.result===(game.playerColor==='w'?'1-0':'0-1')?'Hai vinto':'Hai perso'} · {game.result}</strong></p>}
     {error?<p role="alert">{error}</p>:!data?<p role="status">Raccolta delle decisioni…</p>:!data.ready?<><p>Completa l’analisi Stockfish per vedere la qualità delle tue scelte.</p><button disabled={disabled} onClick={onAnalyze}>{disabled?'Analisi in corso…':'Analizza le decisioni'}</button></>:<>
       <QualityNumbers data={data} onMistakes={()=>setExpanded(v=>!v)} expanded={expanded}/>

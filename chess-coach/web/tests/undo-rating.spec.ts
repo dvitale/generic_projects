@@ -97,7 +97,7 @@ test('Real Maia Elo comparison is persisted, reloadable and handles too few deci
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
   await page.screenshot({path:'test-results/elo-mobile.png',fullPage:true})
   await request.post('/api/import',{data:{pgn:'[White "ShortTest"]\n\n1. d4 d5 *'}})
-  await page.getByRole('button',{name:'Partite',exact:true}).click()
+  await page.getByRole('button',{name:'Altro',exact:true}).click();await page.getByRole('button',{name:'Partite',exact:true}).click()
   await page.locator('.game-list button').filter({hasText:'ShortTest'}).click()
   await page.getByRole('tab',{name:'Decisioni',exact:true}).click()
   if(!await panel.isVisible())await page.getByText('Somiglianza con Maia · facoltativa',{exact:true}).click()

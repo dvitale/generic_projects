@@ -1,3 +1,4 @@
+import InfoNote from './InfoNote'
 import {useEffect,useRef,useState} from 'react'
 import {Chess} from 'chess.js'
 import Board from './Board'
@@ -69,9 +70,9 @@ export default function BlunderPrevention({onArchive,onReview,startPositionId,on
     {error&&<div className="alert" role="alert">{error}<button disabled={busy} onClick={()=>position?void open(position):void refresh().catch(e=>setError(e.message))}>Riprova</button></div>}
     {notice&&<div className="notice" role="status">{notice}</div>}
     <div className="prevention-summary"><span><strong>{catalog?.positions.length??'—'}</strong> tue posizioni</span><span><strong>{catalog?.stats.firstSuccesses??0} / {catalog?.stats.firstAttempts??0}</strong> primi tentativi riusciti senza aiuti</span><span>{done.length} completate o escluse in questa sessione</span></div>
-    {!position?<section className="panel prevention-intro"><span className="eyebrow">UNA SCELTA SICURA</span><h2>Riconosci il pericolo prima di muovere.</h2><p>Ritrova una posizione in cui hai commesso un blunder. Puoi scegliere qualsiasi mossa che mantenga la partita difendibile: non devi indovinare la prima scelta del motore.</p>
+    {!position?<section className="panel prevention-intro"><span className="eyebrow">COME FUNZIONA</span><h2>Evita di nuovo lo stesso blunder</h2><p>Ti riproponiamo la posizione prima del tuo errore. Va bene qualsiasi mossa che mantenga la partita difendibile, non serve trovare la prima scelta del motore.</p>
       {!catalog?<p role="status">Caricamento delle tue posizioni…</p>:remaining.length?<button className="primary" disabled={busy} onClick={next}>Inizia Blunder prevention →</button>:<><p>{catalog.positions.length?'Hai completato tutte le posizioni disponibili in questa sessione.':'Nessun blunder evitabile disponibile. Gioca o importa una partita, seleziona il tuo colore e avvia Analizza partita: le posizioni adatte appariranno qui.'}</p>{catalog.positions.length>0&&<button onClick={()=>{setDone([]);void open(catalog.positions[0])}}>Ripeti come pratica</button>}<button onClick={onArchive}>Apri le tue partite</button></>}
-      <p className="footnote">{catalog?.rule.description} Le posizioni già perse prima dell’errore vengono escluse. Il primo accesso include una verifica Stockfish approfondita.</p></section>:<div className="training-layout layout-prevention">
+      <InfoNote summary="Quali mosse sono accettate"><p>{catalog?.rule.description} Le posizioni già perse prima dell’errore vengono escluse. Il primo accesso include una verifica Stockfish approfondita.</p></InfoNote></section>:<div className="training-layout layout-prevention">
       <section className="board-column">
         <section className={`puzzle-feedback ${result?.success?'solved':result&&!result.closed?'retry':''}`} aria-label="Esito Blunder prevention">
           <div role="status" aria-live="polite"><h3>{motion.message?'↻ Mossa da migliorare':busy?session?'Verifica della mossa…':'Verifica della posizione…':result?.success?'✓ Blunder evitato!':result?.closed?'Una mossa sicura':result?'↻ Riprova una mossa diversa':'Evita il blunder'}</h3><p>{motion.message|| (busy?'Stockfish sta controllando la posizione.':result?.message||'Cerca una mossa sicura. Più alternative possono essere corrette.')}</p></div>
@@ -85,7 +86,7 @@ export default function BlunderPrevention({onArchive,onReview,startPositionId,on
       <aside className="coach-column">
         <ExerciseSource title={position.title} createdAt={position.gameCreatedAt} fen={position.fen} disabled={busy} onReview={()=>onReview(position.gameId,position.ply)}/>
         <section className="panel"><ThinkingGuide/><p className="footnote">La mossa può perdere per una tattica o compromettere una posizione difendibile. Stockfish decide l’esito; la spiegazione distingue fatti e ipotesi.</p></section>
-        <section className="panel"><span className="eyebrow">PRIMA DI MUOVERE</span><h2>Controlla entrambi i colori.</h2><ol><li>Il re è al sicuro?</li><li>Quali pezzi sono attaccati o indifesi?</li><li>Quali scacchi e catture avrà l’avversario?</li></ol><p className="muted">Una mossa semplice che evita la perdita è sufficiente.</p>
+        <section className="panel"><span className="eyebrow">PRIMA DI MUOVERE</span><h2>Tre controlli</h2><ol><li>Il re è al sicuro?</li><li>Quali pezzi sono attaccati o indifesi?</li><li>Quali scacchi e catture avrà l’avversario?</li></ol><p className="muted">Una mossa semplice che evita la perdita è sufficiente.</p>
           {!result?.closed&&<div className="row"><button disabled={busy||!session} onClick={()=>void submit()}>Mostra una mossa sicura</button><button disabled={busy||!remaining.length} onClick={()=>{setDone(d=>[...d,position.id]);next()}}>Salta posizione</button></div>}
           <p className="footnote">{catalog?.rule.description} I valori sono dal tuo punto di vista e sono stime del motore.</p>
           {session?.exposure==='practice'&&<p className="footnote">Ripetizione anticipata: utile per esercitarti, non aumenta i successi indipendenti.</p>}

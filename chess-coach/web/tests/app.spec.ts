@@ -19,7 +19,7 @@ test('Real Maia play, black orientation, drill and mobile layout',async({page,re
   const id=await page.evaluate(()=>localStorage.getItem('chess-coach-game'))
   await expect.poll(async()=>(await (await request.get('/api/games/'+id)).json()).version).toBe(2)
   expect(maiaRequestAt-humanResponseAt).toBeGreaterThanOrEqual(1150)
-  await page.locator('.coach-column select').selectOption('b')
+  await page.getByRole('group',{name:'Il tuo colore'}).getByRole('button',{name:'Nero'}).click()
   page.once('dialog',dialog=>dialog.dismiss())
   await page.getByRole('button',{name:'Nuova partita'}).click()
   expect(await page.evaluate(()=>localStorage.getItem('chess-coach-game'))).toBe(id)

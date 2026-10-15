@@ -1,6 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { Chess, type Square } from 'chess.js'
 import type { Color } from './types'
+import {useBoardSettings} from './boardSettings'
+import {playMoveSound} from './sound'
+import {moveClassInfo,type MoveClass} from './moveClass'
 
 const symbols: Record<string, string> = {wk:'♚',wq:'♛',wr:'♜',wb:'♝',wn:'♞',wp:'♟',bk:'♚',bq:'♛',br:'♜',bb:'♝',bn:'♞',bp:'♟'}
 const names: Record<string, string> = {k:'re',q:'donna',r:'torre',b:'alfiere',n:'cavallo',p:'pedone'}
@@ -13,32 +16,44 @@ function squareCenter(square:string,orientation:Color){
     const file=square.charCodeAt(0)-97,rank=Number(square[1])-1
     return [(orientation==='w'?file:7-file)*100+50,(orientation==='w'?7-rank:rank)*100+50]
 }
-function BoardAnnotation({from,to,orientation,preview=false,automatic=false}:Annotation&{orientation:Color;preview?:boolean;automatic?:boolean}) {
+// Arrow geometry and brushes follow chessground, the board used by maiachess.com:
+// widths in 64ths of a square, round caps, marker heads, a 60% shapes layer.
+type Brush={key:string;color:string;opacity:number;width:number}
+const brushes:Record<string,Brush>={
+  annotation:{key:'g',color:'#15781B',opacity:1,width:10},
+  stockfish:{key:'b',color:'#003088',opacity:1,width:8},
+  maia:{key:'r',color:'#882020',opacity:1,width:10},
+  playedOutline:{key:'po',color:'#4A8FB3',opacity:.95,width:11},
+  played:{key:'pw',color:'#FFFFFF',opacity:.98,width:8},
+}
+const unit=100/64
+function ArrowMarkers(){
+  return <defs>{Object.values(brushes).map(b=><marker key={b.key} id={'arrowhead-'+b.key} orient="auto" markerWidth="4" markerHeight="8" refX="2.05" refY="2.01"><path d="M0,0 V4 L3,2 Z" fill={b.color}/></marker>)}</defs>
+}
+function BoardAnnotation({from,to,orientation,brush=brushes.annotation,extra=0,shorten=false,preview=false,automatic=false}:Annotation&{orientation:Color;brush?:Brush;extra?:number;shorten?:boolean;preview?:boolean;automatic?:boolean}) {
   const [x1,y1]=squareCenter(from,orientation),[x2,y2]=squareCenter(to,orientation)
-  const attributes={'data-from':from,'data-to':to,className:automatic?'analysis-arrow-shape':preview?'annotation-preview':'board-annotation'}
-  if(from===to)return <circle {...attributes} cx={x1} cy={y1} r="36" fill="none" stroke="currentColor" strokeWidth="9"/>
+  const attributes={'data-from':from,'data-to':to,className:automatic?'analysis-arrow-shape':preview?'annotation-preview':'board-annotation',opacity:brush.opacity*(preview?.9:1)}
+  if(from===to)return <circle {...attributes} cx={x1} cy={y1} r={50-(preview?3:4)*unit/2} fill="none" stroke={brush.color} strokeWidth={(preview?3:4)*unit}/>
+  const margin=(shorten&&!preview?20:10)*unit
+  const stroke={stroke:brush.color,strokeWidth:(brush.width+extra)*unit*(preview?.85:1),strokeLinecap:'round' as const,markerEnd:`url(#arrowhead-${brush.key})`}
   const horizontal=Math.abs(x2-x1),vertical=Math.abs(y2-y1)
   if((horizontal===100&&vertical===200)||(horizontal===200&&vertical===100)){
-    // Follow the two-square leg first, then turn toward the destination.
+    // Knight: follow the two-square leg first, then turn toward the destination.
     const bendX=horizontal===200?x2:x1,bendY=vertical===200?y2:y1
-    const dx=(x2-bendX)/100,dy=(y2-bendY)/100
-    const baseX=x2-dx*30,baseY=y2-dy*30
-    return <g {...attributes}>
-      <path d={`M ${x1} ${y1} L ${bendX} ${bendY} L ${baseX} ${baseY}`} fill="none" stroke="currentColor" strokeWidth="16" strokeLinejoin="round"/>
-      <polygon points={`${baseX-dy*24},${baseY+dx*24} ${x2},${y2} ${baseX+dy*24},${baseY-dx*24}`} fill="currentColor"/>
-    </g>
+    const dx=Math.sign(x2-bendX),dy=Math.sign(y2-bendY)
+    return <path {...attributes} d={`M ${x1} ${y1} L ${bendX} ${bendY} L ${x2-dx*margin} ${y2-dy*margin}`} fill="none" strokeLinejoin="miter" strokeMiterlimit={4} {...stroke}/>
   }
-  const length=Math.hypot(x2-x1,y2-y1),dx=(x2-x1)/length,dy=(y2-y1)/length
-  const baseX=x2-dx*30,baseY=y2-dy*30
-  const points=[[x1-dy*8,y1+dx*8],[baseX-dy*8,baseY+dx*8],[baseX-dy*24,baseY+dx*24],[x2,y2],[baseX+dy*24,baseY-dx*24],[baseX+dy*8,baseY-dx*8],[x1+dy*8,y1-dx*8]]
-  return <polygon {...attributes} points={points.map(p=>p.join(',')).join(' ')} fill="currentColor"/>
+  const angle=Math.atan2(y2-y1,x2-x1)
+  return <line {...attributes} x1={x1} y1={y1} x2={x2-Math.cos(angle)*margin} y2={y2-Math.sin(angle)*margin}
+    {...stroke}/>
 }
 function Piece({code}:{code:string}) {
   const [missing,setMissing]=useState(false)
   return missing?<span aria-hidden="true" className={`piece ${code[0]==='w'?'white-piece':'black-piece'}`}>{symbols[code]}</span>:
     <img className="piece-image" src={`/pieces/neo/${code}.png`} alt="" aria-hidden="true" draggable={false} onError={()=>setMissing(true)}/>
 }
-export default function Board({fen, orientation, interactive, legalMoves, onMove, lastMove, animateMove=false,reverseMove=false,analysisArrows=[]}: {fen:string; orientation:Color; interactive:boolean; legalMoves:string[]; onMove:(uci:string)=>void; lastMove?:string;animateMove?:boolean;reverseMove?:boolean;analysisArrows?:AnalysisArrow[]}) {
+export default function Board({fen, orientation, interactive, legalMoves, onMove, lastMove, animateMove=false,reverseMove=false,analysisArrows=[],badge}: {fen:string; orientation:Color; interactive:boolean; legalMoves:string[]; onMove:(uci:string)=>void; lastMove?:string;animateMove?:boolean;reverseMove?:boolean;analysisArrows?:AnalysisArrow[];badge?:{square:string;kind:MoveClass}}) {
+  const {theme}=useBoardSettings()
   const [selected, setSelected] = useState<string | null>(null)
   const [promotion, setPromotion] = useState<string[]>([])
   const [drag, setDrag] = useState<{from:string;code:string;x:number;y:number;size:number}|null>(null)
@@ -78,7 +93,7 @@ export default function Board({fen, orientation, interactive, legalMoves, onMove
   useLayoutEffect(()=>{
     const previous=previousFen.current
     previousFen.current=fen
-    if(previous===fen||!animateMove||!lastMove||window.matchMedia('(prefers-reduced-motion: reduce)').matches)return
+    if(previous===fen||!lastMove)return
     const from=lastMove.slice(0,2),to=lastMove.slice(2,4)
     let castling=false
     try {
@@ -86,7 +101,10 @@ export default function Board({fen, orientation, interactive, legalMoves, onMove
       const moved=before.move({from,to,promotion:lastMove[4]})
       if(before.fen()!==(reverseMove?previous:fen))return
       castling=moved.isKingsideCastle()||moved.isQueensideCastle()
+      // Sound only for moves played forward, never for a puzzle resetting.
+      if(!reverseMove)playMoveSound(before.inCheck()?'check':moved.captured?'capture':'move')
     }catch{return}
+    if(!animateMove||window.matchMedia('(prefers-reduced-motion: reduce)').matches)return
     const animations:Animation[]=[]
     function slide(origin:string,destination:string){
       const start=boardElement.current?.querySelector<HTMLElement>(`[data-square="${origin}"]`)
@@ -189,7 +207,7 @@ export default function Board({fen, orientation, interactive, legalMoves, onMove
     return files[Math.floor((x-rect.left)/rect.width*8)]+ranks[Math.floor((y-rect.top)/rect.height*8)]
   }
   return <div className="board-wrap">
-    <div ref={boardElement} className="board theme-chesscom" role="group" aria-label="Scacchiera"
+    <div ref={boardElement} className={`board board-theme-${theme}`} role="group" aria-label="Scacchiera"
       onContextMenu={event=>event.preventDefault()}
       onKeyDown={event=>{if(event.key==='Escape'){cancelDrag();clearAnnotations();setPromotion([])}}}>
       {Array.from(ranks).flatMap((rank, ri) => Array.from(files).map((file, fi) => {
@@ -207,27 +225,34 @@ export default function Board({fen, orientation, interactive, legalMoves, onMove
           {ri === 7 && <span className="file-label">{file}</span>}
           {piece && <Piece key={piece.color+piece.type} code={piece.color+piece.type}/>}
           {targets.includes(square) && <span className={piece ? 'capture-ring' : 'move-dot'} aria-hidden="true"/>}
+          {badge?.square===square&&<span className={`move-badge move-class-${badge.kind}`} title={moveClassInfo[badge.kind].label} aria-hidden="true">{moveClassInfo[badge.kind].symbol}</span>}
         </button>
       }))}
       <svg className="board-annotations" viewBox="0 0 800 800" aria-hidden="true">
-        {[...analysisArrows].sort((a,b)=>b.rank-a.rank).map(arrow=>{
-          const from=arrow.move.slice(0,2),to=arrow.move.slice(2,4)
-          const [x1,y1]=squareCenter(from,orientation),[x2,y2]=squareCenter(to,orientation)
-          const length=Math.hypot(x2-x1,y2-y1)||1
-          const shared=analysisArrows.filter(a=>a.move.slice(0,4)===arrow.move.slice(0,4))
-          const lane=(shared.indexOf(arrow)-(shared.length-1)/2)*Math.min(18,42/Math.max(1,shared.length-1))
-          return <g key={arrow.source+arrow.rank+arrow.move} className={`analysis-arrow source-${arrow.source}`} data-source={arrow.source} data-rank={arrow.rank} data-move={arrow.move} transform={`translate(${-(y2-y1)/length*lane} ${(x2-x1)/length*lane})`} opacity={arrow.rank===1?1:arrow.rank===2?.7:.5}>
-            <BoardAnnotation from={from} to={to} orientation={orientation} automatic/>
-            {arrow.source!=='played'&&<text className="analysis-arrow-rank" x={x2} y={y2-30} textAnchor="middle">{arrow.rank}</text>}
-          </g>
-        })}
-        {annotations.map(a=><BoardAnnotation key={a.from+a.to} {...a} orientation={orientation}/>)}
+        <ArrowMarkers/>
+        {(()=>{
+          // Stacking order as on maiachess.com: Maia, Stockfish, then the played move on top.
+          const order={maia:0,stockfish:1,played:2}
+          const sorted=[...analysisArrows].sort((a,b)=>b.rank-a.rank||order[a.source]-order[b.source])
+          const all=[...sorted.map(a=>({from:a.move.slice(0,2),to:a.move.slice(2,4)})),...annotations]
+          return sorted.map(arrow=>{
+            const from=arrow.move.slice(0,2),to=arrow.move.slice(2,4)
+            const same=sorted.filter(a=>a.move.slice(0,4)===arrow.move.slice(0,4))
+            const extra=(same.length-same.indexOf(arrow)-1)*1.25
+            const shorten=all.some(a=>a.to===to&&a.from!==from)
+            const props={from,to,orientation,extra,shorten,automatic:true}
+            return <g key={arrow.source+arrow.rank+arrow.move} className={`analysis-arrow source-${arrow.source}`} data-source={arrow.source} data-rank={arrow.rank} data-move={arrow.move} opacity={arrow.rank===1?1:arrow.rank===2?.7:.5}>
+              {arrow.source==='played'?<><BoardAnnotation {...props} brush={brushes.playedOutline}/><BoardAnnotation {...props} brush={brushes.played}/></>:<BoardAnnotation {...props} brush={brushes[arrow.source]}/>}
+            </g>
+          })
+        })()}
+        {annotations.map(a=><BoardAnnotation key={a.from+a.to} {...a} orientation={orientation} shorten={[...annotations,...analysisArrows.map(x=>({from:x.move.slice(0,2),to:x.move.slice(2,4)}))].some(b=>b.to===a.to&&b.from!==a.from)}/>)}
         {preview&&<BoardAnnotation {...preview} orientation={orientation} preview/>}
       </svg>
     </div>
     {drag&&<div className="dragged-piece" aria-hidden="true" style={{left:drag.x,top:drag.y,width:drag.size,height:drag.size,fontSize:drag.size*.82}}><Piece code={drag.code}/></div>}
-    {promotion.length > 0 && <div className="promotion" role="dialog" aria-label="Scegli la promozione">
-      <p>Promuovi il pedone</p><div className="row">{promotion.map(move => <button key={move} onClick={() => {setPromotion([]); setSelected(null); if(interactive&&legalMoves.includes(move))onMove(move)}}>{names[move[4]]}</button>)}<button onClick={()=>{setPromotion([]);setSelected(null)}}>Annulla</button></div>
+    {promotion.length > 0 && <div className={`promotion board-theme-${theme}`} role="dialog" aria-label="Scegli la promozione">
+      <p>Promuovi il pedone</p><div className="promotion-choices">{promotion.map(move => <button key={move} className="promotion-piece" aria-label={names[move[4]]} title={names[move[4]]} onClick={() => {setPromotion([]); setSelected(null); if(interactive&&legalMoves.includes(move))onMove(move)}}><Piece code={board.turn()+move[4]}/></button>)}</div><button className="promotion-cancel" onClick={()=>{setPromotion([]);setSelected(null)}}>Annulla</button>
     </div>}
   </div>
 }

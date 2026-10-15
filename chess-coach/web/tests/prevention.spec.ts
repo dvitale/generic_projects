@@ -56,7 +56,7 @@ test('Blunder prevention accepts alternatives, rejects the original blunder and 
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
   await page.screenshot({path:'test-results/blunder-prevention-mobile.png',fullPage:true})
   await page.getByRole('button',{name:'Rivedi nella partita'}).click()
-  await expect(page.getByRole('heading',{name:'Capisci le tue scelte.'})).toBeVisible()
+  await expect(page.getByRole('heading',{name:'Rivedi la partita',level:1})).toBeVisible()
   await expect(page.locator('[data-square="g3"] img')).toBeVisible()
 })
 
@@ -66,5 +66,5 @@ test('empty catalog explains how personal positions are obtained',async({page})=
   await page.getByRole('button',{name:'Blunder prevention',exact:false}).click()
   await expect(page.getByText('Nessun blunder evitabile disponibile.',{exact:false})).toBeVisible()
   await page.getByRole('button',{name:'Apri le tue partite'}).click()
-  await expect(page.getByRole('heading',{name:'Le tue partite.',exact:true})).toBeVisible()
+  await expect(page.getByRole('heading',{name:'Partite',exact:true,level:1})).toBeVisible()
 })

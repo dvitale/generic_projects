@@ -16,6 +16,7 @@ test('Maia PGN files import once, generate exercises, and a successful review pe
   await expect(page.getByRole('region',{name:'Importazione partite'})).toContainText('2 già presenti')
   await page.getByRole('button',{name:/Importa PGN/}).click()
   await page.getByRole('button',{name:'Allenamento',exact:true}).click()
+  await page.locator('summary',{hasText:'Organizza la settimana'}).click()
   await page.getByLabel('Minuti per sessione').fill('60')
   await page.getByLabel('Posizioni nuove al giorno').fill('10')
   await page.getByRole('button',{name:'Salva piano'}).click()

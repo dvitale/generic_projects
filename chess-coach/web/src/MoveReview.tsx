@@ -23,7 +23,7 @@ export default function MoveReview({game,cursor,onPosition,level,onLevel,predict
   const best=current?.best.pv[0]
   const currentLabel=current?label(current):''
   return <section className="panel move-review" aria-label="Revisione passo passo">
-    <span className="eyebrow">UNA MOSSA ALLA VOLTA</span><h2>Revisione passo passo</h2>
+    <span className="eyebrow">CONFRONTO</span><h2>Revisione passo passo</h2>
     <ThinkingGuide/>
     <label className="field-label">Livello Maia per il confronto<select aria-label="Livello Maia per l’analisi" value={level} onChange={e=>onLevel(Number(e.target.value))}>{Array.from({length:21},(_,i)=>600+i*100).map(r=><option key={r} value={r}>{r}</option>)}</select></label>
     {!moves.length?<><p>{analyzing?'Stockfish sta preparando il confronto di tutte le mosse…':'Avvia la revisione per confrontare ogni mossa con Stockfish e Maia.'}</p><button className="primary full" disabled={analyzing||!game.version} onClick={onAnalyze}>Avvia revisione passo passo</button></>:<>

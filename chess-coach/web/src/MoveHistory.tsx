@@ -1,6 +1,7 @@
 import {useEffect,useMemo,useRef} from 'react'
 import {Chess} from 'chess.js'
 import type {Game} from './types'
+import {classifyMove,MoveClassIcon} from './moveClass'
 
 export default function MoveHistory({game,ply,onPosition,onReview,reviewDisabled}:{game:Game;ply:number;onPosition:(ply:number)=>void;onReview:()=>void;reviewDisabled:boolean}) {
   const list=useRef<HTMLDivElement>(null)
@@ -24,16 +25,17 @@ export default function MoveHistory({game,ply,onPosition,onReview,reviewDisabled
     else if(item.bottom>box.bottom)container.scrollTop+=item.bottom-box.bottom
   },[ply,game.version])
   const last=game.moves.length
+  const classes=new Map((game.analysis?.moves??[]).filter(d=>game.moves[d.ply]===d.played).map(d=>[d.ply+1,classifyMove(d)]))
   return <section className="panel move-history" aria-label="Mosse della partita" onKeyDown={event=>{
     const target=event.key==='ArrowLeft'?Math.max(0,ply-1):event.key==='ArrowRight'?Math.min(last,ply+1):event.key==='Home'?0:event.key==='End'?last:null
     if(target!==null){event.preventDefault();onPosition(target)}
   }}>
     <h2>Mosse della partita</h2>
-    <p className="muted">Seleziona una mossa per rivedere la posizione.</p>
+    <p className="muted">Seleziona una mossa per tornare a quella posizione.</p>
     <div className="move-history-list" ref={list}>
       {rows.length?rows.map(row=><div className="move-history-row" key={row.number}><span>{row.number}.</span>{(['w','b'] as const).map(color=>{
         const move=row[color]
-        return move?<button key={color} aria-label={`${row.number}${color==='w'?'.':'…'} ${move.san}`} aria-current={ply===move.ply?'step':undefined} onClick={()=>onPosition(move.ply)}>{move.san}</button>:<span key={color}>—</span>
+        return move?<button key={color} aria-label={`${row.number}${color==='w'?'.':'…'} ${move.san}`} aria-current={ply===move.ply?'step':undefined} onClick={()=>onPosition(move.ply)}>{move.san}{(()=>{const kind=classes.get(move.ply);return kind&&kind!=='good'?<MoveClassIcon kind={kind}/>:null})()}</button>:<span key={color}>—</span>
       })}</div>):<p className="empty-text">Le mosse appariranno qui.</p>}
     </div>
     <div className="review-controls" aria-label="Navigazione della partita">

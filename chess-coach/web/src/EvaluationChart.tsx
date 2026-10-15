@@ -1,3 +1,4 @@
+import InfoNote from './InfoNote'
 import {useId,useMemo,useState,type KeyboardEvent,type PointerEvent} from 'react'
 import type {Game} from './types'
 import {evaluationSeries,evaluationText,type EvaluationPoint} from './evaluationSeries'
@@ -33,7 +34,7 @@ export default function EvaluationChart({game,cursor,onPosition,analyzing,onAnal
     event.preventDefault();setHover(null);onPosition(points[target].position)
   }
   return <section className="panel evaluation-chart" aria-label="Andamento della valutazione">
-    <span className="eyebrow">LA PARTITA, MOSSA DOPO MOSSA</span><h2>Valutazione Stockfish</h2>
+    <span className="eyebrow">ANDAMENTO</span><h2>Valutazione Stockfish</h2>
     <p className="muted">Sopra lo zero è in vantaggio il Bianco; sotto, il Nero. Ogni punto mostra la posizione dopo una mossa, oltre alla posizione iniziale.</p>
     {analyzing&&<p role="status">Analisi in corso: il grafico si aggiornerà al termine.{points.length>0?' Per ora sono mostrati i risultati precedenti.':''}</p>}
     {!points.length?<><p>Analizza la partita per visualizzare la valutazione di tutte le mosse, di entrambi i colori.</p><button disabled={analyzing||!game.moves.length} onClick={onAnalyze}>Calcola andamento</button></>:<>
@@ -64,9 +65,9 @@ export default function EvaluationChart({game,cursor,onPosition,analyzing,onAnal
       <div className="chart-readout" aria-live="polite"><strong>{selected?`${selected.label} · ${evaluationText(selected)}`:'La posizione selezionata non ha una valutazione disponibile.'}</strong></div>
       {hover!==null&&preview&&<p className="chart-preview">{preview.label} · {evaluationText(preview)} — clicca per rivedere</p>}
       <label className="field-label" htmlFor={id}>Posizione sul grafico<select id={id} aria-label="Posizione sul grafico" value={selected?.position??''} onChange={e=>{setHover(null);onPosition(Number(e.target.value))}}>{!selected&&<option value="">Scegli una posizione</option>}{points.map(p=><option key={p.position} value={p.position}>{p.label} · {evaluationText(p)}</option>)}</select></label>
-      <p className="footnote">Clicca o tocca il grafico per aggiornare la scacchiera. Puoi usare anche ← →, Home e Fine. I rombi sul bordo indicano matto: non rappresentano un punteggio numerico. La scala si adatta ai valori disponibili.</p>
+      <p className="footnote">Clicca o tocca il grafico per aggiornare la scacchiera; da tastiera usa ← →, Home e Fine.</p>
       <details><summary>Tutte le valutazioni</summary><div className="evaluation-table"><table><thead><tr><th>Mossa</th><th>Valutazione · Bianco</th><th>Posizione</th></tr></thead><tbody>{points.map(p=><tr key={p.position}><td>{p.label}</td><td>{evaluationText(p)}</td><td><button onClick={()=>onPosition(p.position)} aria-label={`Rivedi ${p.label}`}>Rivedi</button></td></tr>)}</tbody></table></div></details>
-      <p className="footnote">Stima Stockfish, non Elo né materiale perso. Sono riutilizzate le valutazioni salvate per la mossa effettivamente giocata; il riferimento resta il Bianco anche quando ruoti la scacchiera.</p>
+      <InfoNote summary="Come leggere il grafico"><p>I rombi sul bordo indicano matto: non rappresentano un punteggio numerico. La scala si adatta ai valori disponibili.</p><p>Stima Stockfish, non Elo né materiale perso. Sono riutilizzate le valutazioni salvate per la mossa effettivamente giocata; il riferimento resta il Bianco anche quando ruoti la scacchiera.</p></InfoNote>
     </>}
   </section>
 }

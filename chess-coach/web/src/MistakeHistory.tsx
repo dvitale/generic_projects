@@ -1,3 +1,4 @@
+import InfoNote from './InfoNote'
 import {useEffect,useState} from 'react'
 import {api} from './api'
 import type {Evaluation} from './types'
@@ -50,7 +51,7 @@ export default function MistakeHistory({kind,targetId,revision}:{kind:'preventio
   return <section className="panel mistake-history" aria-label="Tentativi sbagliati"><span className="eyebrow">IMPARA DAI TENTATIVI</span><h3>Tentativi sbagliati ({items.length})</h3>
     {error&&<p role="alert">{error} <button onClick={()=>setRetry(n=>n+1)}>Ricarica tentativi</button></p>}
     {!items.length?<p className="muted">Qui ritroverai gli errori di questa posizione, anche nelle prossime sessioni.</p>:<>
-      <p className="footnote">Calo registrato rispetto alla migliore alternativa, dal tuo punto di vista: non equivale a materiale perso. “Spiega motivo” approfondisce la verifica Stockfish e confronta le varianti. Nei casi di matto direttamente verificabili usa le risposte legali; negli altri casi invia a DeepSeek questa posizione e le varianti da confrontare. La spiegazione può svelare una mossa migliore e viene conservata.</p>
+      <InfoNote summary="Come leggere i tentativi">Calo registrato rispetto alla migliore alternativa, dal tuo punto di vista: non equivale a materiale perso. “Spiega motivo” approfondisce la verifica Stockfish e confronta le varianti. Nei casi di matto direttamente verificabili usa le risposte legali; negli altri casi invia a DeepSeek questa posizione e le varianti da confrontare. La spiegazione può svelare una mossa migliore e viene conservata.</InfoNote>
       <ol className="mistake-list">{items.map(m=><MistakeRow key={m.id} mistake={m} path={path}/>)}</ol></>}
   </section>
 }

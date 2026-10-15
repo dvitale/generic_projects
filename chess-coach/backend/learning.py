@@ -19,9 +19,11 @@ def init_schema(con):
 def decisions(row, start=0):
     if not row['analysis'] or row['analysis_version'] != len(json.loads(row['moves'])):
         return []
+    # Moves played after a requested suggestion are help, not independent decisions.
+    assisted = set(json.loads(row['assisted_plies'])) if 'assisted_plies' in row.keys() else set()
     # Recheck perspective and scope, including legacy analyses and black-to-move FENs.
     return [d for d in json.loads(row['analysis']).get('decisions', [])
-            if d['ply'] >= start and not d.get('forced')
+            if d['ply'] >= start and not d.get('forced') and d['ply'] not in assisted
             and chess.Board(d['fen']).turn == (row['player_color'] == 'w')
             and chess.Board(d['fen']).legal_moves.count() > 1]
 

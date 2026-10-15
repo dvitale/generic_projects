@@ -1,0 +1,22 @@
+import {test,expect} from '@playwright/test'
+
+test('Move suggestion shows the first Stockfish and Maia choices and marks the turn as assisted',async({page,request})=>{
+  let game=await(await request.post('/api/games',{data:{color:'w',elo:1500}})).json()
+  for(const move of ['e2e4','e7e5'])game=await(await request.post(`/api/games/${game.id}/moves`,{data:{move,version:game.version,revision:game.revision,actor:game.turn==='w'?'human':'maia'}})).json()
+  await page.addInitScript(id=>localStorage.setItem('chess-coach-game',id),game.id)
+  await page.goto('/')
+  await page.getByRole('button',{name:'Continua partita',exact:true}).click()
+  const button=page.getByRole('button',{name:'Suggerisci mossa',exact:true})
+  await expect(button).toBeEnabled()
+  await button.click()
+  const box=page.getByRole('status',{name:'Suggerimento'})
+  await expect(box).toContainText('Stockfish:',{timeout:60000})
+  await expect(box).toContainText('Maia 1500:',{timeout:90000})
+  await expect(page.locator('.analysis-arrow[data-source="stockfish"]')).toHaveCount(1)
+  await expect(page.locator('.analysis-arrow[data-source="maia"]')).toHaveCount(1)
+  await page.screenshot({path:'test-results/suggestion.png'})
+  expect((await(await request.get('/api/games/'+game.id)).json()).assistedPlies).toEqual([2])
+  await page.locator('[data-square="g1"]').click();await page.locator('[data-square="f3"]').click()
+  await expect(box).toHaveCount(0)
+  await expect(page.locator('.analysis-arrow[data-source="stockfish"]')).toHaveCount(0)
+})
