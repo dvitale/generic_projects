@@ -20,13 +20,13 @@ export default function GameArchive({games,disabled,onOpen}:{games:Saved[];disab
   const [preview,setPreview]=useState<string|null>(null)
   const shown=games.filter(g=>filter==='all'||outcome(g)===filter)
   return <section className="archive">
-    <div className="section-head"><h2>Le tue partite</h2><span>{games.length} salvate</span></div>
+    <div className="section-head"><h2>Le tue partite</h2><div className="row">{shown.length>0&&<a className="button-link" href={`/api/games/pgn?ids=${shown.map(g=>encodeURIComponent(g.id)).join(',')}`} download title="Un unico file PGN con le partite elencate, tempi inclusi">↓ Esporta PGN ({shown.length})</a>}<span>{games.length} salvate</span></div></div>
     {games.length?<>
       <div className="segmented archive-filters" role="group" aria-label="Filtra le partite">{filters.map(f=><button key={f.id} aria-pressed={filter===f.id} onClick={()=>setFilter(f.id)}>{f.label}<small>{f.id==='all'?games.length:games.filter(g=>outcome(g)===f.id).length}</small></button>)}</div>
       <div className="game-table-head" aria-hidden="true"><span>Esito</span><span>Partita</span><span>Colore</span><span>Qualità</span><span>Mosse</span><span>Data</span></div>
       <div className="game-list">{shown.map(item=>{
         const result=outcome(item),q=item.quality
-        return <button key={item.id} onClick={()=>onOpen(item.id)} disabled={disabled} onPointerEnter={()=>setPreview(item.id)} onPointerLeave={()=>setPreview(p=>p===item.id?null:p)} onFocus={()=>setPreview(item.id)} onBlur={()=>setPreview(p=>p===item.id?null:p)}>
+        return <div className="game-row" key={item.id}><button onClick={()=>onOpen(item.id)} disabled={disabled} onPointerEnter={()=>setPreview(item.id)} onPointerLeave={()=>setPreview(p=>p===item.id?null:p)} onFocus={()=>setPreview(item.id)} onBlur={()=>setPreview(p=>p===item.id?null:p)}>
           <span className={`result-badge result-${result}`}>{outcomeLabel[result]}</span>
           <span className="game-title"><strong>{item.title}</strong><small>{item.source==='pgn'?'Importata da PGN':item.source==='drill'?'Drill':'Contro Maia'}{item.result?` · ${item.result}`:''}</small></span>
           <span className="game-color">{item.playerColor&&<><i className={`side-dot side-dot-${item.playerColor}`} aria-hidden="true"/>{item.playerColor==='w'?'Bianco':'Nero'}</>}</span>
@@ -35,7 +35,7 @@ export default function GameArchive({games,disabled,onOpen}:{games:Saved[];disab
           <span className="game-date">{new Date(item.createdAt).toLocaleDateString('it-IT',{day:'2-digit',month:'short',year:'2-digit'})}</span>
           <span className="arrow" aria-hidden="true">→</span>
           {preview===item.id&&item.fen&&<span className="game-preview"><MiniBoard fen={item.fen} orientation={item.playerColor}/></span>}
-        </button>
+        </button><a className="row-download" href={`/api/games/${encodeURIComponent(item.id)}/pgn`} download aria-label={`Esporta PGN di ${item.title}`} title="Esporta PGN (tempi inclusi)">↓ PGN</a></div>
       })}</div>
       {!shown.length&&<p className="empty-text">Nessuna partita in questa categoria.</p>}
       <p className="footnote">Qualità: quota delle tue decisioni non obbligate senza perdite rilevanti, quando l’analisi Stockfish è completa. Non è un punteggio Elo.</p>

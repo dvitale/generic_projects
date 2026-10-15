@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import Board from './Board'
+import {useBoardOrientation} from './boardFlip'
 import LichessAnalysis from './LichessAnalysis'
 import PanelTabs from './PanelTabs'
 import PgnExport from './PgnExport'
@@ -16,6 +17,7 @@ export default function Drills({onReview,startTemplateId,onStarted}:{onReview:(g
   const [view,setView]=useState('catalog')
   const [catalog,setCatalog]=useState<Template[]>([])
   const [game,setGame]=useState<Game|null>(null)
+  const boardOrientation=useBoardOrientation(game?.playerColor??'w')
   const [elo,setElo]=useState(1500)
   const [color,setColor]=useState<Color>('w')
   const [target,setTarget]=useState(5)
@@ -75,7 +77,7 @@ export default function Drills({onReview,startTemplateId,onStarted}:{onReview:(g
     {!game&&<section className="panel"><p>Scegli un drill per iniziare una sessione.</p><button onClick={()=>setView('catalog')}>Scegli un drill</button></section>}
     {game?.drill&&<div className="training-layout">
       <section className="board-column"><div className="player-row"><span className="avatar">♞</span><div><strong>{game.drill.name}</strong><small>Maia {game.elo} · {thinking?'Maia sta pensando…':game.drill.complete?'Sessione completata':game.turn===game.playerColor?'Tocca a te':'Attendi Maia'}</small></div></div>
-        <Board analysisArrows={hint.arrows} animateMove={game.turn===game.playerColor} fen={game.fen} orientation={game.playerColor} legalMoves={game.legalMoves} interactive={!busy&&!thinking&&!game.drill.complete&&game.turn===game.playerColor} onMove={move} lastMove={game.moves.at(-1)}/>
+        <Board analysisArrows={hint.arrows} animateMove={game.turn===game.playerColor} fen={game.fen} orientation={boardOrientation} legalMoves={game.legalMoves} interactive={!busy&&!thinking&&!game.drill.complete&&game.turn===game.playerColor} onMove={move} lastMove={game.moves.at(-1)}/>
         <div className="board-actions"><button disabled={busy||thinking||game.drill.complete||game.turn!==game.playerColor||!!hint.suggestion?.loading} onClick={()=>void hint.request()} title="Prima scelta di Stockfish (blu) e di Maia (rosso) nella posizione attuale"><span aria-hidden="true">💡</span> Suggerisci mossa</button></div>
         <SuggestionBox suggestion={hint.suggestion} elo={game.elo}/>
         <LichessAnalysis key={game.id} fen={game.fen} orientation={game.playerColor} game={game}/>

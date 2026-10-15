@@ -146,6 +146,7 @@ class NewGame(BaseModel):
     color: Literal["w", "b"] = "w"
     elo: int = Field(default=1500, ge=600, le=2600)
     fen: str = Field(default=chess.STARTING_FEN, max_length=120)
+    title: str | None = Field(default=None, max_length=160)
 
 
 class MoveInput(BaseModel):
@@ -300,11 +301,13 @@ def health():
 
 @app.post("/api/games")
 def new_game(body: NewGame):
-    reconstruct(body.fen, [])
+    board = reconstruct(body.fen, [])
+    if board.is_game_over(claim_draw=True):
+        raise HTTPException(422, 'La posizione è già conclusa: scegline una precedente')
     game_id = str(uuid.uuid4())
     with database() as con:
         con.execute("INSERT INTO games(id,initial_fen,moves,player_color,elo,title,created_at,analysis,analysis_version,source) VALUES(?,?,?,?,?,?,?,?,?,?)",
-                    (game_id, body.fen, "[]", body.color, body.elo, f"Allenamento con Maia {body.elo}", now(), None, None, "maia"))
+                    (game_id, body.fen, "[]", body.color, body.elo, body.title or f"Allenamento con Maia {body.elo}", now(), None, None, "maia"))
         return game_view(find_game(con, game_id))
 
 
@@ -324,6 +327,18 @@ def games():
                        "result": None if outcome == '*' else outcome, "fen": board.fen(),
                        "quality": learning.quality(learning.decisions(r, r["start_ply"])) if analyzed else None})
     return result
+
+
+@app.get('/api/games/pgn')
+def export_games_pgn(ids: str = '', include_times: bool = True):
+    """Several archived games in one PGN file, in the order requested (latest 50 when empty)."""
+    wanted = [i for i in ids.split(',') if i][:50]
+    with database() as con:
+        rows = [find_game(con, i) for i in wanted] if wanted else \
+            con.execute("SELECT * FROM games ORDER BY created_at DESC LIMIT 50").fetchall()
+        text = '\n\n'.join(str(game_pgn(row, include_times)) for row in rows)
+    return Response(text + '\n', media_type='application/x-chess-pgn',
+                    headers={'Content-Disposition': f'attachment; filename="sparringmate-{len(rows)}-partite.pgn"'})
 
 
 @app.get("/api/games/{game_id}")
@@ -450,6 +465,25 @@ def suggest_move(game_id: str, body: UndoInput):
         assisted = sorted(set(json.loads(row['assisted_plies'])) | {body.version})
         con.execute('UPDATE games SET assisted_plies=? WHERE id=?', (json.dumps(assisted), game_id))
     return {'stockfish': best, 'ply': body.version, 'assistedPlies': assisted}
+
+
+@app.get('/api/games/{game_id}/evaluation')
+def position_evaluation(game_id: str, ply: int):
+    """Quick Stockfish evaluation of the position after `ply` half-moves, for the evaluation bar."""
+    with database() as con:
+        row = find_game(con, game_id)
+    moves = json.loads(row['moves'])
+    if not 0 <= ply <= len(moves):
+        raise HTTPException(404, 'Posizione non presente nella partita')
+    board = reconstruct(row['initial_fen'], moves[:ply])
+    side = 'w' if board.turn else 'b'
+    if board.is_checkmate():
+        value = {'cp': -100000, 'mate': 0, 'pv': [], 'san': [], 'depth': 0, 'nodes': 0, 'perspective': side}
+    elif board.is_game_over(claim_draw=True):
+        value = {'cp': 0, 'mate': None, 'pv': [], 'san': [], 'depth': 0, 'nodes': 0, 'perspective': side}
+    else:
+        value = evaluator.evaluate(board, nodes=30000)
+    return {'ply': ply, 'evaluation': value}
 
 
 @app.post('/api/games/{game_id}/undo')

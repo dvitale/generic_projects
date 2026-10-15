@@ -2,6 +2,7 @@ import InfoNote from './InfoNote'
 import {useEffect,useRef,useState} from 'react'
 import {Chess} from 'chess.js'
 import Board from './Board'
+import {useBoardOrientation} from './boardFlip'
 import LichessAnalysis from './LichessAnalysis'
 import ExerciseSource from './ExerciseSource'
 import MistakeHistory from './MistakeHistory'
@@ -19,6 +20,7 @@ const evaluation=(e:Evaluation)=>e.mate!==null?(e.mate>0?`Matto a tuo favore in 
 export default function BlunderPrevention({onArchive,onReview,startPositionId,onStarted}:{onArchive:()=>void;onReview:(id:string,ply:number)=>void;startPositionId?:string|null;onStarted?:()=>void}) {
   const [catalog,setCatalog]=useState<Catalog|null>(null)
   const [position,setPosition]=useState<Position|null>(null)
+  const boardOrientation=useBoardOrientation(position?.turn??'w')
   const [session,setSession]=useState<Session|null>(null)
   const [result,setResult]=useState<Result|null>(null)
   const [done,setDone]=useState<string[]>([])
@@ -74,16 +76,16 @@ export default function BlunderPrevention({onArchive,onReview,startPositionId,on
       {!catalog?<p role="status">Caricamento delle tue posizioni…</p>:remaining.length?<button className="primary" disabled={busy} onClick={next}>Inizia Blunder prevention →</button>:<><p>{catalog.positions.length?'Hai completato tutte le posizioni disponibili in questa sessione.':'Nessun blunder evitabile disponibile. Gioca o importa una partita, seleziona il tuo colore e avvia Analizza partita: le posizioni adatte appariranno qui.'}</p>{catalog.positions.length>0&&<button onClick={()=>{setDone([]);void open(catalog.positions[0])}}>Ripeti come pratica</button>}<button onClick={onArchive}>Apri le tue partite</button></>}
       <InfoNote summary="Quali mosse sono accettate"><p>{catalog?.rule.description} Le posizioni già perse prima dell’errore vengono escluse. Il primo accesso include una verifica Stockfish approfondita.</p></InfoNote></section>:<div className="training-layout layout-prevention">
       <section className="board-column">
-        <section className={`puzzle-feedback ${result?.success?'solved':result&&!result.closed?'retry':''}`} aria-label="Esito Blunder prevention">
-          <div role="status" aria-live="polite"><h3>{motion.message?'↻ Mossa da migliorare':busy?session?'Verifica della mossa…':'Verifica della posizione…':result?.success?'✓ Blunder evitato!':result?.closed?'Una mossa sicura':result?'↻ Riprova una mossa diversa':'Evita il blunder'}</h3><p>{motion.message|| (busy?'Stockfish sta controllando la posizione.':result?.message||'Cerca una mossa sicura. Più alternative possono essere corrette.')}</p></div>
-          {result?.closed&&<div className="puzzle-next">{remaining.length?<button className="primary" disabled={busy} onClick={next}>Prossima posizione →</button>:<><p>Hai completato tutte le posizioni disponibili.</p><button onClick={()=>{setPosition(null);setSession(null);setResult(null)}}>Riepilogo della sessione</button></>}</div>}
-        </section>
         <div className="player-row"><span className="avatar">◇</span><div><strong>{position.turn==='w'?'Muove il Bianco':'Muove il Nero'}</strong><small>Mossa {position.moveNumber} · {position.title}</small></div></div>
-        <Board fen={board!.fen()} orientation={position.turn} legalMoves={position.legalMoves} interactive={!busy&&!!session&&!result?.closed} onMove={move=>void submit(move)} lastMove={showOriginal?displayedMove:motion.lastMove} animateMove reverseMove={!showOriginal&&motion.reverse}/>
+        <Board fen={board!.fen()} orientation={boardOrientation} legalMoves={position.legalMoves} interactive={!busy&&!!session&&!result?.closed} onMove={move=>void submit(move)} lastMove={showOriginal?displayedMove:motion.lastMove} animateMove reverseMove={!showOriginal&&motion.reverse}/>
         <p className="footnote">{showOriginal?'Scacchiera dopo il tuo errore originale.':result?.closed?'Scacchiera dopo la mossa verificata.':'Scacchiera prima del tuo errore: trascina un pezzo o usa due clic.'}</p>
         <LichessAnalysis key={position.id} fen={board!.fen()} orientation={position.turn}/>
       </section>
       <aside className="coach-column">
+        <section className={`puzzle-feedback ${result?.success?'solved':result&&!result.closed?'retry':''}`} aria-label="Esito Blunder prevention">
+          <div role="status" aria-live="polite"><h3>{motion.message?'↻ Mossa da migliorare':busy?session?'Verifica della mossa…':'Verifica della posizione…':result?.success?'✓ Blunder evitato!':result?.closed?'Una mossa sicura':result?'↻ Riprova una mossa diversa':'Evita il blunder'}</h3><p>{motion.message|| (busy?'Stockfish sta controllando la posizione.':result?.message||'Cerca una mossa sicura. Più alternative possono essere corrette.')}</p></div>
+          {result?.closed&&<div className="puzzle-next">{remaining.length?<button className="primary" disabled={busy} onClick={next}>Prossima posizione →</button>:<><p>Hai completato tutte le posizioni disponibili.</p><button onClick={()=>{setPosition(null);setSession(null);setResult(null)}}>Riepilogo della sessione</button></>}</div>}
+        </section>
         <ExerciseSource title={position.title} createdAt={position.gameCreatedAt} fen={position.fen} disabled={busy} onReview={()=>onReview(position.gameId,position.ply)}/>
         <section className="panel"><ThinkingGuide/><p className="footnote">La mossa può perdere per una tattica o compromettere una posizione difendibile. Stockfish decide l’esito; la spiegazione distingue fatti e ipotesi.</p></section>
         <section className="panel"><span className="eyebrow">PRIMA DI MUOVERE</span><h2>Tre controlli</h2><ol><li>Il re è al sicuro?</li><li>Quali pezzi sono attaccati o indifesi?</li><li>Quali scacchi e catture avrà l’avversario?</li></ol><p className="muted">Una mossa semplice che evita la perdita è sufficiente.</p>

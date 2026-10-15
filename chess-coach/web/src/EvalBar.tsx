@@ -17,9 +17,9 @@ function share(value:BarValue){
 
 export default function EvalBar({value,orientation}:{value:BarValue|null;orientation:Color}){
   const white=value?share(value):50
-  const text=!value?'—':value.mate?`M${value.mateIn??''}`:`${Math.abs((value.cp??0)/100).toFixed(1)}`
+  const text=!value?'—':value.mate?(value.mateIn===0?(value.mate==='w'?'1-0':'0-1'):`M${value.mateIn??''}`):`${Math.abs((value.cp??0)/100).toFixed(1)}`
   const leader=!value?null:value.mate??((value.cp??0)>=0?'w':'b')
-  const description=!value?'Valutazione non disponibile':value.mate?`Matto previsto per il ${value.mate==='w'?'Bianco':'Nero'}`:`Valutazione Stockfish ${(value.cp??0)>0?'+':''}${((value.cp??0)/100).toFixed(2)} dal punto di vista del Bianco`
+  const description=!value?'Valutazione non disponibile':value.mate?`${value.mateIn===0?'Scacco matto':'Matto previsto'} per il ${value.mate==='w'?'Bianco':'Nero'}`:`Valutazione Stockfish ${(value.cp??0)>0?'+':''}${((value.cp??0)/100).toFixed(2)} dal punto di vista del Bianco`
   return <div className={`eval-bar ${orientation==='b'?'flipped':''} ${value?'':'empty'}`} role="img" aria-label={description} title={description}>
     <span className="eval-white" style={{height:`${white}%`}}/>
     <small className={`eval-text ${leader==='b'?'on-black':'on-white'}`}>{text}</small>
