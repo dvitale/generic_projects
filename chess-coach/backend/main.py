@@ -26,6 +26,8 @@ from . import prevention
 from . import mistakes
 from . import insights
 from . import training_schedule, pgn_import, learning
+from . import study
+from . import auth
 from .rating import rating_plan, summarize_rating, RATING_LEVELS, RATING_METHOD
 
 DB_PATH = Path(os.environ.get("CHESS_COACH_DATA", str(ROOT / "data"))) / "coach.sqlite3"
@@ -104,6 +106,7 @@ def init_db():
         training_schedule.init_schema(con)
         learning.init_schema(con)
         final_review.init_schema(con)
+        study.init_schema(con)
         for row in con.execute('SELECT * FROM games WHERE analysis IS NOT NULL').fetchall():
             if row['analysis_version'] == len(json.loads(row['moves'])):
                 prevention.seed_game(con, row, json.loads(row['analysis']), now())
@@ -130,12 +133,13 @@ ENGINE_NODES = 400000
 
 @app.middleware("http")
 async def local_headers(request, call_next):
-    # Reject cross-site writes to the unauthenticated loopback application.
+    # Reject cross-site writes: only loopback pages or the host serving the app (behind a reverse proxy)
+    # may post. The session cookie is also SameSite=Strict.
     origin = request.headers.get("origin")
     if request.method not in {"GET", "HEAD", "OPTIONS"} and origin:
         from urllib.parse import urlsplit
         parsed = urlsplit(origin)
-        if parsed.hostname not in {"localhost", "127.0.0.1", "::1"}:
+        if parsed.hostname not in {"localhost", "127.0.0.1", "::1"} and parsed.netloc != request.headers.get("host"):
             from starlette.responses import JSONResponse
             return JSONResponse({"detail": "Origine non consentita"}, status_code=403)
     response = await call_next(request)
@@ -492,6 +496,8 @@ def preserve_review(con, row, session):
     con.execute('UPDATE game_ratings SET game_id=? WHERE game_id=?', (archive_id, row['id']))
     con.execute('UPDATE prevention_positions SET game_id=? WHERE game_id=?', (archive_id, row['id']))
     con.execute('UPDATE position_judgments SET game_id=? WHERE game_id=?', (archive_id, row['id']))
+    con.execute('UPDATE study_cards SET game_id=? WHERE game_id=?', (archive_id, row['id']))
+    con.execute('UPDATE study_quizzes SET game_id=? WHERE game_id=?', (archive_id, row['id']))
 
 
 def suggestion_position(con, game_id, body):
@@ -1026,6 +1032,8 @@ def request_tutor(game_id: str, body: TutorInput):
 prevention.install(app, database, reconstruct, now)
 mistakes.install(app, database, tutor_lock)
 final_review.install(app, database, find_game, game_pgn, now, tutor_lock)
+study.install(app, database, find_game, now, tutor_lock)
+auth.install(app, ROOT / ".env", lambda: DB_PATH.parent)
 
 DIST = ROOT / "web" / "dist"
 @app.get('/api/training-guide')

@@ -23,6 +23,9 @@ def test_game_legality_versions_and_persistence(client):
     assert client.post(path, json={'move':'e2e4','version':0,'actor':'human'}).status_code == 409
     assert client.get('/api/games/' + g['id']).json()['moves'] == ['e2e4']
     assert client.post('/api/games', json={}, headers={'origin':'https://example.com'}).status_code == 403
+    # A reverse proxy keeps the public host: same-origin writes from that host are accepted.
+    assert client.post('/api/games', json={}, headers={'origin':'https://coach.example.com','host':'coach.example.com'}).status_code == 200
+    assert client.post('/api/games', json={}, headers={'origin':'https://evil.example.com','host':'coach.example.com'}).status_code == 403
 
 
 def test_special_moves_and_black_scores(client):

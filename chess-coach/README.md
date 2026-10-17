@@ -24,6 +24,7 @@ Aprire http://localhost:8033 nel browser Windows. Il server resta in background 
 | `make stop` | Arresta conservando partite e allenamenti. Ripetibile a server già fermo. |
 | `make logs` | Mostra le ultime 60 righe del log. |
 | `make build` | Ricompila l'interfaccia dopo modifiche al frontend. |
+| `make deploy` | Pubblica la versione corrente su sparringmate.u-s.it (`scripts/deploy.sh`). |
 | `make` | Mostra l'aiuto. |
 
 Per un'altra porta usa, per esempio, `make start PORT=8001` e lo stesso `PORT` per status/stop/restart. PID e log sono separati per porta in `.run/`; una seconda porta usa comunque gli stessi dati, salvo `CHESS_COACH_DATA` esplicito. All'avvio l'interfaccia viene compilata solo se manca `web/dist/index.html`: dopo modifiche esegui `make build`.
@@ -31,6 +32,30 @@ Per un'altra porta usa, per esempio, `make start PORT=8001` e lo stesso `PORT` p
 L'arresto invia SIGTERM solo a un processo Uvicorn verificato per questa cartella e porta. I comandi sono serializzati; un PID vecchio non autorizza ad arrestare altri processi. Una porta occupata da un servizio diverso impedisce l'avvio. Se un'analisi richiede oltre 60 secondi per terminare, l'arresto segnala l'attesa e il riavvio non parte: controlla `make status` oppure aumenta l'attesa con `make restart STOP_TIMEOUT=180`. Non viene usato SIGKILL.
 
 Alternativa in primo piano: `./start.sh`, arresto con Ctrl+C; altra porta: `PORT=8001 ./start.sh`. `make start` non configura un avvio automatico al riavvio di Windows/WSL. Esegui i comandi con lo stesso utente che ha avviato il server. Serve GNU Make (`sudo apt install make` su Debian se manca).
+
+## Accesso
+
+Se `.env`, nella cartella del progetto, contiene `SPARRINGMATE_USER` e `SPARRINGMATE_PASSWORD`, l’app chiede di accedere: tutte le API tranne `/api/health` e `/api/auth/*` rispondono 401 senza una sessione valida.
+
+```bash
+SPARRINGMATE_USER=nome
+SPARRINGMATE_PASSWORD=password
+```
+
+Le stesse variabili d’ambiente, se impostate, prevalgono su `.env`. Il file è escluso da Git; tienilo con permessi `600`, perché la password è salvata in chiaro. La sessione dura 30 giorni in un cookie firmato (`HttpOnly`, `SameSite=Strict`). La firma usa `data/session.key`, generato al primo avvio: cambiare la password o cancellare quel file chiude tutte le sessioni. Le modifiche a `.env` valgono dalla richiesta successiva, senza riavvio. Dopo cinque tentativi errati in cinque minuti lo stesso indirizzo deve attendere. **Esci** è in alto a destra. Senza le due variabili l’app resta aperta come prima.
+
+Il login non sostituisce HTTPS: per un accesso da altri dispositivi esponi il servizio solo dietro un proxy TLS. Il cookie diventa `Secure` quando la richiesta arriva in HTTPS.
+
+## Pubblicazione su sparringmate.u-s.it
+
+L’istanza pubblica gira su Debian 11 in `/opt/sparringmate`, con l’utente di sistema `sparringmate`. Il servizio è `sparringmate.service` e Uvicorn ascolta solo su `127.0.0.1:8033`. nginx termina TLS con il certificato `*.u-s.it` e reindirizza HTTP su HTTPS. Unit e virtual host sono in `deploy/`; sul server il virtual host si trova in `/etc/nginx/sites-enabled/sparringmate.conf`.
+
+- **Python:** il server ha Python 3.9, quindi il venv usa Python 3.12 da `/opt/uv-python`, creato con `uv venv` e installato con `uv pip install -r requirements.lock`.
+- **Stockfish:** il binario `universal` richiede glibc 2.35, mentre Debian 11 ha la 2.31. Stockfish 19 è quindi compilato sul server dai sorgenti in `vendor/stockfish/src` con `make profile-build ARCH=x86-64-avx2`; servono anche `vendor/stockfish/scripts`. Il binario si trova in `/opt/sparringmate/engine/stockfish` e il servizio lo indica con `STOCKFISH_PATH`.
+- **Dati e credenziali:** i dati sono in `/opt/sparringmate/data`, l’unica cartella scrivibile dal servizio. Le credenziali sono in `/opt/sparringmate/.env`, con permessi `600`.
+- **Proxy:** Uvicorn parte con `--proxy-headers`, così vede lo schema HTTPS (il cookie diventa `Secure`) e l’indirizzo reale di chi tenta l’accesso. Le scritture sono accettate da localhost o dallo stesso host che serve la pagina; ogni altra origine riceve 403. nginx limita anche `/api/auth/login` a 10 richieste al minuto per indirizzo.
+
+Per aggiornare l’istanza: `make deploy`. Il comando compila l’interfaccia, sincronizza il codice, aggiorna le dipendenze e installa unit e virtual host se sono cambiati, verificando nginx prima di ricaricarlo; poi riavvia il servizio e controlla che risponda. Usa la chiave SSH oppure, se impostata, la variabile `SSHPASS`. Dettagli del server, ricompilazione di Stockfish e storia della configurazione: [`deploy/SERVER.md`](deploy/SERVER.md).
 
 ## Funzioni
 
@@ -55,10 +80,11 @@ Verifica del motore e differenze rispetto al gioco sul sito ufficiale: [audit Ma
 - **Rivedi:** revisione passo passo di entrambe le parti. Ogni posizione confronta mossa giocata, scelta Stockfish e mossa più probabile di Maia al livello selezionato, con probabilità e varianti. Le frecce e il selettore delle mosse mostrano la scacchiera prima della decisione. Restano importazione/esportazione PGN e momenti critici personali. Per vecchie analisi, ricalcolare per includere tutte le mosse.
 - **Drill:** aperture, finale di torre e posizioni delle proprie partite, mostrate con un’anteprima della posizione; 3–12 decisioni contro Maia e revisione dedicata.
 - **Puzzle:** decisioni critiche personali, alternative verificate, tentativi, indizi, soluzione e ripassi distanziati.
+- **Studio:** sezione separata con sei schede: Flashcard, Quiz, Esame di prova, Impara da una partita, Chiedi al tutor e Quaderno. Vedi [Studio](#studio).
 - **Commento finale:** in Rivedi, su richiesta e dopo l’analisi Stockfish, DeepSeek riassume andamento della partita, punti riusciti e priorità di allenamento collegati alle posizioni. Solo al clic invia l’andamento delle valutazioni e fino a sei posizioni con le varianti, senza nomi dei giocatori; il commento viene salvato finché partita e analisi non cambiano.
 - **Tutor DeepSeek:** spiegazioni e piano dopo la revisione Stockfish, con riflessione del giocatore e collegamenti agli esercizi. Vedi `docs/tutor-deepseek.md`.
 - **Partite:** archivio delle ultime 50 partite con esito, colore, qualità delle decisioni (se analizzate), numero di mosse e data; filtri per esito e anteprima della posizione finale al passaggio del mouse. **↓ PGN** su ogni riga scarica la singola partita; **Esporta PGN (N)** scarica in un unico file tutte le partite elencate con il filtro attivo (endpoint `GET /api/games/pgn?ids=…`, tempi inclusi).
-- **Progressi:** evidenze iniziali, variazione degli errori rispetto al blocco precedente, temi in barre orizzontali e piano base di 25 minuti. Aiuti e ripetizioni immediate non gonfiano i successi indipendenti.
+- **Progressi:** evidenze iniziali, variazione degli errori rispetto al blocco precedente, temi in barre orizzontali, piano base di 25 minuti e storico degli esami di prova. Aiuti e ripetizioni immediate non gonfiano i successi indipendenti.
 
 I Puzzle personali compaiono dopo aver analizzato una partita contenente errori rilevanti. Per cominciare senza partite, utilizzare il catalogo Drill o importare un proprio PGN.
 
@@ -89,7 +115,7 @@ npm run build
 npm test
 ```
 
-Le prove del browser usano Chromium di sistema (`/usr/bin/chromium`), il vero Maia e dati temporanei su una porta separata. Le prove Python verificano Stockfish, legalità, versioni, esercizi e registrazione dei progressi.
+Prove Python (`tests/conftest.py`) e prove del browser impostano `CHESS_COACH_DISABLE_AUTH=1`, così le credenziali di `.env` non le bloccano; il login è verificato da `tests/test_auth.py` e `web/tests/login.spec.ts`. Le prove del browser usano Chromium di sistema (`/usr/bin/chromium`), il vero Maia e dati temporanei su una porta separata. Le prove Python verificano Stockfish, legalità, versioni, esercizi e registrazione dei progressi.
 
 Le richieste Maia di gioco, revisione ed Elo condividono una coda: non vengono eseguite contemporaneamente sulla stessa sessione ONNX. Gli output vengono verificati anche nella dimensione e nella valutazione; in caso di numeri non validi il worker viene ricreato e la stessa inferenza ritentata una volta. Un errore persistente interrompe il calcolo senza salvare punteggi parziali. Le prove di recupero usano anche un worker simulato per iniettare errori numerici riproducibili.
 
@@ -103,6 +129,10 @@ Le richieste Maia di gioco, revisione ed Elo condividono una coda: non vengono e
 | `backend/drills.py` | Catalogo e preparazione delle posizioni Drill |
 | `web/src/Drills.tsx` | Sessione di pratica contro Maia |
 | `docs/drill-puzzle-personalizzati.md` | Analisi del sito e progetto evolutivo del tutor |
+| `backend/study.py` | API della sezione Studio: flashcard, quiz, esami, pacchetto partita, domande al tutor, quaderno |
+| `web/src/study/` | Interfaccia della sezione Studio |
+| `backend/auth.py`, `web/src/Login.tsx` | Login con credenziali da `.env` e cookie di sessione firmato |
+| `deploy/` | Unit systemd e virtual host nginx dell’istanza pubblica |
 
 Questo è un prototipo funzionante ed estendibile. Non include ancora un modello calibrato delle competenze, un generatore tattico a più mosse o verifiche di apprendimento su posizioni nuove. L'analisi individua fino a tre momenti critici per partita con budget limitato; i temi sono indicativi. Il piano attuale è semplice e trasparente, non un tutor autonomo completo.
 
@@ -131,6 +161,19 @@ Le partite libere non hanno un conto alla rovescia: si registra il tempo attivo 
 
 Nei PGN importati si conservano sia `[%clk ...]` (tempo residuo sull'orologio) sia `[%emt ...]` (durata della mossa), quando presenti. Disattivare Includi tempi esclude queste annotazioni dal download senza cancellare i dati. Annullare una mossa rimuove anche i relativi tempi; un'eventuale copia di revisione conserva la linea originale con i suoi tempi.
 
+
+## Studio
+
+La voce **Studio** raccoglie gli strumenti che trasformano le partite analizzate in esercizi di richiamo, separati da Gioca e Rivedi. Da **Rivedi → Decisioni**, **Studia questa partita** apre direttamente il pacchetto della partita. Le partite di confutazione contro Stockfish restano escluse.
+
+- **Flashcard:** ogni lezione di **Spiega motivo** (Puzzle e Blunder prevention) diventa una scheda, salvo che la verifica più profonda abbia accettato la mossa; altre schede si creano dal pacchetto di una partita o dalle risposte del tutor. Il fronte mostra la posizione e una domanda; dopo **Mostra risposta** (tasto Spazio) compaiono la lezione e le frecce della mossa giocata e di Stockfish. La valutazione del ricordo (tasti 1–4) decide il prossimo ripasso: *Di nuovo* dopo 10 minuti, poi 1 giorno, 3 giorni e intervalli crescenti con fattore di facilità in stile SM-2. Una scheda non ancora scaduta non si può rivalutare.
+- **Quiz:** fino a cinque domande sulle tre decisioni più costose di una partita: la mossa migliore, la risposta più forte dell’avversario dopo il tuo errore e la valutazione della posizione. Ogni opzione sbagliata è controllata da Stockfish (perde almeno 1,50 rispetto a quella corretta; la tua mossa di allora può perdere meno); la domanda sulla valutazione è omessa vicino alle soglie di ±1,00. Conta solo la prima risposta.
+- **Esame di prova:** 6–10 posizioni dai tuoi puzzle, con temi alternati e preferenza per quelle non viste negli ultimi 3 giorni, tempo limite di 8–20 minuti, nessun indizio e nessun riscontro fino alla consegna. Il criterio è quello dei puzzle (meno di 0,70 di perdita). Allo scadere del tempo l’esame si chiude da solo. Non modifica i ripassi; i risultati compaiono anche in **Progressi**, con un esame consigliato ogni 14 giorni.
+- **Impara da una partita:** per ogni errore o imprecisione mostra mossa giocata, variante di Stockfish e risposta avversaria, con i collegamenti a Puzzle, Blunder prevention, Drill da qui, partita contro Stockfish con la tua mossa, domanda al tutor e una flashcard con la tua lezione.
+- **Chiedi al tutor:** domande libere su una posizione (dal pacchetto, dal quaderno o incollando una FEN); muovere un pezzo sulla scacchiera prepara la domanda «Perché non …?». Le mosse citate, anche in notazione italiana (C, A, T, D, R) o UCI, vengono analizzate da Stockfish. Con DeepSeek configurato il tutor riceve solo quelle varianti; una risposta che cita mosse di pezzo o catture assenti dalle varianti viene scartata e sostituita dai fatti di Stockfish. Senza DeepSeek la risposta è costruita dalle sole varianti.
+- **Quaderno:** errori e imprecisioni delle partite analizzate, raggruppati per tema, con le tue lezioni e i tre esempi più costosi per tema. **Esporta PGN annotato** (`GET /api/study/notebook.pgn`) scarica un capitolo per esempio: mossa giocata con perdita e lezioni come commento, variante di Stockfish come alternativa.
+
+Verifiche dedicate: `tests/test_study.py` e `web/tests/study.spec.ts`.
 
 ## Blunder prevention
 
@@ -179,7 +222,7 @@ Dopo una risposta corretta, la propria mossa rimane visibile brevemente, poi vie
 
 Impostazioni, verifiche e scadenze sono salvate in SQLite; il calendario usa Europe/Rome e non invia notifiche esterne. Le prove anticipate non fanno avanzare l’obiettivo giornaliero. Il calendario misura il richiamo di posizioni già viste, non ancora il trasferimento delle abilità alle nuove partite.
 
-La [guida pratica](docs/training-guide.html) si apre da **Allenamento → Apri la guida** in una popup con indice navigabile, impaginazione per telefono e stampa/PDF. È scaricabile in HTML per la lettura offline; se il browser blocca la popup, compare un collegamento per aprirla in una nuova scheda. Spiega importazione e calendario e contiene tutorial adattati al lavoro contro Maia per Aimchess, MoveTrainer e Noctie. Documentazione ufficiale verificata il 6 ottobre 2026; le aree personali dei servizi esterni non sono state provate con l’account dell’utente. Il sorgente resta in `docs/training-guide.md`; per rigenerare l’HTML usa `pwsh -File scripts/build_training_guide.ps1` (PowerShell 7, nessuna dipendenza aggiuntiva).
+La [guida pratica](docs/training-guide.html) si apre da **Allenamento → Apri la guida** in una popup con indice navigabile, impaginazione per telefono e stampa/PDF. È scaricabile in HTML per la lettura offline; se il browser blocca la popup, compare un collegamento per aprirla in una nuova scheda. Spiega importazione, calendario e strumenti di Studio e contiene tutorial adattati al lavoro contro Maia per Aimchess, MoveTrainer e Noctie. Documentazione ufficiale verificata il 6 ottobre 2026; le aree personali dei servizi esterni non sono state provate con l’account dell’utente. Il sorgente resta in `docs/training-guide.md`; per rigenerare l’HTML usa `pwsh -File scripts/build_training_guide.ps1` (PowerShell 7, nessuna dipendenza aggiuntiva).
 
 Verifiche dedicate: `tests/test_batch_import.py`, `tests/test_training_schedule.py` e `web/tests/training-plan.spec.ts`, oltre alle regressioni di Puzzle, Blunder prevention, analisi automatica e collegamenti Lichess.
 

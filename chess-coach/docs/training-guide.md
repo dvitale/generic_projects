@@ -1,8 +1,8 @@
 # Allenarsi per perdere meno contro Maia: guida pratica
 
-Funzioni SparringMate aggiornate il 9 ottobre 2026. Tutorial esterni verificati il 6 ottobre 2026. I tutorial esterni si basano sulla documentazione ufficiale consultata il 6 ottobre: le aree personali a pagamento non sono state provate con il tuo account. Nomi e disponibilità possono variare. Le routine proposte sono consigli per il tuo obiettivo, non prescrizioni ufficiali dei servizi.
+Funzioni SparringMate aggiornate il 16 ottobre 2026. Tutorial esterni verificati il 6 ottobre 2026. I tutorial esterni si basano sulla documentazione ufficiale consultata il 6 ottobre: le aree personali a pagamento non sono state provate con il tuo account. Nomi e disponibilità possono variare. Le routine proposte sono consigli per il tuo obiettivo, non prescrizioni ufficiali dei servizi.
 
-**Passa subito alla pratica:** [importa i PGN Maia](http://localhost:8033/?section=schedule&import=pgn) · [apri Allenamento](http://localhost:8033/?section=schedule) · [apri Blunder prevention](http://localhost:8033/?section=prevention) · [rivedi le tue partite](http://localhost:8033/?section=archive).
+**Passa subito alla pratica:** [importa i PGN Maia](http://localhost:8033/?section=schedule&import=pgn) · [apri Allenamento](http://localhost:8033/?section=schedule) · [apri Blunder prevention](http://localhost:8033/?section=prevention) · [apri Studio](http://localhost:8033/?section=study) · [rivedi le tue partite](http://localhost:8033/?section=archive).
 
 I collegamenti a SparringMate aprono l’app locale in una nuova scheda e richiedono che sia avviata su questo PC. I rimandi ai capitoli restano nella guida; quelli ai servizi esterni aprono una nuova scheda.
 
@@ -91,7 +91,64 @@ Prima di ogni risposta, cerca uno scacco avversario, una cattura e una minaccia 
 
 Passa alla pratica: [Blunder prevention](http://localhost:8033/?section=prevention) per evitare una mossa perdente, [Drill](http://localhost:8033/?section=drill) per continuare a giocare e [Progressi](http://localhost:8033/?section=progress) per rivedere gli indicatori.
 
-## 3. Aimchess: scegliere cosa allenare
+## 3. Studio: fissare le lezioni delle tue partite
+
+Il calendario ti fa rigiocare le posizioni. **Studio**, nella barra laterale sotto Puzzle (sul telefono nel menu **Altro**), serve a ricordare *perché* una mossa era sbagliata e a verificarlo senza aiuti. Le sei schede usano solo partite già analizzate: le partite di confutazione contro Stockfish non compaiono. [Apri Studio](http://localhost:8033/?section=study).
+
+### Dopo ogni partita: Impara da una partita
+
+1. In **Rivedi → Decisioni** premi **Studia questa partita**, oppure apri **Studio → Impara da una partita** e scegli la partita.
+2. L’elenco mostra le decisioni che hanno perso almeno 0,80. Per ciascuna trovi in un solo posto **Puzzle**, **Blunder prevention**, **Drill da qui**, **Gioca contro Stockfish**, **Chiedi al tutor** e **Rivedi nella partita**. Puzzle e Drill sono attivi solo per i tre errori più costosi; Blunder prevention solo per i blunder che rendono la posizione difficile da difendere.
+3. Scrivi in **La mia lezione** una frase che controlleresti prima di muovere, per esempio «Prima di catturare conto chi difende la casa d’arrivo», e premi **Crea flashcard**.
+4. Chiudi con **Quiz della partita**.
+
+### Quiz: richiamare senza muovere i pezzi
+
+Il quiz propone fino a cinque domande sulle tre decisioni più costose della partita: la mossa migliore, la risposta più forte dell’avversario dopo il tuo errore e chi stava meglio. Ogni opzione sbagliata è controllata da Stockfish e perde almeno 1,50 rispetto a quella giusta, quindi non ci sono risposte «quasi giuste». Conta solo la prima risposta: rispondi pensando, non per tentativi. Fallo il giorno dopo la revisione, non subito: ricordare dopo una pausa è proprio ciò che vuoi allenare.
+
+### Flashcard: ripassare la regola, non la mossa
+
+Quando, dopo un puzzle o una prevenzione sbagliati, usi **Spiega motivo**, la lezione ottenuta diventa una scheda, tranne quando un’analisi più profonda di Stockfish giudica buona la mossa giocata. Altre schede nascono dal pacchetto di una partita o dal tutor.
+
+1. Osserva la posizione e la domanda; prova a dire la regola ad alta voce.
+2. Premi **Mostra risposta**: vedi la lezione con la freccia della tua mossa e di quella di Stockfish.
+3. Valuta con onestà quanto ricordavi (tasti 1–4):
+
+| Valutazione | Quando usarla | Prossima scadenza |
+|---|---|---|
+| Di nuovo | Non ricordavi la regola | Dopo 10 minuti |
+| Difficile | Ricordata a fatica | 1 giorno, poi intervalli poco più lunghi |
+| Bene | Ricordata con un po’ di riflessione | 1 giorno, poi 3, poi intervalli crescenti |
+| Facile | Ricordata subito | 4 giorni, poi intervalli più lunghi |
+
+**Archivia scheda** quando la regola è superata o era sbagliata. Le flashcard hanno un calendario proprio: non modificano le scadenze dei puzzle in **Allenamento**.
+
+### Esame di prova: verificare senza aiuti
+
+Ogni due settimane, in **Esame di prova** scegli 6, 8 o 10 posizioni e 8, 12 o 20 minuti, poi premi **Inizia l’esame**. Le posizioni vengono dai tuoi puzzle, con temi alternati e preferenza per quelle che non hai visto negli ultimi tre giorni. Non ci sono indizi né esiti finché non premi **Consegna**: con **Salta per ora** passi oltre e torni dopo alle posizioni lasciate senza risposta. Una mossa vale come nei puzzle, se perde meno di 0,70 rispetto a Stockfish.
+
+Nei risultati apri ogni posizione sbagliata con **Apri come puzzle** o **Rivedi nella partita**. L’esame non tocca tentativi e ripassi dei puzzle; lo storico dei punteggi compare anche in [**Progressi**](http://localhost:8033/?section=progress). Servono almeno tre puzzle per avviarlo. Il punteggio dipende da quali posizioni escono: confronta la tendenza su più esami, non un singolo risultato.
+
+### Chiedi al tutor: domande su una posizione
+
+Apri una posizione con **Chiedi al tutor** dal pacchetto o dal quaderno, oppure incolla una FEN. Scrivi una domanda come «Perché non Cxe5?», anche in notazione italiana (C, A, T, D, R), oppure muovi un pezzo sulla scacchiera: la domanda «Perché non …?» si prepara da sola e la posizione non cambia.
+
+Stockfish analizza ogni mossa citata e la migliore; le varianti restano visibili sotto la risposta. Se il tutor DeepSeek è configurato, spiega soltanto quelle varianti. Una risposta che cita mosse di pezzo o catture non verificate viene scartata e sostituita dai fatti di Stockfish. Senza chiave la risposta è costruita solo dalle varianti. Con **Salva la lezione come flashcard** la regola entra nei ripassi. Prima di chiedere, formula la tua ipotesi: il tutor serve a confermarla o smentirla.
+
+### Quaderno: vedere quali errori si ripetono
+
+Il **Quaderno** raggruppa errori e imprecisioni per tema, con le tue lezioni e i tre esempi più costosi di ciascun tema. Una volta alla settimana leggi il tema più numeroso e scegli la regola da portare nella partita successiva. **Esporta PGN annotato** crea un capitolo per esempio, con la variante di Stockfish, da aprire in Lichess Studio, ChessBase o un altro lettore PGN.
+
+### La tua routine di studio
+
+- Dopo ogni partita analizzata: pacchetto della partita e una o due flashcard, cinque minuti.
+- Il giorno dopo: il quiz della partita.
+- Ogni giorno, prima dei puzzle: le flashcard in scadenza.
+- Ogni due settimane: un esame di prova, senza guardare prima le soluzioni.
+
+Per approfondire: [routine sulle minacce](#la-tua-routine-consigliata) e [esempio di settimana](#una-settimana-sostenibile).
+
+## 4. Aimchess: scegliere cosa allenare
 
 ### A cosa ti serve
 
@@ -112,7 +169,7 @@ Non scegliere la mossa soltanto perché sembra meno aggressiva. L'obiettivo è d
 
 Per ora darei priorità a prevenzione e difesa. Il lavoro esteso sulle aperture può attendere: conoscere una variante più lunga non risolve da solo il problema degli scacchi avversari non controllati.
 
-## 4. MoveTrainer: ricordare l'idea dopo una pausa
+## 5. MoveTrainer: ricordare l'idea dopo una pausa
 
 ### Che cosa stai usando
 
@@ -138,7 +195,7 @@ Per partire, dedica cinque minuti al giorno a poche posizioni comprese bene. Se 
 
 Non è verificato un flusso diretto “Maia → corso personale MoveTrainer” per il tuo account. Il calendario locale di SparringMate copre già il ripasso dei tuoi PGN Maia; non occorre comprare un corso per ottenere questa funzione.
 
-## 5. Noctie: provare le idee durante il gioco
+## 6. Noctie: provare le idee durante il gioco
 
 ### Funzioni pertinenti
 
@@ -167,19 +224,19 @@ La guida Noctie documenta collegamenti per Chess.com e Lichess attraverso Profil
 
 Userei Noctie quando vuoi allenare il controllo delle minacce dentro una partita con feedback. Terrei però le partite Maia online come prova esterna, a condizioni il più possibile simili, e le importerei in SparringMate. I livelli e i colori dei vari servizi non sono direttamente confrontabili.
 
-## 6. Una settimana sostenibile
+## 7. Una settimana sostenibile
 
 Esempio organizzativo, modificabile:
 
 | Giorno | Attività principale |
 |---|---|
-| Lunedì | Ripassi SparringMate e una breve continuazione dalla tua partita |
+| Lunedì | Flashcard in scadenza, ripassi SparringMate e una breve continuazione dalla tua partita |
 | Martedì | Ripassi più un modulo di prevenzione/difesa, in SparringMate oppure Aimchess |
 | Mercoledì | Una partita Maia online senza aiuti, poi importazione |
-| Giovedì | Ripassi e poche posizioni comprese con MoveTrainer, se lo utilizzi |
+| Giovedì | Quiz della partita di mercoledì, ripassi e poche posizioni comprese con MoveTrainer, se lo utilizzi |
 | Venerdì | Una sessione Noctie con obiettivo preciso, oppure un drill locale |
 | Sabato | Una partita Maia online e revisione di un episodio |
-| Domenica | Pausa o breve bilancio, secondo il calendario scelto |
+| Domenica | Pausa o breve bilancio con il Quaderno; un esame di prova ogni due settimane |
 
 Per iniziare questa settimana: [importa le partite Maia](#da-maia-chess-a-sparringmate), [imposta il calendario](http://localhost:8033/?section=schedule) e scegli un solo supporto tra [Aimchess](#aimchess-scegliere-cosa-allenare), [MoveTrainer](#movetrainer-ricordare-lidea-dopo-una-pausa) e [Noctie](#noctie-provare-le-idee-durante-il-gioco).
 

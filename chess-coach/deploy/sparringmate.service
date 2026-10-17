@@ -1,0 +1,22 @@
+[Unit]
+Description=SparringMate (FastAPI/Uvicorn) behind nginx on sparringmate.u-s.it
+After=network.target
+
+[Service]
+User=sparringmate
+Group=sparringmate
+WorkingDirectory=/opt/sparringmate
+Environment=STOCKFISH_PATH=/opt/sparringmate/engine/stockfish
+Environment=CHESS_COACH_DATA=/opt/sparringmate/data
+ExecStart=/opt/sparringmate/.venv/bin/python -m uvicorn backend.main:app --host 127.0.0.1 --port 8033 --proxy-headers --forwarded-allow-ips 127.0.0.1
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=90
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/sparringmate/data
+
+[Install]
+WantedBy=multi-user.target
