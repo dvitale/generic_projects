@@ -69,11 +69,22 @@ test('Leaving play cancels the pending Maia move and returning resumes it',async
   await expect.poll(async()=>(await(await request.get('/api/games/'+id)).json()).version,{timeout:15000}).toBe(2)
 })
 
+/** Batch import of one game as White, without automatic analysis, then open it in the review. */
+async function importAndOpen(page:import('@playwright/test').Page,pgn:string){
+  await page.getByRole('button',{name:'↑ Importa PGN'}).click()
+  const panel=page.getByRole('region',{name:'Importazione partite'})
+  await panel.getByLabel('Partite PGN').fill(pgn)
+  await panel.getByLabel('Colore da analizzare').selectOption('w')
+  await panel.getByLabel('Analizza e prepara gli esercizi dopo l’importazione').uncheck()
+  await panel.getByRole('button',{name:'Importa partite',exact:true}).click()
+  // The same PGN may already be in the shared test archive: imported or already present, it opens the same game.
+  await expect(panel.getByRole('status')).toContainText(/1 importate · 0 già presenti|0 importate · 1 già presenti/)
+  await panel.getByRole('status').getByRole('button').first().click()
+}
+
 test('PGN review creates personalized puzzles and tracks assistance',async({page})=>{
   await page.goto('/')
-  await page.getByRole('button',{name:'↑ Importa PGN'}).click()
-  await page.getByLabel('Partita PGN').fill('[White "Demo"]\n[Black "Opponent"]\n\n1. e4 e5 2. Qh5 Nc6 3. Qxe5+ Nxe5 *')
-  await page.getByRole('button',{name:'Importa partita',exact:true}).click()
+  await importAndOpen(page,'[White "Demo"]\n[Black "Opponent"]\n\n1. e4 e5 2. Qh5 Nc6 3. Qxe5+ Nxe5 *')
   await page.getByRole('button',{name:/^(Analizza partita|Ricalcola analisi)$/}).click()
   await expect(page.getByText(/Revisione pronta/)).toBeVisible({timeout:60000})
   await page.getByRole('button',{name:/^Puzzle/}).click()
@@ -83,7 +94,7 @@ test('PGN review creates personalized puzzles and tracks assistance',async({page
   await page.getByRole('button',{name:'Mostra soluzione'}).click()
   await expect(page.getByText(/Soluzione mostrata/)).toBeVisible({timeout:30000})
   await page.getByRole('button',{name:'Drill',exact:true}).click()
-  await expect(page.getByRole('heading',{name:'Riparti da una tua decisione'}).first()).toBeVisible()
+  await expect(page.getByRole('heading',{name:'Le tue posizioni critiche'})).toBeVisible()
 })
 
 test('Tutor is explicitly requested and renders a saved explanation',async({page})=>{
@@ -97,9 +108,7 @@ test('Tutor is explicitly requested and renders a saved explanation',async({page
     else await r.fulfill({json:null})
   })
   await page.goto('/')
-  await page.getByRole('button',{name:'↑ Importa PGN'}).click()
-  await page.getByLabel('Partita PGN').fill('1. e4 e5 2. Qh5 Nc6 3. Qxe5+ Nxe5 *')
-  await page.getByRole('button',{name:'Importa partita',exact:true}).click()
+  await importAndOpen(page,'1. e4 e5 2. Qh5 Nc6 3. Qxe5+ Nxe5 *')
   await page.getByRole('button',{name:/^(Analizza partita|Ricalcola analisi)$/}).click()
   await expect(page.getByText(/Revisione pronta/)).toBeVisible({timeout:60000})
   expect(requests).toBe(0)

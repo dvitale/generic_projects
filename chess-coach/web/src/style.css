@@ -344,7 +344,8 @@ details.panel>summary{font-weight:650;font-size:var(--fs-lg)}
 .move-review .field-label{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px}
 .move-review .field-label select{width:110px;margin:0}
 .choice-rank{display:inline-block;font-size:11px;color:var(--muted);vertical-align:middle;margin-right:6px}
-@media(min-width:1101px){.layout-review .move-review{max-height:max(420px,calc(100dvh - 380px));overflow:auto}}
+/* Wide screens: the whole review column (summary, export, tabs, panels) scrolls beside the board, so the page itself stays about one viewport high. */
+@media(min-width:1101px) and (min-height:701px){.layout-review .coach-column{position:relative;max-height:calc(100dvh - 150px);overflow-y:auto;overscroll-behavior:contain;padding-right:4px;scrollbar-gutter:stable}}
 
 /* Play move list */
 .move-history-list{max-height:260px;min-height:100px;overflow:auto;overscroll-behavior:contain;margin:12px 0;border:1px solid var(--border);border-radius:var(--r-md)}
