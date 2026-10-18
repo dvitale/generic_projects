@@ -99,6 +99,8 @@ def init_db():
         for name, declaration in {'move_times': "TEXT NOT NULL DEFAULT '[]'", 'pgn_headers': "TEXT NOT NULL DEFAULT '{}'", 'termination': 'TEXT', 'assisted_plies': "TEXT NOT NULL DEFAULT '[]'"}.items():
             if name not in columns:
                 con.execute(f'ALTER TABLE games ADD COLUMN {name} {declaration}')
+        if 'last_shown_at' not in {r[1] for r in con.execute('PRAGMA table_info(exercises)')}:
+            con.execute('ALTER TABLE exercises ADD COLUMN last_shown_at TEXT')
         columns = {r[1] for r in con.execute("PRAGMA table_info(attempts)")}
         for name, declaration in {"session_id": "TEXT", "is_first": "INTEGER NOT NULL DEFAULT 0", "exposure": "TEXT NOT NULL DEFAULT 'legacy'"}.items():
             if name not in columns:
@@ -798,7 +800,11 @@ def find_exercise(con, exercise_id):
 @app.get("/api/exercises")
 def exercises():
     with database() as con:
-        return [exercise_view(r) for r in con.execute("SELECT e.*,g.title AS game_title,g.created_at AS game_created_at FROM exercises e JOIN games g ON g.id=e.game_id ORDER BY e.due_at LIMIT 100")]
+        # Due puzzles rotate: never shown first, then the least recently shown. Opening a puzzle without
+        # answering leaves its due date unchanged, so ordering by due date alone always started with the same few.
+        return [exercise_view(r) for r in con.execute('''SELECT e.*,g.title AS game_title,g.created_at AS game_created_at
+            FROM exercises e JOIN games g ON g.id=e.game_id
+            ORDER BY e.due_at<=? DESC, e.last_shown_at IS NOT NULL, e.last_shown_at, e.due_at LIMIT 100''', (now(),))]
 
 
 @app.get("/api/exercises/{exercise_id}")
@@ -816,6 +822,7 @@ def puzzle_session(exercise_id: str):
     with database() as con:
         con.execute("BEGIN IMMEDIATE")
         ex = find_exercise(con, exercise_id)
+        con.execute("UPDATE exercises SET last_shown_at=? WHERE id=?", (now(), exercise_id))
         seen = con.execute("SELECT count(*) FROM puzzle_sessions WHERE exercise_id=?", (exercise_id,)).fetchone()[0]
         active = con.execute("SELECT * FROM puzzle_sessions WHERE exercise_id=? AND status='active' ORDER BY created_at DESC LIMIT 1", (exercise_id,)).fetchone()
         if active:
