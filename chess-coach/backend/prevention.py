@@ -47,6 +47,8 @@ def init_schema(con):
       move TEXT NOT NULL, success INTEGER NOT NULL, assisted INTEGER NOT NULL,
       is_first INTEGER NOT NULL, created_at TEXT NOT NULL);
     ''')
+    if 'last_shown_at' not in {r[1] for r in con.execute('PRAGMA table_info(prevention_positions)')}:
+        con.execute('ALTER TABLE prevention_positions ADD COLUMN last_shown_at TEXT')
 
 
 def seed_game(con, row, analysis, timestamp):
@@ -119,7 +121,8 @@ def install(app, database, reconstruct, now):
     def catalog():
         with database() as con:
             rows = con.execute('''SELECT p.*,g.title,g.created_at AS game_created_at FROM prevention_positions p JOIN games g ON g.id=p.game_id
-                WHERE p.enabled=1 ORDER BY p.due_at,p.id''').fetchall()
+                WHERE p.enabled=1
+                ORDER BY p.due_at<=? DESC, p.last_shown_at IS NOT NULL, p.last_shown_at, p.due_at, p.id''', (now(),)).fetchall()
             items = []
             for row in rows:
                 board = board_for(row)
@@ -151,6 +154,8 @@ def install(app, database, reconstruct, now):
         with database() as con:
             con.execute('BEGIN IMMEDIATE')
             row = find(con, position_id)
+            # Due positions rotate in the catalog: opening one sends it behind those not yet shown.
+            con.execute('UPDATE prevention_positions SET last_shown_at=? WHERE id=?', (now(), position_id))
             previous = con.execute("SELECT * FROM prevention_sessions WHERE position_id=? AND status='active'", (position_id,)).fetchone()
             if previous:
                 return {'id': previous['id'], 'version': previous['guesses'], 'exposure': previous['exposure']}

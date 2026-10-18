@@ -193,7 +193,7 @@ La prima mossa è quella dell'avversario, quasi sempre l'errore da punire: la sc
 
 ## Blunder prevention
 
-La sezione **Blunder prevention** propone le posizioni delle tue partite analizzate prima di un errore che rende la posizione perdente. Accetta qualsiasi mossa valutata da Stockfish almeno −1,00 dal tuo punto di vista, senza matto forzato contro di te: non serve trovare la prima scelta. Le posizioni già perse e le mosse obbligate vengono escluse, e ogni candidato è ricontrollato prima del primo tentativo.
+La sezione **Blunder prevention** propone le posizioni delle tue partite analizzate prima di un errore che rende la posizione perdente. Accetta qualsiasi mossa valutata da Stockfish almeno −1,00 dal tuo punto di vista, senza matto forzato contro di te: non serve trovare la prima scelta. Le posizioni già perse e le mosse obbligate vengono escluse, e ogni candidato è ricontrollato prima del primo tentativo. Come nei Puzzle, fra le posizioni da ripassare si parte da quelle mai mostrate, poi da quelle viste meno di recente.
 
 I tentativi e i ripassi sono separati dai Puzzle. Dopo una scelta corretta o la richiesta di un esempio, puoi confrontare il vecchio errore, aprire la partita originale e passare alla posizione successiva. I retry e gli aiuti non gonfiano i successi al primo tentativo. Le analisi già presenti alimentano il catalogo automaticamente; per altre partite usa **Analizza partita**. [Criteri e limiti](docs/blunder-prevention.md).
 

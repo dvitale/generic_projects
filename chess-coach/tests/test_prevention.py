@@ -125,3 +125,17 @@ def test_catalog_uses_all_personal_decisions_not_just_three_critical_moments(cli
     positions=client.get('/api/prevention').json()['positions']
     assert sorted(p['ply'] for p in positions)==[0,2,4,6,8]
     assert all(p['turn']=='w' for p in positions)
+
+
+def test_due_positions_rotate_so_the_same_ones_do_not_always_come_first(client):
+    _, p = seed(client)
+    session(client, p)  # Verifies the position and marks it as shown.
+    with main.database() as con:
+        for ply, ident in enumerate(('a', 'b'), start=1):
+            con.execute('''INSERT INTO prevention_positions(id,game_id,ply,initial_fen,history,original_move,due_at,verification)
+                SELECT ?,game_id,?,initial_fen,history,original_move,'2000-01-01T00:00:00+00:00',verification
+                FROM prevention_positions WHERE id=?''', (ident, ply, p['id']))
+    order = lambda: [x['id'] for x in client.get('/api/prevention').json()['positions']]
+    assert order() == ['a', 'b', p['id']]
+    session(client, {'id': 'a'})
+    assert order() == ['b', p['id'], 'a']
