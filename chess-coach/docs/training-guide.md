@@ -93,7 +93,7 @@ Passa alla pratica: [Blunder prevention](http://localhost:8033/?section=preventi
 
 ## 3. Studio: fissare le lezioni delle tue partite
 
-Il calendario ti fa rigiocare le posizioni. **Studio**, nella barra laterale sotto Puzzle (sul telefono nel menu **Altro**), serve a ricordare *perché* una mossa era sbagliata e a verificarlo senza aiuti. Le sei schede usano solo partite già analizzate: le partite di confutazione contro Stockfish non compaiono. [Apri Studio](http://localhost:8033/?section=study).
+Il calendario ti fa rigiocare le posizioni. **Studio**, nella barra laterale sotto Puzzle e Problemi (sul telefono nel menu **Altro**), serve a ricordare *perché* una mossa era sbagliata e a verificarlo senza aiuti. Le sei schede usano solo partite già analizzate: le partite di confutazione contro Stockfish non compaiono. [Apri Studio](http://localhost:8033/?section=study).
 
 ### Dopo ogni partita: Impara da una partita
 

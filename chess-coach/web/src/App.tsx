@@ -3,6 +3,7 @@ import { Chess } from 'chess.js'
 import Board, {type AnalysisArrow} from './Board'
 import Drills from './Drills'
 import BlunderPrevention from './BlunderPrevention'
+import Problems from './Problems'
 import TutorPanel from './TutorPanel'
 import FinalReview from './FinalReview'
 import RatingPanel from './RatingPanel'
@@ -47,12 +48,12 @@ import { maia, type Prediction } from './engine/maia'
 import { chooseMaiaMove } from './engine/play'
 import type { Game, Color, Exercise, Attempt, Profile, Analysis, Evaluation, PuzzleSession } from './types'
 
-type Tab = 'schedule' | 'play' | 'review' | 'drill' | 'train' | 'progress' | 'archive' | 'prevention' | 'study'
+type Tab = 'schedule' | 'play' | 'review' | 'drill' | 'train' | 'problems' | 'progress' | 'archive' | 'prevention' | 'study'
 const initialFen = new Chess().fen()
-const navigation:[Tab,string,boolean][]=[['schedule','Allenamento',true],['play','Gioca',true],['review','Rivedi',true],['train','Puzzle',true],['study','Studio',false],['drill','Drill',false],['prevention','Blunder prevention',false],['progress','Progressi',false],['archive','Partite',false]]
+const navigation:[Tab,string,boolean][]=[['schedule','Allenamento',true],['play','Gioca',true],['review','Rivedi',true],['train','Puzzle',true],['problems','Problemi',false],['study','Studio',false],['drill','Drill',false],['prevention','Blunder prevention',false],['progress','Progressi',false],['archive','Partite',false]]
 const levels=[800,1100,1400,1700,2000,2300]
-const titles: Record<Tab, string> = {schedule:'Allenamento di oggi',study:'Studio',prevention:'Blunder prevention',play:'Gioca contro Maia',review:'Rivedi la partita',drill:'Drill',train:'Puzzle dalle tue partite',progress:'Progressi',archive:'Partite'}
-const subtitles: Record<Tab, string> = {schedule:'Ripassi in scadenza e nuove posizioni tratte dalle tue partite.',study:'Flashcard, quiz, esami di prova e quaderno degli errori costruiti dalle tue partite.',prevention:'Trova una mossa sicura nelle posizioni in cui hai commesso un blunder.',play:'Maia gioca come un avversario umano del livello che scegli.',review:'Confronta ogni mossa con Stockfish e con la scelta più probabile di Maia.',drill:'Gioca un’apertura, un finale o una tua posizione critica contro Maia.',train:'Ritrova la mossa giusta nelle posizioni in cui avevi sbagliato.',progress:'Errori, ripassi e temi ricorrenti nelle partite analizzate.',archive:'Apri una partita per riprenderla o rivederla.'}
+const titles: Record<Tab, string> = {schedule:'Allenamento di oggi',study:'Studio',prevention:'Blunder prevention',play:'Gioca contro Maia',review:'Rivedi la partita',drill:'Drill',train:'Puzzle dalle tue partite',problems:'Problemi da partite reali',progress:'Progressi',archive:'Partite'}
+const subtitles: Record<Tab, string> = {schedule:'Ripassi in scadenza e nuove posizioni tratte dalle tue partite.',study:'Flashcard, quiz, esami di prova e quaderno degli errori costruiti dalle tue partite.',prevention:'Trova una mossa sicura nelle posizioni in cui hai commesso un blunder.',play:'Maia gioca come un avversario umano del livello che scegli.',review:'Confronta ogni mossa con Stockfish e con la scelta più probabile di Maia.',drill:'Gioca un’apertura, un finale o una tua posizione critica contro Maia.',train:'Ritrova la mossa giusta nelle posizioni in cui avevi sbagliato.',problems:'Problemi tattici del database Lichess, divisi per fasce di rating.',progress:'Errori, ripassi e temi ricorrenti nelle partite analizzate.',archive:'Apri una partita per riprenderla o rivederla.'}
 function position(game: Game, ply: number) {
   const board = new Chess(game.initialFen)
   for (const move of game.moves.slice(0, ply)) board.move({from:move.slice(0,2),to:move.slice(2,4),promotion:move[4]})
@@ -63,7 +64,7 @@ function score(evaluation: Evaluation) { return evaluation.mate !== null ? `Matt
 export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
   const [entrySection] = useState<Tab|null>(()=>{
     const section=new URLSearchParams(window.location.search).get('section')
-    return section&&['schedule','prevention','archive','drill','progress','study'].includes(section)?section as Tab:null
+    return section&&['schedule','prevention','archive','drill','progress','study','problems'].includes(section)?section as Tab:null
   })
   const [tab, setTab] = useState<Tab>(entrySection??'play')
   const [reviewTab,setReviewTab] = useState('moves')
@@ -393,14 +394,14 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
       <div className="local-status"><span className="status-dot"/> Spazio personale locale<small>Partite archiviate su questo computer.</small></div>
     </aside>
     <main className={'page-'+tab}>
-      <header className="topbar"><div className="topbar-title"><span className="crumb">SparringMate <span aria-hidden="true">/</span></span><h1>{titles[tab]}</h1></div><div className="topbar-actions"><button className="quiet" onClick={()=>setShowImport(!showImport)}>↑ <span className="label-long">Importa </span>PGN</button>{onLogout&&<button className="quiet" aria-label="Esci" title="Esci" onClick={onLogout}>⏻<span className="label-long"> Esci</span></button>}{['play','review','train','drill','prevention','study'].includes(tab)&&<FlipBoardButton/>}<BoardSettingsMenu/><span className="pill engine-pill">Maia + Stockfish <span className="status-dot"/></span></div></header>
-      {!['play','review','train','prevention'].includes(tab)&&<p className="page-subtitle">{subtitles[tab]}</p>}
+      <header className="topbar"><div className="topbar-title"><span className="crumb">SparringMate <span aria-hidden="true">/</span></span><h1>{titles[tab]}</h1></div><div className="topbar-actions"><button className="quiet" onClick={()=>setShowImport(!showImport)}>↑ <span className="label-long">Importa </span>PGN</button>{onLogout&&<button className="quiet" aria-label="Esci" title="Esci" onClick={onLogout}>⏻<span className="label-long"> Esci</span></button>}{['play','review','train','drill','prevention','study','problems'].includes(tab)&&<FlipBoardButton/>}<BoardSettingsMenu/><span className="pill engine-pill">Maia + Stockfish <span className="status-dot"/></span></div></header>
+      {!['play','review','train','prevention','problems'].includes(tab)&&<p className="page-subtitle">{subtitles[tab]}</p>}
       {error&&<div className="alert" role="alert">{error}<button onClick={()=>{setError('');setRetry(x=>x+1)}}>Riprova</button></div>}
       {notice&&<div className="notice" role="status">{notice}</div>}
       {showImport&&<ImportGames onImported={()=>void refresh().catch(fail)} onOpen={id=>void openGame(id)}/>}
 
 
-      {tab==='schedule'?<TrainingPlan focusJudgment={focusJudgment} onFocused={()=>setFocusJudgment(false)} onOpen={(kind,id)=>void openTraining(kind,id)} onImport={()=>setShowImport(true)} judgment={<PositionJudgment onReview={(id,ply)=>void openGame(id,ply)}/>}/>:tab==='prevention'?<BlunderPrevention startPositionId={requestedPrevention} onStarted={()=>setRequestedPrevention(null)} onArchive={()=>navigate('archive')} onReview={(id,ply)=>void openGame(id,ply)} onPlayMistake={(id,m)=>void playMistake('prevention',id,m)}/>:tab==='drill'?<Drills startTemplateId={requestedDrill} onStarted={()=>setRequestedDrill(null)} onReview={g=>{keepGame(g);setCursor(g.version);setTab('review');refresh().catch(fail)}}/>:tab==='progress'?<div className="progress-layout"><LearningProgress onPractice={()=>{setFocusJudgment(true);navigate('schedule')}}/>
+      {tab==='schedule'?<TrainingPlan focusJudgment={focusJudgment} onFocused={()=>setFocusJudgment(false)} onOpen={(kind,id)=>void openTraining(kind,id)} onImport={()=>setShowImport(true)} judgment={<PositionJudgment onReview={(id,ply)=>void openGame(id,ply)}/>}/>:tab==='problems'?<Problems/>:tab==='prevention'?<BlunderPrevention startPositionId={requestedPrevention} onStarted={()=>setRequestedPrevention(null)} onArchive={()=>navigate('archive')} onReview={(id,ply)=>void openGame(id,ply)} onPlayMistake={(id,m)=>void playMistake('prevention',id,m)}/>:tab==='drill'?<Drills startTemplateId={requestedDrill} onStarted={()=>setRequestedDrill(null)} onReview={g=>{keepGame(g);setCursor(g.version);setTab('review');refresh().catch(fail)}}/>:tab==='progress'?<div className="progress-layout"><LearningProgress onPractice={()=>{setFocusJudgment(true);navigate('schedule')}}/>
         <section className="panel"><span className="eyebrow">SESSIONE CONSIGLIATA</span><h2>Piano di 25 minuti</h2>{profile?.plan.map((item,i)=><div className="plan-row" key={item.title}><span className="step-number">0{i+1}</span><div><h3>{item.title}</h3><p>{item.description}</p></div><span className="duration">{item.minutes} min</span></div>)}<button className="primary" onClick={()=>navigate(exercises.length?'train':'play')}>Inizia la sessione →</button></section>
         <section className="panel"><span className="eyebrow">DATI RACCOLTI</span><h2>{profile?.confidence||'Nessun dato'}</h2><div className="stat-tiles"><div><strong>{profile?.games||0}</strong><span>partite salvate</span></div><div><strong>{profile?.attempts||0}</strong><span>tentativi</span></div><div><strong>{profile?.unaidedSuccesses||0}</strong><span>primi tentativi riusciti</span></div></div>{profile?.themes.length?<><h3>Posizioni per tema</h3><BarList items={profile.themes.map(t=>({key:t.theme,label:t.theme,value:t.examples}))}/></>:<p className="empty-text">Analizza una partita per iniziare a raccogliere le tue posizioni di allenamento.</p>}<InfoNote>I successi contano solo il primo tentativo senza aiuti, su esercizi nuovi o in scadenza. Le ripetizioni immediate restano pratica. Non sono ancora una misura di padronanza: servono anche verifiche su posizioni nuove.</InfoNote></section>
         <section className="panel"><h2>Tattica e posizione nelle tue decisioni</h2><ThinkingGuide/>{profile?.domains?.length?<BarList items={profile.domains.map(d=>({key:d.kind,label:d.label,value:d.examples}))}/>:null}<InfoNote summary="Come leggere i conteggi">Conteggi di decisioni con peggioramento: le posizioni ripetute sono contate una volta. Indicano cosa rivedere, non una diagnosi di carenze. La categoria posizionale segnala indizi, non una causa dimostrata.</InfoNote></section>

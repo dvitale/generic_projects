@@ -795,3 +795,12 @@ details.panel>summary{font-weight:650;font-size:var(--fs-lg)}
 .login-card .error-text{margin:4px 0 0}
 .login-brand{display:flex;align-items:center;gap:8px;font-size:19px;font-weight:750;letter-spacing:-.4px;color:var(--text)}
 .login-brand .brand-light{color:var(--accent)}
+
+/* Problems from real games (Lichess puzzle database) */
+.problems-filters{margin-bottom:14px}
+.problems-filters .chip-stat{font-size:11px;opacity:.75}
+.problems-theme{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:var(--fs-sm)}
+.problems-theme select{max-width:100%}
+.problems .command{background:var(--surface-2,#f1f1ee);border-radius:var(--r-sm);padding:8px 12px;margin:10px 0;overflow-x:auto}
+.problems .variation{overflow-wrap:anywhere}
+.maia-estimate .bar-track span{background:#882020}

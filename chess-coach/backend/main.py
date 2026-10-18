@@ -27,6 +27,7 @@ from . import mistakes
 from . import insights
 from . import training_schedule, pgn_import, learning
 from . import study
+from . import problems
 from . import auth
 from .rating import rating_plan, summarize_rating, RATING_LEVELS, RATING_METHOD
 
@@ -107,6 +108,7 @@ def init_db():
         learning.init_schema(con)
         final_review.init_schema(con)
         study.init_schema(con)
+        problems.init_schema(con)
         for row in con.execute('SELECT * FROM games WHERE analysis IS NOT NULL').fetchall():
             if row['analysis_version'] == len(json.loads(row['moves'])):
                 prevention.seed_game(con, row, json.loads(row['analysis']), now())
@@ -1034,6 +1036,7 @@ mistakes.install(app, database, tutor_lock)
 final_review.install(app, database, find_game, game_pgn, now, tutor_lock)
 study.install(app, database, find_game, now, tutor_lock)
 auth.install(app, ROOT / ".env", lambda: DB_PATH.parent)
+problems.install(app, database, lambda: DB_PATH.parent, now)
 
 DIST = ROOT / "web" / "dist"
 @app.get('/api/training-guide')

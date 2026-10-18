@@ -1,0 +1,12 @@
+PuzzleId,FEN,Moves,Rating,RatingDeviation,Popularity,NbPlays,Themes,GameUrl,OpeningTags
+007mr,5k2/p2r3p/1p4pP/3r1q2/3Rp3/2P5/PP3PQ1/K3R3 w - - 0 33,d4e4 d5d1 e1d1 d7d1,646,77,100,202,backRankMate endgame mate mateIn2 short,https://lichess.org/J12UnEgz#65,
+001wr,r4rk1/p3ppbp/Pp1q1np1/3PpbB1/2B5/2N5/1PPQ1PPP/3RR1K1 w - - 4 18,f2f3 d6c5 g1h1 c5c4,989,75,97,2532,advantage fork master masterVsMaster middlegame short,https://lichess.org/KnJ2mojX#35,Pirc_Defense Pirc_Defense_Classical_Variation
+0009B,r2qr1k1/b1p2ppp/pp4n1/P1P1p3/4P1n1/B2P2Pb/3NBP1P/RN1QR1K1 b - - 1 16,b6c5 e2g4 h3g4 d1g4,1084,74,88,611,advantage middlegame short,https://lichess.org/4MWQCxQ6/black#32,Kings_Pawn_Game Kings_Pawn_Game_Leonardis_Variation
+0008Q,8/4R3/1p2P3/p4r2/P6p/1P3Pk1/4K3/8 w - - 1 64,e7f7 f5e5 e2f1 e5e6,1383,81,92,771,advantage endgame rookEndgame short,https://lichess.org/MQSyb3KW#127,
+0000D,5rk1/1p3ppp/pq3b2/8/8/1P1Q1N2/P4PPP/3R2K1 w - - 2 27,d3d6 f8d8 d6d8 f6d8,1529,74,96,37506,advantage endgame short,https://lichess.org/F8M8OS71#53,
+00143,r2q1rk1/5ppp/1np5/p1b5/2p1B3/P7/1P3PPP/R1BQ1RK1 b - - 1 17,d8f6 d1h5 h7h6 h5c5,1797,76,91,2948,advantage middlegame short,https://lichess.org/jcuxlI63/black#34,Scotch_Game Scotch_Game_Mieses_Variation
+001kG,rnbq3r/1p2bkpp/p4n2/8/2pNP3/2N5/PPP3PP/R1BQ1RK1 b - - 1 11,e7c5 d1h5 f7g8 h5c5,1974,76,93,1232,advantage opening pin short,https://lichess.org/xXAEaVto/black#22,Sicilian_Defense Sicilian_Defense_Najdorf_Variation
+008nF,2rq1rk1/7p/1n4pb/1R2p3/pPpP1P2/P1B5/3NQ1PP/2R3K1 w - - 0 31,e2e5 f8e8 e5e8 d8e8,2168,86,90,848,crushing master middlegame short trappedPiece,https://lichess.org/tYO5rrIU#61,
+002mG,5r1k/B1p3pp/2Qb1p2/3Pq3/P6P/8/2P3K1/3R1R2 w - - 1 36,g2f2 f8e8 c6e8 e5e8,2377,82,88,205,advantage middlegame quietMove short,https://lichess.org/age2hanq#71,
+002e8,r3nrk1/1b3pp1/4pb2/p3q3/1p1N4/3B2R1/PPPQN2P/1K4R1 b - - 1 23,a8d8 d2h6 g7g6 g3h3,2554,82,92,676,crushing defensiveMove master middlegame pin short,https://lichess.org/ygzu5djr/black#46,
+001wb,r3k2r/pb1p1ppp/1b4q1/1Q2P3/8/2NP1Pn1/PP4PP/R1B2R1K w kq - 1 17,h2g3 g6h5,1149,76,95,290,mate mateIn1 middlegame oneMove,https://lichess.org/hNzYRMWP#33,Ruy_Lopez Ruy_Lopez_Bird_Variation

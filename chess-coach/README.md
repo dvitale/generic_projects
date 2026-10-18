@@ -80,6 +80,7 @@ Verifica del motore e differenze rispetto al gioco sul sito ufficiale: [audit Ma
 - **Rivedi:** revisione passo passo di entrambe le parti. Ogni posizione confronta mossa giocata, scelta Stockfish e mossa più probabile di Maia al livello selezionato, con probabilità e varianti. Le frecce e il selettore delle mosse mostrano la scacchiera prima della decisione. Restano importazione/esportazione PGN e momenti critici personali. Per vecchie analisi, ricalcolare per includere tutte le mosse.
 - **Drill:** aperture, finale di torre e posizioni delle proprie partite, mostrate con un’anteprima della posizione; 3–12 decisioni contro Maia e revisione dedicata.
 - **Puzzle:** decisioni critiche personali, alternative verificate, tentativi, indizi, soluzione e ripassi distanziati.
+- **Problemi:** problemi tattici da partite reali del database Lichess, per fasce di rating, con rating personale e stima Maia per livello. Vedi [Problemi da partite reali](#problemi-da-partite-reali).
 - **Studio:** sezione separata con sei schede: Flashcard, Quiz, Esame di prova, Impara da una partita, Chiedi al tutor e Quaderno. Vedi [Studio](#studio).
 - **Commento finale:** in Rivedi, su richiesta e dopo l’analisi Stockfish, DeepSeek riassume andamento della partita, punti riusciti e priorità di allenamento collegati alle posizioni. Solo al clic invia l’andamento delle valutazioni e fino a sei posizioni con le varianti, senza nomi dei giocatori; il commento viene salvato finché partita e analisi non cambiano.
 - **Tutor DeepSeek:** spiegazioni e piano dopo la revisione Stockfish, con riflessione del giocatore e collegamenti agli esercizi. Vedi `docs/tutor-deepseek.md`.
@@ -92,7 +93,7 @@ I Puzzle personali compaiono dopo aver analizzato una partita contenente errori 
 
 Maia3 non è una CNN: è la generazione Transformer descritta nel paper Chessformer. Si usa l'artefatto ONNX pronto del sito ufficiale, eseguito nel browser tramite JavaScript/WASM, senza addestramento. Il primo caricamento trasferisce circa 46 MB dal server locale e li conserva nella cache del browser. Stockfish 19 gira in WSL.
 
-Le partite restano in `data/coach.sqlite3`; gli asset sono in `web/public/maia3`, `web/public/ort` e `vendor/stockfish`. Maia e Stockfish funzionano localmente. Il tutor DeepSeek opzionale richiede una chiave e invia i dati selezionati al servizio solo quando richiesto. Salvare la cartella `data` a server fermo per il backup; a server acceso usare il backup SQLite.
+Le partite restano in `data/coach.sqlite3`; i problemi importati con `make puzzles` in `data/lichess_puzzles.sqlite3`, in sola lettura; gli asset sono in `web/public/maia3`, `web/public/ort` e `vendor/stockfish`. Maia e Stockfish funzionano localmente. Il tutor DeepSeek opzionale richiede una chiave e invia i dati selezionati al servizio solo quando richiesto. Salvare la cartella `data` a server fermo per il backup; a server acceso usare il backup SQLite.
 
 ## Installazione da un nuovo clone
 
@@ -174,6 +175,19 @@ La voce **Studio** raccoglie gli strumenti che trasformano le partite analizzate
 - **Quaderno:** errori e imprecisioni delle partite analizzate, raggruppati per tema, con le tue lezioni e i tre esempi più costosi per tema. **Esporta PGN annotato** (`GET /api/study/notebook.pgn`) scarica un capitolo per esempio: mossa giocata con perdita e lezioni come commento, variante di Stockfish come alternativa.
 
 Verifiche dedicate: `tests/test_study.py` e `web/tests/study.spec.ts`.
+
+## Problemi da partite reali
+
+La sezione **Problemi** (nel menu **Altro** sul telefono, link diretto `?section=problems`) propone problemi tattici tratti da partite reali, presi dal [database dei puzzle di Lichess](https://database.lichess.org/#puzzles) (CC0). Va installata una volta:
+
+```bash
+make puzzles               # 3.000 problemi per fascia, circa 7 MB
+make puzzles PER_BAND=5000
+```
+
+Lo script (`scripts/import_lichess_puzzles.py`) legge il file compresso in streaming senza salvarlo, tiene solo problemi con popolarità almeno 80, almeno 200 tentativi e deviazione del rating fino a 90, e si ferma quando tutte le dieci fasce sono piene (da “Fino a 800” a “Oltre 2500”): di solito in pochi secondi. Il file nuovo sostituisce il precedente solo a importazione completata. `--file` usa un CSV già scaricato. Dopo l'importazione la sezione funziona offline.
+
+La prima mossa è quella dell'avversario, quasi sempre l'errore da punire: la scacchiera la mostra, poi tocca a te. La verifica avviene sul server mossa per mossa, quindi la soluzione non arriva al browser prima della fine; come su Lichess, qualsiasi matto è accettato anche se diverso da quello salvato. La fascia **Adattiva** sceglie problemi entro 100 punti dal tuo rating personale, che parte da 1200 e cambia una sola volta per problema (formula Elo, fattore K decrescente): al primo errore, alla richiesta della soluzione o alla soluzione pulita. Saltare prima di muovere non lascia traccia. Si può filtrare per tema. A fine problema compaiono rating, temi, apertura, collegamento alla partita originale e la **stima Maia**: la probabilità che Maia, ai livelli 800–2300, giochi l'intera soluzione al primo colpo. Il rating del problema è calcolato da Lichess sui tentativi di chi risolve, non è l'Elo dei giocatori della partita. [Metodo, fonti e limiti](docs/problemi.md).
 
 ## Blunder prevention
 
