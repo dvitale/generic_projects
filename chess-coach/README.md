@@ -52,6 +52,7 @@ L’istanza pubblica gira su Debian 11 in `/opt/sparringmate`, con l’utente di
 
 - **Python:** il server ha Python 3.9, quindi il venv usa Python 3.12 da `/opt/uv-python`, creato con `uv venv` e installato con `uv pip install -r requirements.lock`.
 - **Stockfish:** il binario `universal` richiede glibc 2.35, mentre Debian 11 ha la 2.31. Stockfish 19 è quindi compilato sul server dai sorgenti in `vendor/stockfish/src` con `make profile-build ARCH=x86-64-avx2`; servono anche `vendor/stockfish/scripts`. Il binario si trova in `/opt/sparringmate/engine/stockfish` e il servizio lo indica con `STOCKFISH_PATH`.
+- **Cache del browser:** le pagine HTML hanno `Cache-Control: no-cache` e i file in `/assets/`, che hanno l’hash nel nome, una cache di un anno. Dopo un deploy il browser carica subito la nuova interfaccia, senza ricaricamento forzato.
 - **Dati e credenziali:** i dati sono in `/opt/sparringmate/data`, l’unica cartella scrivibile dal servizio. Le credenziali sono in `/opt/sparringmate/.env`, con permessi `600`.
 - **Proxy:** Uvicorn parte con `--proxy-headers`, così vede lo schema HTTPS (il cookie diventa `Secure`) e l’indirizzo reale di chi tenta l’accesso. Le scritture sono accettate da localhost o dallo stesso host che serve la pagina; ogni altra origine riceve 403. nginx limita anche `/api/auth/login` a 10 richieste al minuto per indirizzo.
 

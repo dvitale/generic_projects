@@ -150,6 +150,12 @@ async def local_headers(request, call_next):
     response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
     response.headers["Cross-Origin-Embedder-Policy"] = "require-corp"
     response.headers["X-Content-Type-Options"] = "nosniff"
+    # Built assets carry a content hash in their name and never change; the page that names them must be
+    # revalidated, or a browser keeps an old index.html pointing to the previous build after a deploy.
+    if request.url.path.startswith("/assets/") and response.status_code == 200:
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    elif response.headers.get("content-type", "").startswith("text/html"):
+        response.headers["Cache-Control"] = "no-cache"
     return response
 
 
