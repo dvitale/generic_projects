@@ -2,6 +2,7 @@ import InfoNote from './InfoNote'
 import {useEffect,useRef,useState} from 'react'
 import {Chess} from 'chess.js'
 import Board from './Board'
+import FailureDiagnosis from './FailureDiagnosis'
 import {useBoardOrientation} from './boardFlip'
 import LichessAnalysis from './LichessAnalysis'
 import ExerciseSource from './ExerciseSource'
@@ -23,6 +24,8 @@ export default function BlunderPrevention({onArchive,onReview,onPlayMistake,star
   const boardOrientation=useBoardOrientation(position?.turn??'w')
   const [session,setSession]=useState<Session|null>(null)
   const [result,setResult]=useState<Result|null>(null)
+  // Session whose safe-move request opened the self-diagnosis: a new session closes it.
+  const [diagnosing,setDiagnosing]=useState<string|null>(null)
   const [done,setDone]=useState<string[]>([])
   const [busy,setBusy]=useState(false)
   const [error,setError]=useState('')
@@ -77,7 +80,7 @@ export default function BlunderPrevention({onArchive,onReview,onPlayMistake,star
       <InfoNote summary="Quali mosse sono accettate"><p>{catalog?.rule.description} Le posizioni già perse prima dell’errore vengono escluse. Il primo accesso include una verifica Stockfish approfondita.</p></InfoNote></section>:<div className="training-layout layout-prevention">
       <section className="board-column">
         <div className="player-row"><span className="avatar">◇</span><div><strong>{position.turn==='w'?'Muove il Bianco':'Muove il Nero'}</strong><small>Mossa {position.moveNumber} · {position.title}</small></div></div>
-        <Board fen={board!.fen()} orientation={boardOrientation} legalMoves={position.legalMoves} interactive={!busy&&!!session&&!result?.closed} onMove={move=>void submit(move)} lastMove={showOriginal?displayedMove:motion.lastMove} animateMove reverseMove={!showOriginal&&motion.reverse}/>
+        <Board fen={board!.fen()} orientation={boardOrientation} legalMoves={position.legalMoves} interactive={!busy&&!!session&&!result?.closed&&diagnosing!==session.id} onMove={move=>void submit(move)} lastMove={showOriginal?displayedMove:motion.lastMove} animateMove reverseMove={!showOriginal&&motion.reverse}/>
         <p className="footnote">{showOriginal?'Scacchiera dopo il tuo errore originale.':result?.closed?'Scacchiera dopo la mossa verificata.':'Scacchiera prima del tuo errore: trascina un pezzo o usa due clic.'}</p>
         <LichessAnalysis key={position.id} fen={board!.fen()} orientation={position.turn}/>
       </section>
@@ -89,10 +92,11 @@ export default function BlunderPrevention({onArchive,onReview,onPlayMistake,star
         <ExerciseSource title={position.title} createdAt={position.gameCreatedAt} fen={position.fen} disabled={busy} onReview={()=>onReview(position.gameId,position.ply)}/>
         <section className="panel"><ThinkingGuide/><p className="footnote">La mossa può perdere per una tattica o compromettere una posizione difendibile. Stockfish decide l’esito; la spiegazione distingue fatti e ipotesi.</p></section>
         <section className="panel"><span className="eyebrow">PRIMA DI MUOVERE</span><h2>Tre controlli</h2><ol><li>Il re è al sicuro?</li><li>Quali pezzi sono attaccati o indifesi?</li><li>Quali scacchi e catture avrà l’avversario?</li></ol><p className="muted">Una mossa semplice che evita la perdita è sufficiente.</p>
-          {!result?.closed&&<div className="row"><button disabled={busy||!session} onClick={()=>void submit()}>Mostra una mossa sicura</button><button disabled={busy||!remaining.length} onClick={()=>{setDone(d=>[...d,position.id]);next()}}>Salta posizione</button></div>}
+          {!result?.closed&&<div className="row"><button disabled={busy||!session||diagnosing===session.id} onClick={()=>setDiagnosing(session!.id)}>Mostra una mossa sicura</button><button disabled={busy||!remaining.length} onClick={()=>{setDone(d=>[...d,position.id]);next()}}>Salta posizione</button></div>}
           <p className="footnote">{catalog?.rule.description} I valori sono dal tuo punto di vista e sono stime del motore.</p>
           {session?.exposure==='practice'&&<p className="footnote">Ripetizione anticipata: utile per esercitarti, non aumenta i successi indipendenti.</p>}
         </section>
+        {session&&diagnosing===session.id&&<FailureDiagnosis kind="prevention" targetId={position.id} sessionId={session.id} onReveal={()=>void submit()} onCancel={()=>setDiagnosing(null)}/>}
         {result&&<section className="panel"><span className="eyebrow">LA TUA SCELTA</span><h2>{result.san} · {evaluation(result.actual)}</h2>{!result.closed?<><p>Dopo aver mostrato la mossa, la scacchiera torna alla posizione iniziale per riprovare.</p><p className="variation">Possibile seguito: {result.actual.san.join(' ')}</p></>:<><p>{result.assisted?'Esempio mostrato con aiuto.':result.firstTry?'Riuscito al primo tentativo senza aiuti.':'Mossa accettata. I tentativi precedenti restano registrati.'}</p><p className="variation">Possibile seguito: {result.actual.san.join(' ')}</p></>}</section>}
         {result?.closed&&result.original&&<section className="panel"><span className="eyebrow">IL CONFRONTO CON LA PARTITA</span><h3>Avevi giocato {result.original.san}</h3><p>Valutazione dopo l’errore: {evaluation(result.original.evaluation)}.</p><p className="variation">{result.original.evaluation.san.join(' ')}</p><div className="row"><button onClick={()=>setShowOriginal(v=>!v)}>{showOriginal?'Mostra la mossa sicura':'Mostra il vecchio errore'}</button><button onClick={()=>onReview(position.gameId,position.ply)}>Rivedi nella partita</button></div></section>}
         {result?.closed&&<ChessInsights insight={result.insight} compact/>}

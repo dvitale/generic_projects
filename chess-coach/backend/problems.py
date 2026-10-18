@@ -12,6 +12,8 @@ import chess
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
+from . import diagnosis
+
 PUZZLES_FILE = 'lichess_puzzles.sqlite3'
 SOURCE = 'https://database.lichess.org/#puzzles'
 # (lower bound inclusive, upper bound exclusive, label). Shared with scripts/import_lichess_puzzles.py.
@@ -122,6 +124,22 @@ def install(app, database, data_dir, now):
         rated = con.execute('SELECT success, rating_before, rating_after FROM problem_attempts WHERE session_id=?', (session_id,)).fetchone()
         return {'success': bool(rated and rated['success']), 'ratingBefore': rated and rated['rating_before'],
                 'ratingAfter': rated and rated['rating_after'], **details(row)}
+
+    def diagnosis_position(con, puzzle_id, session_id):
+        session = session_row(con, session_id)
+        if session['puzzle_id'] != puzzle_id or session['status'] != 'active':
+            raise HTTPException(409, 'Problema già concluso')
+        with closing(require()) as store:
+            row = puzzle(store, puzzle_id)
+        solution = row['moves'].split()[session['step']]
+
+        def accepts(board, move, evaluation, best):
+            after = board.copy(stack=False)
+            after.push(move)
+            return move.uci() == solution or after.is_checkmate()
+        return {'board': board_at(row, session['step']), 'accepts': accepts, 'themes': row['themes'].split()}
+
+    diagnosis.register('problem', diagnosis_position)
 
     @app.get('/api/problems')
     def overview():

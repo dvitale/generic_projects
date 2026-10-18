@@ -1,4 +1,5 @@
 import InfoNote from './InfoNote'
+import DiagnosisProgress from './DiagnosisProgress'
 import {useEffect,useState} from 'react'
 import {api} from './api'
 import {QualityNumbers,qualityMethod,type Quality} from './DecisionQuality'
@@ -25,5 +26,6 @@ export default function LearningProgress({onPractice}:{onPractice:()=>void}){
       {data&&<><p>{data.judgments.matched} / {data.judgments.fresh} giudizi concordano con la fascia di Stockfish, su posizioni che hai indicato come non ricordate.</p><p>{data.judgments.falseAlarms} / {data.judgments.fearedLost} volte hai pensato “già persa” mentre il motore stimava almeno −1,00 dalla tua prospettiva.</p><p className="footnote">{data.judgments.total} valutazioni registrate in totale. Nessuna risposta raccolta significa dato mancante, non assenza di difficoltà. Le posizioni ricordate restano pratica; queste osservazioni non misurano ancora il trasferimento a partite nuove.</p></>}
       <button onClick={onPractice}>Valuta una posizione</button>
     </section>
+    <DiagnosisProgress/>
   </>
 }

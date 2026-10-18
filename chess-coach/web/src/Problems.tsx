@@ -2,6 +2,7 @@ import {useEffect,useRef,useState} from 'react'
 import {Chess} from 'chess.js'
 import Board from './Board'
 import InfoNote from './InfoNote'
+import FailureDiagnosis from './FailureDiagnosis'
 import {useBoardOrientation} from './boardFlip'
 import {maia} from './engine/maia'
 import {api} from './api'
@@ -72,6 +73,8 @@ export default function Problems(){
   const [estimateError,setEstimateError]=useState('')
   const [busy,setBusy]=useState(false)
   const [error,setError]=useState('')
+  // Session whose solution request opened the self-diagnosis: a new problem closes it.
+  const [diagnosing,setDiagnosing]=useState<string|null>(null)
   const token=useRef(0)
   const orientation=useBoardOrientation(problem?.puzzle.turn??'w')
 
@@ -176,7 +179,7 @@ export default function Problems(){
     :<div className="training-layout layout-prevention">
       <section className="board-column">
         <div className="player-row"><span className="avatar">{problem.puzzle.turn==='w'?'♙':'♟'}</span><div className="player-info"><strong>{problem.puzzle.turn==='w'?'Muove il Bianco':'Muove il Nero'}</strong><small>{phase==='done'?`Problema ${problem.puzzle.id}`:`Trova ${solverMoves===1?'la mossa vincente':`la sequenza vincente · ${solverMoves} mosse`}`}</small></div></div>
-        <Board fen={board!.fen()} orientation={orientation} legalMoves={legal} interactive={phase==='solving'&&!busy&&cursor===null} onMove={m=>void move(m)} lastMove={lastMove} animateMove/>
+        <Board fen={board!.fen()} orientation={orientation} legalMoves={legal} interactive={phase==='solving'&&!busy&&cursor===null&&diagnosing!==problem.sessionId} onMove={m=>void move(m)} lastMove={lastMove} animateMove/>
         {phase==='done'&&<div className="board-toolbar review-controls"><button aria-label="Posizione iniziale" onClick={()=>setCursor(0)} disabled={cursor===0}>⏮</button><button aria-label="Mossa precedente" onClick={()=>setCursor(c=>Math.max(0,(c??line.length)-1))} disabled={cursor===0}>◀</button><span>{cursor??line.length} / {line.length}</span><button aria-label="Mossa successiva" onClick={()=>setCursor(c=>c===null||c+1>=line.length?null:c+1)} disabled={cursor===null}>▶</button><button aria-label="Ultima posizione" onClick={()=>setCursor(null)} disabled={cursor===null}>⏭</button></div>}
       </section>
       <aside className="coach-column">
@@ -186,12 +189,13 @@ export default function Problems(){
             <p>{phase==='wrong'?'La scacchiera torna alla posizione precedente: il primo tentativo è già registrato, ma puoi continuare.':phase==='done'?(change!==null?`Rating ${result!.ratingBefore} → ${result!.ratingAfter} (${change>=0?'+':''}${change}).`:'Questo problema era già stato valutato.'):'Cerca catture, scacchi e minacce: il vantaggio nasce dall’ultima mossa dell’avversario.'}</p>
           </div>
           <div className="row">
-            {phase!=='done'?<><button disabled={busy||phase!=='solving'} onClick={()=>void reveal()}>Mostra soluzione</button><button disabled={busy} onClick={()=>void start()}>{failed||problem.step>1?'Prossimo problema':'Salta'}</button></>
+            {phase!=='done'?<><button disabled={busy||phase!=='solving'||diagnosing===problem.sessionId} onClick={()=>setDiagnosing(problem.sessionId)}>Mostra soluzione</button><button disabled={busy} onClick={()=>void start()}>{failed||problem.step>1?'Prossimo problema':'Salta'}</button></>
             :<button className="primary" disabled={busy} onClick={()=>void start()}>Prossimo problema →</button>}
             <button className="quiet" disabled={busy&&phase!=='done'} onClick={()=>{token.current++;setProblem(null);setBusy(false)}}>Cambia fascia</button>
           </div>
           {problem.repeated&&phase!=='done'&&<p className="footnote">Hai già visto tutti i problemi di questa selezione: questo è una ripetizione.</p>}
         </section>
+        {diagnosing===problem.sessionId&&<FailureDiagnosis kind="problem" targetId={problem.puzzle.id} sessionId={problem.sessionId} onReveal={()=>void reveal()} onCancel={()=>setDiagnosing(null)}/>}
         {result&&<section className="panel"><span className="eyebrow">IL PROBLEMA</span><h2>Rating {result.rating} <small className="muted">± {result.ratingDeviation}</small></h2>
           <p className="variation">{sanLine.map((san,i)=><span key={i} className={i===0?'muted':undefined}>{san}{' '}</span>)}</p>
           {visibleThemes.length>0&&<div className="chip-row">{visibleThemes.map(t=><span key={t} className="chip">{themeLabel(t)}</span>)}</div>}

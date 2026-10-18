@@ -10,6 +10,7 @@ import RatingPanel from './RatingPanel'
 import DecisionQuality from './DecisionQuality'
 import LearningProgress from './LearningProgress'
 import PositionJudgment from './PositionJudgment'
+import FailureDiagnosis from './FailureDiagnosis'
 import MoveReview from './MoveReview'
 import MoveHistory from './MoveHistory'
 import PanelTabs from './PanelTabs'
@@ -77,6 +78,8 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
   const [attempt, setAttempt] = useState<Attempt | null>(null)
   const [session, setSession] = useState<PuzzleSession | null>(null)
   const [hint, setHint] = useState('')
+  // Puzzle session whose solution request opened the self-diagnosis.
+  const [diagnosing, setDiagnosing] = useState<string|null>(null)
   const puzzleMotion=useTrainingMove((exercise?.id??'')+':'+(session?.id??''))
   const puzzleMove=puzzleMotion.move
   const puzzleComparison=usePuzzleComparison(exercise,session?.id,tab==='train'&&!!attempt?.success)
@@ -189,7 +192,7 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
   const boardFen = tab === 'train' && puzzleBoard ? puzzleBoard.fen() : tab === 'review' ? reviewBoard.fen() : browsingHistory && game ? position(game,playPly).fen() : game?.fen || initialFen
   const orientation: Color = tab === 'train' && exercise ? exercise.turn : game?.playerColor || (color==='b'?'b':'w')
   const legal = tab === 'train' ? exercise?.legalMoves || [] : game?.legalMoves || []
-  const canMove = !busy && !jobId && (tab === 'train' ? !!exercise && !!session && !attempt?.closed : tab === 'play' && !browsingHistory && !!game && !game.result && (game.source === 'maia' || game.source === 'stockfish') && game.turn === game.playerColor && !botThinking)
+  const canMove = !busy && !jobId && (tab === 'train' ? !!exercise && !!session && !attempt?.closed && diagnosing !== session.id : tab === 'play' && !browsingHistory && !!game && !game.result && (game.source === 'maia' || game.source === 'stockfish') && game.turn === game.playerColor && !botThinking)
   const decision = game?.analysis?.decisions.find(d=>d.ply === cursor)
   const visiblePrediction = predictionKey===boardFen+':'+reviewElo?prediction:null
   const reviewedMove=(game?.analysis?.moves||game?.analysis?.decisions)?.find(d=>d.ply===cursor)
@@ -468,7 +471,7 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
             <section className="panel"><span className="eyebrow">MAIA</span><h3>Mosse più probabili a questo livello</h3>{visiblePrediction?.moves.slice(0,3).map(m=><div className="policy" key={m.uci}><strong>{m.san}</strong><div><span style={{width:`${m.probability*100}%`}}/></div><span>{Math.round(m.probability*100)}%</span></div>)}{!visiblePrediction&&<p className="muted">{game?'Caricamento delle previsioni…':'Nessuna posizione selezionata.'}</p>}<small className="footnote">Probabilità del modello, non giudizi sulla qualità delle mosse.</small></section>
             </div>
           </>}
-          {tab==='train'&&<section className="panel puzzle-panel"><span className="eyebrow">DALLE TUE PARTITE</span><h2>{exercise?exercise.theme:'Il tuo primo esercizio'}</h2>{!exercise?<p className="empty-text">Gli esercizi nasceranno dalla revisione delle tue partite. Gioca o importa un PGN, poi avvia l'analisi.</p>:<><p className="muted">{attempt?.closed?'Confronta la posizione sulla scacchiera con la variante di riferimento.':'Muovi sulla scacchiera. Sono accettate anche alternative che mantengono la qualità della posizione.'}</p>{!attempt?.closed&&session&&<div className="row"><button disabled={busy} onClick={()=>puzzleHelp()}><span aria-hidden="true">💡</span> Chiedi un indizio</button><button disabled={busy} onClick={()=>puzzleHelp(true)}>Mostra soluzione</button></div>}{hint&&<p className="hint">{hint}</p>}{attempt?.closed&&<div className="puzzle-solution"><h3>Variante di riferimento</h3><p className="variation">{attempt.best?.san.join(' ')}</p><small>{attempt.assisted?'Esercizio con aiuto.':'Esercizio senza aiuti.'} Ripasso: {new Date(attempt.dueAt).toLocaleDateString('it-IT')}.</small></div>}</>}</section>}
+          {tab==='train'&&<section className="panel puzzle-panel"><span className="eyebrow">DALLE TUE PARTITE</span><h2>{exercise?exercise.theme:'Il tuo primo esercizio'}</h2>{!exercise?<p className="empty-text">Gli esercizi nasceranno dalla revisione delle tue partite. Gioca o importa un PGN, poi avvia l'analisi.</p>:<><p className="muted">{attempt?.closed?'Confronta la posizione sulla scacchiera con la variante di riferimento.':'Muovi sulla scacchiera. Sono accettate anche alternative che mantengono la qualità della posizione.'}</p>{!attempt?.closed&&session&&<div className="row"><button disabled={busy} onClick={()=>puzzleHelp()}><span aria-hidden="true">💡</span> Chiedi un indizio</button><button disabled={busy||diagnosing===session.id} onClick={()=>setDiagnosing(session.id)}>Mostra soluzione</button></div>}{hint&&<p className="hint">{hint}</p>}{session&&diagnosing===session.id&&<FailureDiagnosis kind="puzzle" targetId={exercise.id} sessionId={session.id} onReveal={()=>void puzzleHelp(true)} onCancel={()=>setDiagnosing(null)}/>}{attempt?.closed&&<div className="puzzle-solution"><h3>Variante di riferimento</h3><p className="variation">{attempt.best?.san.join(' ')}</p><small>{attempt.assisted?'Esercizio con aiuto.':'Esercizio senza aiuti.'} Ripasso: {new Date(attempt.dueAt).toLocaleDateString('it-IT')}.</small></div>}</>}</section>}
           {tab==='train'&&exercise&&<ExerciseSource title={exercise.gameTitle} createdAt={exercise.gameCreatedAt} fen={exercise.fen} disabled={busy} onReview={()=>void openGame(exercise.gameId,exercise.ply)}/>}
           {tab==='train'&&dueExercises.length>0&&<section className="panel"><div className="section-head"><h3>Da ripassare</h3><span className="count-chip">{profile?.due??dueExercises.length}</span></div><div className="exercise-list">{dueExercises.map(ex=><button key={ex.id} className={exercise?.id===ex.id?'exercise-link chosen':'exercise-link'} disabled={busy} onClick={()=>pickExercise(ex)}><span>{ex.theme}</span><small>Mossa {Math.floor(ex.ply/2)+1} · {new Date(ex.dueAt).getTime()<=Date.now()?'da ripassare':'programmato'}</small></button>)}</div><InfoNote summary="Quando un puzzle esce dalla lista">Escono dalla lista solo i puzzle risolti al primo tentativo senza aiuti; torneranno alla scadenza del ripasso.</InfoNote></section>}
           {tab==='train'&&exercise&&<MistakeHistory key={exercise.id} kind="puzzle" targetId={exercise.id} revision={session?.version??0} onPlay={m=>void playMistake('puzzle',exercise.id,m)}/>}

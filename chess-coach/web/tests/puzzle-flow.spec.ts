@@ -77,6 +77,7 @@ test('Puzzle feedback distinguishes retry, success and reveal and advances witho
   expect(sessions[0]).not.toBe(sessions[1])
   await expect(page.locator('[data-square="g6"] img')).toBeVisible()
   await page.getByRole('button',{name:'Mostra soluzione',exact:true}).click()
+  await page.getByRole('button',{name:'Salta: mostra subito'}).click()
   await expect(feedback).toContainText('Soluzione mostrata')
   await expect(feedback).not.toContainText('Mossa corretta!')
   await expect(feedback).toContainText('Non ci sono altri puzzle')

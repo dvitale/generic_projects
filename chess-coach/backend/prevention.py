@@ -12,6 +12,7 @@ from .engine import evaluator
 from . import mistakes
 from . import insights
 from . import training_schedule
+from . import diagnosis
 
 SAFE_CP = -100
 BLUNDER_CP = -200
@@ -106,6 +107,13 @@ def install(app, database, reconstruct, now):
         board = board_for(row)
         return {'move': row['original_move'], 'san': board.san(chess.Move.from_uci(row['original_move'])),
                 'evaluation': verification['actual']}
+
+    def diagnosis_position(con, position_id, session_id):
+        row = find(con, position_id)
+        active(con, position_id, session_id)
+        return {'board': board_for(row), 'accepts': lambda board, move, evaluation, best: safe(evaluation)}
+
+    diagnosis.register('prevention', diagnosis_position)
 
     @app.get('/api/prevention')
     def catalog():

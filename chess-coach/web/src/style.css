@@ -817,3 +817,20 @@ details.panel>summary{font-weight:650;font-size:var(--fs-lg)}
 .review-lines .score-chip{min-width:58px;font-size:var(--fs-xs)}
 .line-moves{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-2)}
 .review-count th{text-align:left;padding-left:14%}
+/* Self-diagnosis before a revealed solution */
+.failure-diagnosis fieldset.diagnosis-step{border:1px solid var(--border);border-radius:var(--r-md);margin:16px 0 0;padding:10px 12px}
+.failure-diagnosis legend{font-size:var(--fs-sm);font-weight:550;color:var(--text-2);padding:0 4px}
+.failure-diagnosis .row{flex-wrap:wrap;gap:8px;align-items:center}
+.failure-diagnosis textarea{display:block;width:100%;margin-top:6px;min-height:56px}
+.diagnosis-board{margin-top:12px;max-width:320px}
+.diagnosis-actions{margin-top:16px}
+.puzzle-panel .failure-diagnosis{padding:0;border:0;box-shadow:none;background:none;margin-top:16px}
+.diagnosis-list{list-style:none;padding:0;margin:8px 0 0;display:grid;gap:10px}
+.diagnosis-list li{border-left:3px solid var(--accent,#5b7f3a);padding:4px 0 4px 10px}
+.diagnosis-list li p{margin:4px 0 0}
+.diagnosis-list li.diagnosis-accurate{border-left-color:var(--success,#3a7d35)}
+.diagnosis-list li.diagnosis-ignored_threat,.diagnosis-list li.diagnosis-pessimistic,.diagnosis-list li.diagnosis-optimistic,.diagnosis-list li.diagnosis-phantom_threat{border-left-color:var(--error,#b4473a)}
+.diagnosis-calibration{padding-left:18px;margin:6px 0}
+.diagnosis-themes{width:100%;border-collapse:collapse;font-size:var(--fs-sm)}
+.diagnosis-themes th,.diagnosis-themes td{text-align:left;padding:4px 6px;border-bottom:1px solid var(--border)}
+.diagnosis-themes td:not(:first-child),.diagnosis-themes th:not(:first-child){text-align:right}

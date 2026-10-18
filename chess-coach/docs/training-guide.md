@@ -28,6 +28,10 @@ In [**Progressi**](http://localhost:8033/?section=progress), confronta partite c
 
 Le posizioni derivano dalle tue partite analizzate e possono essere favorevoli, equilibrate o sfavorevoli. Non sono selezionate soltanto fra i tuoi blunder. Una posizione ricordata non prova un miglioramento del giudizio in una partita nuova. Queste verifiche non incrementano i successi dei puzzle né il calendario dei ripassi.
 
+### Quando non trovi la soluzione
+
+In Puzzle, Problemi e Blunder prevention, **Mostra soluzione** apre prima tre domande: come valuti la posizione, quale minaccia temi (la muovi sulla scacchiera) e quale mossa avevi scartato. Rispondi con sincerità, prima di vedere la soluzione: Stockfish ti dirà se la mossa buona non era fra le tue candidate, se l'avevi vista e scartata, se eri troppo pessimista o se temevi una minaccia inesistente. In **Progressi → Diagnosi degli errori** guarda quale categoria si ripete e segui l'indicazione accanto. Se hai fretta, **Salta: mostra subito**.
+
 ## 1. Da Maia Chess a SparringMate
 
 ### Recuperare una partita
