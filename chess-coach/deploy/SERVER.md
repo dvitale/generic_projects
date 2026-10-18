@@ -30,7 +30,7 @@ Il server ospita anche altri siti, con i propri virtual host in `/etc/nginx/site
 | Log applicazione | `journalctl -u sparringmate` |
 | TLS | `/etc/ssl/certs/u-s.it.cer` e `/etc/ssl/private/u-s.it.key`, certificato `*.u-s.it` (scadenza 5 novembre 2026), condiviso con gli altri siti |
 
-Il servizio usa `ProtectSystem=strict`: l'unica cartella in cui può scrivere è `data/`. La chiave DeepSeek (`.secrets/deepseek.json`) non è installata, quindi il tutor risponde con le sole varianti di Stockfish.
+Il servizio usa `ProtectSystem=strict`: l'unica cartella in cui può scrivere è `data/`. La chiave DeepSeek è installata dal 18 ottobre 2026 in `.secrets/deepseek.json` (utente `sparringmate`, cartella 700, file 600, modello `deepseek-flash`): il tutor e **Spiega motivo** usano DeepSeek, con addebito sulla chiave. `make deploy` non tocca `.secrets/`. Per sostituirla: `.venv/bin/python scripts/configure_deepseek.py` sul server, poi `chown -R sparringmate:sparringmate .secrets`.
 
 ## Aggiornare
 
@@ -42,7 +42,8 @@ SSHPASS='…' make deploy    # in alternativa, la password tramite sshpass
 `scripts/deploy.sh` esegue questi passi:
 
 1. compila l'interfaccia (`SKIP_BUILD=1` per saltare il passo);
-2. sincronizza la cartella con `rsync --delete`; non tocca `.env`, `.secrets/`, `data/`, `.venv/` né `engine/`;
+2. sincronizza la cartella con `rsync --delete --no-owner --no-group --chmod=Dgo-w,Fgo-w`: il codice resta di `root` e non è scrivibile da gruppo e altri, qualunque siano i permessi della copia locale; non tocca `.env`, `.secrets/`, `data/`, `.venv/` né `engine/`;
+   se esiste in locale, copia anche `data/lichess_puzzles.sqlite3` (i problemi di `make puzzles`, sola lettura); gli altri file di `data/` restano solo sul server;
 3. aggiorna le dipendenze con `uv pip install`;
 4. installa unit e virtual host se sono cambiati: crea prima una copia in `/root/sparringmate.conf.bak-…`, esegue `nginx -t` e ripristina la copia se il test fallisce;
 5. riavvia il servizio e verifica `/api/health`, poi che `/api/games` senza login risponda 401.
