@@ -5,7 +5,9 @@ import mapping from './data/all_moves_maia3.json'
 
 const indices = mapping as Record<string, number>
 type Pending = { resolve: (value: {logitsMove: Float32Array; logitsValue: Float32Array}) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }
-export interface Prediction { moves: {uci: string; san: string; probability: number}[]; whiteExpectedScore: number }
+/** Game outcome probabilities from White's point of view, as predicted by Maia's value head. */
+export interface Outcome { win: number; draw: number; loss: number }
+export interface Prediction { moves: {uci: string; san: string; probability: number}[]; whiteExpectedScore: number; whiteOutcome: Outcome }
 class InvalidMaiaOutput extends Error {}
 export function mirrorMove(move: string) {
   return move[0] + (9 - Number(move[1])) + move[2] + (9 - Number(move[3])) + move.slice(4)
@@ -124,7 +126,7 @@ class MaiaEngine {
 
   private async predictOnce(fen: string, selfElo: number, opponentElo: number): Promise<Prediction> {
     const input = encode(fen)
-    if (!input.legal.length) return { moves: [], whiteExpectedScore: 0.5 }
+    if (!input.legal.length) return { moves: [], whiteExpectedScore: 0.5, whiteOutcome: { win: 0, draw: 1, loss: 0 } }
     await this.load()
     const id = ++this.nextId
     const output = await new Promise<{logitsMove: Float32Array; logitsValue: Float32Array}>((resolve, reject) => {
@@ -144,8 +146,12 @@ class MaiaEngine {
     const sum = exp.reduce((a, b) => a + b, 0)
     const valueMax = Math.max(...output.logitsValue)
     const values = Array.from(output.logitsValue, x => Math.exp(x - valueMax))
-    const expected = (values[2] + 0.5 * values[1]) / values.reduce((a, b) => a + b, 0)
-    return { moves: input.legal.map((move, i) => ({ uci: move.uci, san: move.san, probability: exp[i] / sum })).sort((a, b) => b.probability - a.probability), whiteExpectedScore: input.black ? 1 - expected : expected }
+    const total = values.reduce((a, b) => a + b, 0)
+    // Value logits are loss, draw, win for the side to move.
+    const own = { win: values[2] / total, draw: values[1] / total, loss: values[0] / total }
+    const expected = own.win + 0.5 * own.draw
+    return { moves: input.legal.map((move, i) => ({ uci: move.uci, san: move.san, probability: exp[i] / sum })).sort((a, b) => b.probability - a.probability),
+      whiteExpectedScore: input.black ? 1 - expected : expected, whiteOutcome: input.black ? { win: own.loss, draw: own.draw, loss: own.win } : own }
   }
 }
 export const maia = new MaiaEngine()

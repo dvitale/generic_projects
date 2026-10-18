@@ -1,11 +1,11 @@
 import {useSyncExternalStore} from 'react'
 
 export type BoardTheme='green'|'brown'|'blue'
-export type BoardSettings={theme:BoardTheme;sound:boolean;evalBar:boolean}
+export type BoardSettings={theme:BoardTheme;sound:boolean;evalBar:boolean;maiaBar:boolean}
 export const boardThemes:{id:BoardTheme;label:string}[]=[{id:'green',label:'Verde'},{id:'brown',label:'Legno'},{id:'blue',label:'Blu'}]
 
 const storageKey='sparringmate-board'
-const defaults:BoardSettings={theme:'green',sound:true,evalBar:true}
+const defaults:BoardSettings={theme:'green',sound:true,evalBar:true,maiaBar:true}
 const listeners=new Set<()=>void>()
 let current=read()
 
@@ -13,7 +13,8 @@ function read():BoardSettings{
   try{
     const saved=JSON.parse(localStorage.getItem(storageKey)||'{}')
     return {theme:boardThemes.some(t=>t.id===saved.theme)?saved.theme:defaults.theme,sound:typeof saved.sound==='boolean'?saved.sound:defaults.sound,
-      evalBar:typeof saved.evalBar==='boolean'?saved.evalBar:defaults.evalBar}
+      evalBar:typeof saved.evalBar==='boolean'?saved.evalBar:defaults.evalBar,
+      maiaBar:typeof saved.maiaBar==='boolean'?saved.maiaBar:defaults.maiaBar}
   }catch{return defaults}
 }
 

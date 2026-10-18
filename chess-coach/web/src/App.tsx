@@ -25,8 +25,9 @@ import LichessAnalysis from './LichessAnalysis'
 import ExerciseSource from './ExerciseSource'
 import {useMoveTime} from './useMoveTime'
 import PlayerBar,{material} from './PlayerBar'
-import EvalBar,{whiteValue,type BarValue} from './EvalBar'
+import EvalBar,{MaiaBar,whiteValue,type BarValue} from './EvalBar'
 import {usePositionEval} from './usePositionEval'
+import {useMaiaScore,type MaiaScore} from './useMaiaScore'
 import {useBoardSettings} from './boardSettings'
 import {FlipBoardButton,resetBoardFlip,useBoardFlip,useBoardOrientation,useFlipShortcut} from './boardFlip'
 import BoardSettingsMenu from './BoardSettingsMenu'
@@ -206,12 +207,16 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
 
   const series=useMemo(()=>tab==='review'&&game?evaluationSeries(game):null,[tab,game])
   const point=series?.points.find(p=>p.position===cursor)
-  const showEval=useBoardSettings().evalBar
+  const {evalBar:showEval,maiaBar:showMaia}=useBoardSettings()
   const flipped=useBoardFlip(),boardOrientation=useBoardOrientation(orientation)
   useFlipShortcut()
   // Without a saved analysis (live game, unanalysed review) the bar asks Stockfish for a quick evaluation.
   const liveEval=usePositionEval(tab==='play'||tab==='review'?game:null,tab==='review'?cursor:playPly,showEval&&(tab==='play'||tab==='review'&&!point))
   const evalValue:BarValue|null|undefined=!showEval?undefined:tab==='review'?(point?{cp:point.cp,mate:point.mate,mateIn:point.terminal&&point.mate?0:null}:liveEval):tab==='play'&&game?liveEval:tab==='train'&&exercise&&attempt?.closed&&!puzzleComparison.visible?((attempt.success?attempt.actual:attempt.best)?whiteValue((attempt.success?attempt.actual:attempt.best)!,exercise.turn):null):undefined
+  // Maia's value head: White's expected score for two humans of the review level, or of the game level while playing.
+  const maiaPosition=showMaia&&game&&(tab==='play'||tab==='review')
+  const maiaScore=useMaiaScore(maiaPosition?boardFen:null,tab==='review'?reviewElo:game?.elo??1500,!!maiaPosition)
+  const maiaValue:MaiaScore|null|undefined=maiaPosition?maiaScore:undefined
   const moveBadge=tab==='review'&&reviewedMove?.fen===boardFen&&arrowSources.played?{square:reviewedMove.played.slice(2,4),kind:classifyMove(reviewedMove)}:undefined
   const shownGame=tab==='play'||tab==='review'?game:null
   const shownPly=tab==='review'?cursor:playPly
@@ -405,9 +410,11 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
       :tab==='archive'?null:<div className={'training-layout layout-'+tab}>
         <section className="board-column">
           {flipped?playerBar:opponentBar}
-          <div className={`board-stage ${evalValue!==undefined?'with-eval':''}`}>
-            {evalValue!==undefined&&<EvalBar value={evalValue} orientation={boardOrientation}/>}
+          {/* Stockfish bar on the left of the board, Maia bar on the right. */}
+          <div className={`board-stage ${evalValue!==undefined?'with-eval':''} ${maiaValue!==undefined?'with-maia':''}`}>
+            {evalValue!==undefined&&<div className="eval-bars"><EvalBar value={evalValue} orientation={boardOrientation}/></div>}
             <Board badge={moveBadge} analysisArrows={analysisArrows} reverseMove={tab==='train'&&puzzleMotion.reverse} animateMove={tab==='train'||tab==='play'&&!browsingHistory&&!!game&&game.turn===game.playerColor} fen={boardFen} orientation={boardOrientation} interactive={canMove} legalMoves={legal} onMove={submitMove} lastMove={tab==='train'?(puzzleComparison.visible?undefined:puzzleMotion.lastMove):tab==='play'?game?.moves[playPly-1]:tab==='review'&&game&&cursor>0?game.moves[cursor-1]:undefined}/>
+            {maiaValue!==undefined&&<div className="eval-bars"><MaiaBar score={maiaValue} orientation={boardOrientation}/></div>}
           </div>
           {flipped?opponentBar:playerBar}
           {tab==='play'&&game&&<div className="board-actions"><button title={`Ritorna alla tua ultima scelta e annulla anche la risposta di ${game.source==='stockfish'?'Stockfish':'Maia'}.`} disabled={!game.canUndo||busy||!!jobId||browsingHistory} onClick={undo}><span aria-hidden="true">↶</span> Annulla ultima mossa</button>{!game.result&&<button disabled={!canMove||!!moveHint.suggestion?.loading} onClick={()=>void moveHint.request()} title="Prima scelta di Stockfish (blu) e di Maia (rosso) nella posizione attuale"><span aria-hidden="true">💡</span> Suggerisci mossa</button>}{(game.source==='maia'||game.source==='stockfish')&&!game.result&&<button className="danger" disabled={busy||!!jobId} onClick={resign}><span aria-hidden="true">⚑</span> Abbandona partita</button>}</div>}

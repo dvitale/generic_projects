@@ -18,6 +18,7 @@ export default function BoardSettingsMenu(){
       <div className="theme-options">{boardThemes.map(t=><button key={t.id} className={`theme-option board-theme-${t.id}`} aria-pressed={settings.theme===t.id} onClick={()=>updateBoardSettings({theme:t.id})}><span className="theme-swatch" aria-hidden="true"/>{t.label}</button>)}</div>
       <label className="switch"><input type="checkbox" checked={settings.sound} onChange={e=>updateBoardSettings({sound:e.target.checked})}/>Suoni delle mosse</label>
       <label className="switch"><input type="checkbox" checked={settings.evalBar} onChange={e=>updateBoardSettings({evalBar:e.target.checked})}/>Barra di valutazione</label>
+      <label className="switch" title="Punteggio atteso del Bianco secondo Maia, per due giocatori umani del livello scelto"><input type="checkbox" checked={settings.maiaBar} onChange={e=>updateBoardSettings({maiaBar:e.target.checked})}/>Barra Maia (punteggio umano)</label>
     </div>}
   </div>
 }

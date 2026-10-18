@@ -191,7 +191,12 @@ details.panel>summary{font-weight:650;font-size:var(--fs-lg)}
 @keyframes pulse{from{opacity:.25}to{opacity:1}}
 
 /* Board */
-.board-stage.with-eval{display:grid;grid-template-columns:24px minmax(0,1fr);gap:8px}
+.board-stage.with-eval,.board-stage.with-maia{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px}
+.board-stage.with-maia{grid-template-columns:minmax(0,1fr) auto}
+.board-stage.with-eval.with-maia{grid-template-columns:auto minmax(0,1fr) auto}
+.eval-bars{display:flex;gap:4px}
+.eval-bars .eval-bar{width:24px}
+@media(max-width:600px){.board-stage.with-eval.with-maia .eval-bars .eval-bar{width:18px}}
 .board-wrap{position:relative;min-width:0}
 .board{position:relative;width:100%;display:grid;grid-template-columns:repeat(8,1fr);aspect-ratio:1;overflow:hidden;border-radius:var(--r-sm);box-shadow:var(--shadow-md);background-image:conic-gradient(from 90deg,var(--sq-light) 25%,var(--sq-dark) 0 50%,var(--sq-light) 0 75%,var(--sq-dark) 0);background-size:25% 25%}
 .board.board-theme-green{background-image:url('/board-themes/chesscom-green.png'),conic-gradient(from 90deg,var(--sq-light) 25%,var(--sq-dark) 0 50%,var(--sq-light) 0 75%,var(--sq-dark) 0);background-size:100% 100%,25% 25%}
@@ -239,6 +244,9 @@ details.panel>summary{font-weight:650;font-size:var(--fs-lg)}
 .eval-text{position:absolute;left:0;right:0;text-align:center;font-size:10px;font-weight:800;z-index:1}
 .eval-text.on-white{bottom:4px;color:#403d39}.eval-text.on-black{top:4px;color:#f4f4f1}
 .eval-bar.flipped .eval-text.on-white{bottom:auto;top:4px}.eval-bar.flipped .eval-text.on-black{top:auto;bottom:4px}
+/* Maia bar: same white/black split, marked with the red of Maia's arrows. */
+.maia-bar{box-shadow:var(--shadow-sm),inset 0 0 0 2px #882020}
+.maia-bar .eval-white{background:#f6eded}
 @media(prefers-reduced-motion:reduce){.eval-white{transition:none}}
 
 /* Analysis arrows */
@@ -613,7 +621,7 @@ details.panel>summary{font-weight:650;font-size:var(--fs-lg)}
 @media(min-width:1500px){
   main{max-width:2600px}
   .training-layout{grid-template-columns:min(calc(100dvh - var(--board-room)),calc(100% - 400px),1180px) minmax(380px,1fr);gap:28px}
-  .board-stage.with-eval{grid-template-columns:28px minmax(0,1fr)}
+  .eval-bars .eval-bar{width:28px}
   .eval-text{font-size:11px}
 }
 @media(min-width:2200px){
