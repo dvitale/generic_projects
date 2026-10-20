@@ -1,6 +1,7 @@
 import {useEffect,useMemo,useRef} from 'react'
 import {Chess} from 'chess.js'
 import type {Color,Decision,Evaluation,Game} from './types'
+import MistakeExplanation from './MistakeExplanation'
 import {classifyMove,MoveClassIcon,moveClassInfo,type MoveClass} from './moveClass'
 import {evaluationSeries,type EvaluationPoint} from './evaluationSeries'
 import {gameAccuracy} from './accuracy'
@@ -94,6 +95,7 @@ export default function ReviewSummary({game,cursor,onPosition}:{game:Game;cursor
     {reviewed&&<ol className="review-lines" aria-label="Scelte di Stockfish nella posizione mostrata">{lines.length?lines.map((e,i)=>{const s=whiteScore(e,mover)
       return <li key={i}><span className={`score-chip score-chip-${s.side}`}>{s.text}</span><span className="line-moves" title={lineText(current!,e.san)}>{lineText(current!,e.san)}</span></li>
     }):<li className="muted">{cursor>=game.moves.length?'Posizione finale: nessuna scelta da confrontare.':'Nessuna analisi per questa posizione.'}</li>}</ol>}
+    {current?.insight?.explanation&&<MistakeExplanation key={current.ply} explanation={current.insight.explanation}/>}
     <ol className="review-moves" ref={list} aria-label="Elenco delle mosse">
       {rows.map(row=><li key={row.number}><span className="move-number">{row.number}.</span>{(['w','b'] as const).map(color=>{
         const move=row[color]

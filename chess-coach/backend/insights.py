@@ -1,7 +1,7 @@
 """Observable chess facts, separate from engine scores and causal hypotheses."""
 import chess
 
-VERSION = 2
+VERSION = 3
 VALUES = {chess.PAWN: 1, chess.KNIGHT: 3, chess.BISHOP: 3, chess.ROOK: 5, chess.QUEEN: 9, chess.KING: 0}
 LABELS = {'tactical': 'Evidenza tattica', 'positional': 'Indizi posizionali',
           'mixed': 'Tattica e posizione', 'unclear': 'Causa da approfondire', 'neutral': 'Confronto didattico'}
@@ -107,6 +107,7 @@ def compare(fen, played, best, actual):
     kind = ('mixed' if facts and structural_change else 'tactical' if facts else 'positional' if positional else 'unclear') if relevant else 'neutral'
     return {'version': VERSION, 'kind': kind, 'label': LABELS[kind], 'tacticalFacts': facts,
             'positionalFacts': positional[:10], 'plans': plans[:3], 'note': LIMIT,
+            'explanation': explain.explain(fen, played, best, actual),
             'material': {'before': material(board,board.turn), 'immediate': material(after,board.turn),
                          'playedLine': paths['actual']['material'], 'bestLine': paths['best']['material']},
             'lines': paths, 'features': comparisons}
@@ -126,3 +127,7 @@ def enrich(analysis):
 
 def public(insight):
     return {k:v for k,v in insight.items() if k not in ('lines','features')}
+
+
+# Imported last: explain builds on the helpers above.
+from . import explain  # noqa: E402

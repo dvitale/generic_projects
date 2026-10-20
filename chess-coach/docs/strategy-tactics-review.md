@@ -57,7 +57,7 @@ Se una scelta passa da +0,30 a −1,40 senza perdere materiale nella linea mostr
 ## Limiti e sviluppi successivi
 
 - Non cambia la soglia di accettazione dei Puzzle o di Blunder prevention. Un confronto basato sulle probabilità di esito, come in Lichess, richiederebbe una scelta separata di prodotto e una calibrazione.
-- Non è un classificatore completo di motivi tattici: inchiodature, sovraccarichi, deviazioni, zugzwang e fortezze non vengono “riconosciuti” soltanto dalla FEN o dall’assenza di catture.
+- Non è un classificatore completo di motivi tattici. Dal 19 ottobre 2026 `backend/explain.py` riconosce i motivi più comuni (pezzo in presa, forchetta, pezzo intrappolato, inchiodatura, scoperta e altri, vedi [spiegazione degli errori](spiegazione-errori.md)) solo quando la variante di Stockfish e un controllo sulla scacchiera concordano; sovraccarichi, deviazioni, zugzwang e fortezze restano esclusi.
 - Non viene lanciata automaticamente una ricerca più profonda: la causalità può restare irrisolta con il budget e la linea disponibili. È preferibile un limite esplicito a una spiegazione plausibile ma inventata.
 - Un’evoluzione utile è un approfondimento su richiesta con ricerca più lunga, confronto della stabilità del punteggio e riproduzione delle due linee sulla scacchiera. Per i progressi servono più esempi indipendenti e verifica su posizioni nuove, non semplici conteggi.
 

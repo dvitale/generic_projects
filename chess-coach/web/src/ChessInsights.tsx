@@ -1,4 +1,7 @@
+import MistakeExplanation,{type Explanation} from './MistakeExplanation'
+
 export interface Insight {
+  explanation?:Explanation|null;
   kind:'tactical'|'positional'|'mixed'|'unclear'|'neutral';label:string;
   tacticalFacts:string[];positionalFacts:string[];plans:string[];note:string;
   material?:{before:number;immediate:number;playedLine:number;bestLine:number}
@@ -23,9 +26,9 @@ export function ReasoningSections({value}:{value:Reasoning}){
   </div>
 }
 
-export default function ChessInsights({insight,compact=false}:{insight?:Insight;compact?:boolean}){
+export default function ChessInsights({insight,compact=false,explanation=true}:{insight?:Insight;compact?:boolean;explanation?:boolean}){
   if(!insight)return null
-  return <div className="chess-insight" aria-label="Tattica e strategia"><span className={`insight-badge insight-${insight.kind}`}>{insight.label}</span>
+  return <div className="chess-insight" aria-label="Tattica e strategia">{explanation&&<MistakeExplanation explanation={insight.explanation}/>}<span className={`insight-badge insight-${insight.kind}`}>{insight.label}</span>
     <details open={compact?undefined:true}><summary>Perché può cambiare la valutazione</summary>
       <h4>Tattica · evidenze nella variante</h4>
       {insight.tacticalFacts.length?<ul>{insight.tacticalFacts.map((fact,i)=><li key={i}>{fact}</li>)}</ul>:<p>Nessuna conseguenza tattica decisiva documentata dalla linea disponibile. Non basta per escludere tattiche più lontane.</p>}
