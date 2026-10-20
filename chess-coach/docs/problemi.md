@@ -54,6 +54,8 @@ La **stima Maia** moltiplica, per ciascuna mossa di chi risolve, la probabilità
 
 La verifica avviene sul server, mossa per mossa. Il browser riceve posizione, prima mossa dell’avversario e mosse legali. Soluzione, rating e temi arrivano solo a problema concluso. Come su Lichess, qualsiasi matto è accettato anche se diverso dalla mossa salvata. Una mossa sbagliata viene mostrata e poi annullata, e si può continuare a cercare.
 
+A problema concluso, **↺ Riprova da capo** riparte dalla mossa dell’avversario. La soluzione è ormai nota al browser, che verifica le mosse da solo con la stessa regola (mossa salvata o qualsiasi matto) e gioca le risposte: nulla arriva al server, quindi il rating non cambia.
+
 ## Verifiche ripetibili
 
 ```bash

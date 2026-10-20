@@ -21,6 +21,15 @@ test('Problems from real games: rating bands, solving, mistakes and the Maia est
   await expect(page.locator('.chip',{hasText:'Matto sulla traversa'})).toBeVisible()
   await expect(page.locator('.maia-estimate .bar-list li')).toHaveCount(6,{timeout:90000})
   await page.screenshot({path:'test-results/problems-solved.png'})
+  // Free practice: back to the start, replay the solution without touching the rating.
+  await page.getByRole('button',{name:'↺ Riprova da capo'}).click()
+  await expect(page.getByRole('heading',{name:'↺ Pratica dalla posizione iniziale'})).toBeVisible()
+  await expect(square(page,'d5')).toHaveAttribute('aria-label',/torre nero/)
+  await square(page,'d5').click();await square(page,'d1').click()
+  await expect(square(page,'d1')).toHaveAttribute('aria-label',/torre bianco/)
+  await square(page,'d7').click();await square(page,'d1').click()
+  await expect(page.getByRole('heading',{name:'✓ Sequenza completata'})).toBeVisible()
+  await expect(page.getByText(/Rating 1200 → 12\d\d/)).toHaveCount(0)
 
   // A wrong first move is rated at once, the board goes back and the problem can still be finished.
   await page.getByRole('button',{name:'Cambia fascia'}).click()

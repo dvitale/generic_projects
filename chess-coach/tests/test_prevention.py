@@ -139,3 +139,18 @@ def test_due_positions_rotate_so_the_same_ones_do_not_always_come_first(client):
     assert order() == ['a', 'b', p['id']]
     session(client, {'id': 'a'})
     assert order() == ['b', p['id'], 'a']
+
+
+def test_practice_after_closing_checks_moves_without_recording(client):
+    _,p=seed(client)
+    s=session(client,p)
+    body=lambda move:{'session_id':s['id'],'move':move}
+    assert client.post(f"/api/prevention/{p['id']}/practice",json=body('g6f5')).status_code==409
+    assert attempt(client,p,s,'g6f5').json()['closed']
+    before=client.get('/api/prevention').json()['stats']
+    bad=client.post(f"/api/prevention/{p['id']}/practice",json=body('g6g8')).json()
+    good=client.post(f"/api/prevention/{p['id']}/practice",json=body('g6f5')).json()
+    assert (bad['success'],bad['san'],good['success'])==(False,'Qg8+',True)
+    assert client.get('/api/prevention').json()['stats']==before
+    with main.database() as con:
+        assert con.execute('SELECT count(*) FROM prevention_attempts WHERE session_id=?',(s['id'],)).fetchone()[0]==1

@@ -10,7 +10,7 @@ import MistakeHistory,{type Mistake} from './MistakeHistory'
 import {useTrainingMove} from './useTrainingMove'
 import ChessInsights,{ThinkingGuide,type Insight} from './ChessInsights'
 import {api} from './api'
-import type {Color,Evaluation} from './types'
+import type {Color,Evaluation,Practice} from './types'
 
 interface Position {id:string;gameId:string;title:string;gameCreatedAt?:string;ply:number;fen:string;turn:Color;moveNumber:number;legalMoves:string[];dueAt:string;streak:number}
 interface Catalog {positions:Position[];stats:{firstAttempts:number;firstSuccesses:number};analyzedGames:number;rule:{description:string}}
@@ -33,6 +33,9 @@ export default function BlunderPrevention({onArchive,onReview,onPlayMistake,onPl
   const [showOriginal,setShowOriginal]=useState(false)
   const operation=useRef(0)
   const motion=useTrainingMove(position?.id+':'+(session?.id??''))
+  // Free retry from the start once the position is closed: Stockfish checks the moves, nothing is recorded.
+  const [practice,setPractice]=useState<{session:string;result:Practice|null}|null>(null)
+  const practicing=!!session&&!!result?.closed&&practice?.session===session.id
   async function refresh(){const next=await api<Catalog>('/prevention');setCatalog(next);return next}
   useEffect(()=>{let stale=false;api<Catalog>('/prevention').then(c=>{if(!stale)setCatalog(c)}).catch(e=>{if(!stale)setError(e.message)});return()=>{stale=true;operation.current++}},[])
   useEffect(()=>{if(startPositionId&&catalog&&!busy){const p=catalog.positions.find(p=>p.id===startPositionId);onStarted?.();if(p)void open(p);else setError('Posizione non disponibile: aggiorna il piano.')}},[startPositionId,catalog])
@@ -67,6 +70,20 @@ export default function BlunderPrevention({onArchive,onReview,onPlayMistake,onPl
     }catch(e){if(token===operation.current){setError(e instanceof Error?e.message:'Verifica non riuscita');if(ticket!==null)await motion.finish(ticket,false)}}
     finally{if(token===operation.current)setBusy(false)}
   }
+  async function practiceMove(move:string){
+    if(!position||!session)return
+    const ticket=motion.start(move)
+    if(ticket===null)return
+    setBusy(true);setError('')
+    try{
+      const response=await api<Practice>(`/prevention/${position.id}/practice`,{session_id:session.id,move})
+      if(!motion.current(ticket))return
+      setPractice({session:session.id,result:response})
+      await motion.finish(ticket,response.success)
+    }catch(e){if(motion.current(ticket)){setError(e instanceof Error?e.message:'Verifica non riuscita');await motion.finish(ticket,false)}}
+    finally{if(motion.current(ticket))setBusy(false)}
+  }
+  function restart(){if(session){setShowOriginal(false);motion.show(null);setPractice({session:session.id,result:null})}}
   function next(){const p=remaining[0];if(p)void open(p)}
   const displayedMove=showOriginal?result?.original?.move:motion.move??undefined
   const board=position?new Chess(position.fen):null
@@ -80,13 +97,14 @@ export default function BlunderPrevention({onArchive,onReview,onPlayMistake,onPl
       <InfoNote summary="Quali mosse sono accettate"><p>{catalog?.rule.description} Le posizioni già perse prima dell’errore vengono escluse. Il primo accesso include una verifica Stockfish approfondita.</p></InfoNote></section>:<div className="training-layout layout-prevention">
       <section className="board-column">
         <div className="player-row"><span className="avatar">◇</span><div><strong>{position.turn==='w'?'Muove il Bianco':'Muove il Nero'}</strong><small>Mossa {position.moveNumber} · {position.title}</small></div></div>
-        <Board fen={board!.fen()} orientation={boardOrientation} legalMoves={position.legalMoves} interactive={!busy&&!!session&&!result?.closed&&diagnosing!==session.id} onMove={move=>void submit(move)} lastMove={showOriginal?displayedMove:motion.lastMove} animateMove reverseMove={!showOriginal&&motion.reverse}/>
-        <p className="footnote">{showOriginal?'Scacchiera dopo il tuo errore originale.':result?.closed?'Scacchiera dopo la mossa verificata.':'Scacchiera prima del tuo errore: trascina un pezzo o usa due clic.'}</p>
+        <Board fen={board!.fen()} orientation={boardOrientation} legalMoves={position.legalMoves} interactive={!busy&&!!session&&(!result?.closed||practicing&&!showOriginal&&!practice?.result?.success)&&diagnosing!==session.id} onMove={move=>void (practicing?practiceMove(move):submit(move))} lastMove={showOriginal?displayedMove:motion.lastMove} animateMove reverseMove={!showOriginal&&motion.reverse}/>
+        <p className="footnote">{showOriginal?'Scacchiera dopo il tuo errore originale.':practicing?'Pratica libera dalla posizione prima del tuo errore: non conta per i ripassi.':result?.closed?'Scacchiera dopo la mossa verificata.':'Scacchiera prima del tuo errore: trascina un pezzo o usa due clic.'}</p>
         <LichessAnalysis key={position.id} fen={board!.fen()} orientation={position.turn}/>
       </section>
       <aside className="coach-column">
         <section className={`puzzle-feedback ${result?.success?'solved':result&&!result.closed?'retry':''}`} aria-label="Esito Blunder prevention">
-          <div role="status" aria-live="polite"><h3>{motion.message?'↻ Mossa da migliorare':busy?session?'Verifica della mossa…':'Verifica della posizione…':result?.success?'✓ Blunder evitato!':result?.closed?'Una mossa sicura':result?'↻ Riprova una mossa diversa':'Evita il blunder'}</h3><p>{motion.message|| (busy?'Stockfish sta controllando la posizione.':result?.message||'Cerca una mossa sicura. Più alternative possono essere corrette.')}</p></div>
+          <div role="status" aria-live="polite"><h3>{practicing?(busy&&!motion.message?'Verifica della mossa…':practice?.result?.success?`✓ ${practice.result.san}: mossa sicura`:practice?.result?`↻ ${practice.result.san}: non basta`:'↺ Pratica dalla posizione iniziale'):motion.message?'↻ Mossa da migliorare':busy?session?'Verifica della mossa…':'Verifica della posizione…':result?.success?'✓ Blunder evitato!':result?.closed?'Una mossa sicura':result?'↻ Riprova una mossa diversa':'Evita il blunder'}</h3><p>{motion.message||(practicing?(practice?.result?.success?'Puoi ricominciare quante volte vuoi.':'Cerca una mossa sicura: Stockfish la verifica, ma la pratica non conta per i ripassi.'):busy?'Stockfish sta controllando la posizione.':result?.message||'Cerca una mossa sicura. Più alternative possono essere corrette.')}</p></div>
+          {result?.closed&&<button disabled={busy} title="Riporta la scacchiera alla posizione iniziale per riprovare: non conta per i ripassi" onClick={restart}>↺ Riprova da capo</button>}
           {result?.closed&&onPlayFrom&&<button className="play-from" disabled={busy} title="Nuova partita contro Maia dalla posizione prima del tuo errore"
             onClick={()=>onPlayFrom(position.fen,position.turn,`Blunder prevention · ${position.title} · ${position.moveNumber}${position.turn==='w'?'.':'…'}`)}>Gioca da qui col {position.turn==='w'?'Bianco':'Nero'}</button>}
           {result?.closed&&<div className="puzzle-next">{remaining.length?<button className="primary" disabled={busy} onClick={next}>Prossima posizione →</button>:<><p>Hai completato tutte le posizioni disponibili.</p><button onClick={()=>{setPosition(null);setSession(null);setResult(null)}}>Riepilogo della sessione</button></>}</div>}

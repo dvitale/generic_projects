@@ -5,9 +5,9 @@ import type {Color,Evaluation} from './types'
 
 export type DiagnosisKind='puzzle'|'problem'|'prevention'
 type Move={uci:string;san:string}
-type Context={existing:Diagnosis|null;fen?:string;color?:Color;playerMoves?:Move[];threatFen?:string|null;threatMoves?:Move[]}
+type Context={existing:Diagnosis|null;fen?:string;color?:Color;playerMoves?:Move[];tried?:Move[];threatFen?:string|null;threatMoves?:Move[]}
 type Answer={assessment:string;confidence:string;fearedLost:boolean;threat:string|null;candidate:string|null;candidateReason:string|null;note:string}
-type Evidence={best:Evaluation;engineBand:string;bandGap:number;
+type Evidence={best:Evaluation;engineBand:string;bandGap:number;tried?:string[];
   threat:{real:boolean;evaluation:Evaluation;san:string|null}|null;
   statedThreat?:{san:string;evaluation:Evaluation;concrete:boolean};
   candidate?:{san:string;evaluation:Evaluation;sound:boolean}}
@@ -31,11 +31,16 @@ export function formatEvaluation(e:Evaluation){
   return `${e.cp>0?'+':''}${(e.cp/100).toFixed(2)}`
 }
 
+const sanList=(sans:string[])=>sans.length>1?`${sans.slice(0,-1).join(', ')} e ${sans.at(-1)}`:sans[0]
+
 function explain(d:Diagnosis,label:string){
-  const e=d.evidence
+  const e=d.evidence,tried=e.tried??[]
+  const played=tried.length?`Hai provato ${sanList(tried)}, che non ${tried.length>1?'risolvono':'risolve'}`:''
   switch(label){
-    case 'missed_solution':return e.candidate?`Avevi considerato ${e.candidate.san} (${formatEvaluation(e.candidate.evaluation)}), che non risolve: scartarla era giusto, ma la mossa buona non era fra le tue candidate.`:'Non avevi una candidata: la mossa buona non è entrata nella tua ricerca.'
-    case 'rejected_solution':return `Avevi visto ${e.candidate!.san}, che funzionava (${formatEvaluation(e.candidate!.evaluation)}), ma l’hai scartata${d.answer.candidateReason?`: «${reasons.find(r=>r[0]===d.answer.candidateReason)?.[1].toLowerCase()}»`:''}.`
+    case 'missed_solution':
+      if(e.candidate)return `${played?`${played}; avevi considerato anche`:'Avevi considerato'} ${e.candidate.san} (${formatEvaluation(e.candidate.evaluation)}), che non risolve: scartarla era giusto, ma la mossa buona non era fra le tue candidate.`
+      return played?`${played}: la mossa buona non era fra le tue candidate.`:'Non avevi una candidata: la mossa buona non è entrata nella tua ricerca.'
+    case 'rejected_solution':return `Avevi visto ${e.candidate!.san}, che funzionava (${formatEvaluation(e.candidate!.evaluation)}), ma l’hai scartata${d.answer.candidateReason?`: «${reasons.find(r=>r[0]===d.answer.candidateReason)?.[1].toLowerCase()}»`:''}${tried.length?`, e hai giocato ${sanList(tried)}`:''}.`
     case 'pessimistic':case 'optimistic':return `Hai indicato «${bandLabel(d.answer.assessment)}»${d.answer.fearedLost?' e la davi per persa':''}; Stockfish: «${bandLabel(e.engineBand)}» (${formatEvaluation(e.best)}).`
     case 'ignored_threat':return `Se l’avversario potesse muovere, ${e.threat?.san} porterebbe la valutazione a ${formatEvaluation(e.threat!.evaluation)}.`
     case 'phantom_threat':return `Dopo ${e.statedThreat?.san} la valutazione resterebbe ${formatEvaluation(e.statedThreat!.evaluation)}: la minaccia non era concreta.`
@@ -80,7 +85,9 @@ export default function FailureDiagnosis({kind,targetId,sessionId,onReveal,onCan
 
   if(saved)return <section className="panel failure-diagnosis" aria-label="Diagnosi dell’errore"><span className="eyebrow">PRIMA DELLA SOLUZIONE</span><Result diagnosis={saved}/></section>
   const opponent=context?.color==='w'?'il Nero':'il Bianco'
-  const pickMoves=picking==='threat'?context?.threatMoves??[]:context?.playerMoves??[]
+  const tried=context?.tried??[]
+  // Moves already tried count as candidates on their own: the picker offers only the others.
+  const pickMoves=picking==='threat'?context?.threatMoves??[]:(context?.playerMoves??[]).filter(m=>!tried.some(t=>t.uci===m.uci))
   function pick(uci:string){
     const move=pickMoves.find(m=>m.uci===uci)
     if(!move)return
@@ -106,7 +113,8 @@ export default function FailureDiagnosis({kind,targetId,sessionId,onReveal,onCan
         </>:<p className="muted">Sei sotto scacco: la minaccia è già sulla scacchiera.</p>}
       </fieldset>
 
-      <fieldset className="diagnosis-step"><legend>Quale mossa avevi considerato e scartato?</legend>
+      <fieldset className="diagnosis-step"><legend>{tried.length?'Quale altra mossa avevi considerato e scartato?':'Quale mossa avevi considerato e scartato?'}</legend>
+        {tried.length>0&&<p className="muted">Le mosse che hai provato contano già fra le tue candidate: <b>{sanList(tried.map(m=>m.san))}</b>.</p>}
         <div className="row">{candidate?<span className="chip">Candidata: <b>{candidate.san}</b></span>:<span className="chip">Nessuna</span>}
           <button aria-pressed={picking==='candidate'} onClick={()=>setPicking(picking==='candidate'?null:'candidate')}>{picking==='candidate'?'Annulla':'Indica sulla scacchiera'}</button>
           {candidate&&<button onClick={()=>{setCandidate(null);setReason('')}}>Nessuna</button>}</div>

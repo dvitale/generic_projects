@@ -3,6 +3,7 @@
 Each Lichess puzzle starts with the opponent's move, usually the mistake to punish; the solution begins
 with the second move. Puzzle ratings come from Lichess solvers (Glicko-2), not from the players of the game.
 """
+import json
 import random
 import sqlite3
 import uuid
@@ -48,6 +49,9 @@ def init_schema(con):
       puzzle_id TEXT NOT NULL, puzzle_rating INTEGER NOT NULL, success INTEGER NOT NULL,
       rating_before INTEGER NOT NULL, rating_after INTEGER NOT NULL, created_at TEXT NOT NULL);
     ''')
+    # Wrong moves of the session as [step, uci]: the diagnosis shows them as the player's first candidates.
+    if 'tried' not in {r[1] for r in con.execute('PRAGMA table_info(problem_sessions)')}:
+        con.execute("ALTER TABLE problem_sessions ADD COLUMN tried TEXT NOT NULL DEFAULT '[]'")
 
 
 class NextBody(BaseModel):
@@ -137,7 +141,8 @@ def install(app, database, data_dir, now):
             after = board.copy(stack=False)
             after.push(move)
             return move.uci() == solution or after.is_checkmate()
-        return {'board': board_at(row, session['step']), 'accepts': accepts, 'themes': row['themes'].split()}
+        tried = [move for step, move in json.loads(session['tried']) if step == session['step']]
+        return {'board': board_at(row, session['step']), 'accepts': accepts, 'themes': row['themes'].split(), 'tried': tried}
 
     diagnosis.register('problem', diagnosis_position)
 
@@ -212,6 +217,8 @@ def install(app, database, data_dir, now):
             if not correct:
                 # The rating changes once, at the first mistake; the user may keep trying without effect.
                 result = None
+                con.execute('UPDATE problem_sessions SET tried=? WHERE id=?',
+                            (json.dumps(json.loads(session['tried']) + [[session['step'], body.move]]), session_id))
                 if not session['failed']:
                     con.execute('UPDATE problem_sessions SET failed=1 WHERE id=?', (session_id,))
                     rated = rate(con, session, row, False)

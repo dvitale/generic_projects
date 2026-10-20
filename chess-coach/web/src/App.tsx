@@ -48,7 +48,7 @@ import type {StudySection,Refutation} from './study/types'
 import { api } from './api'
 import { maia, type Prediction } from './engine/maia'
 import { chooseMaiaMove } from './engine/play'
-import type { Game, Color, Exercise, Attempt, Profile, Analysis, Evaluation, PuzzleSession } from './types'
+import type { Game, Color, Exercise, Attempt, Profile, Analysis, Evaluation, PuzzleSession, Practice } from './types'
 
 type Tab = 'schedule' | 'play' | 'review' | 'drill' | 'train' | 'problems' | 'progress' | 'archive' | 'prevention' | 'study'
 const initialFen = new Chess().fen()
@@ -84,6 +84,10 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
   const puzzleMotion=useTrainingMove((exercise?.id??'')+':'+(session?.id??''))
   const puzzleMove=puzzleMotion.move
   const puzzleComparison=usePuzzleComparison(exercise,session?.id,tab==='train'&&!!attempt?.success)
+  // Free retry from the start once the puzzle is closed: Stockfish checks the moves, nothing is recorded.
+  const [practice,setPractice]=useState<{session:string;result:Practice|null}|null>(null)
+  const practicing=!!session&&!!attempt?.closed&&practice?.session===session.id
+  const puzzleComparing=puzzleComparison.visible&&!practicing
   const dueExercises=exercises.filter(ex=>new Date(ex.dueAt).getTime()<=Date.now())
   const [completedPuzzles,setCompletedPuzzles]=useState<string[]>([])
   const [color, setColor] = useState<Color|'random'>('w')
@@ -188,19 +192,19 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
   function showPlayPosition(ply:number){if(game)setPlayPosition(ply>=game.moves.length?null:{id:game.id,ply:Math.max(0,ply)})}
   const reviewBoard = game ? position(game, cursor) : new Chess()
   const puzzleBoard=exercise?new Chess(exercise.fen):null
-  if(puzzleBoard&&puzzleMove&&!puzzleComparison.visible)puzzleBoard.move({from:puzzleMove.slice(0,2),to:puzzleMove.slice(2,4),promotion:puzzleMove[4]})
+  if(puzzleBoard&&puzzleMove&&!puzzleComparing)puzzleBoard.move({from:puzzleMove.slice(0,2),to:puzzleMove.slice(2,4),promotion:puzzleMove[4]})
   const nextPuzzle=dueExercises.find(ex=>ex.id!==exercise?.id&&!completedPuzzles.includes(ex.id))
   const boardFen = tab === 'train' && puzzleBoard ? puzzleBoard.fen() : tab === 'review' ? reviewBoard.fen() : browsingHistory && game ? position(game,playPly).fen() : game?.fen || initialFen
   const orientation: Color = tab === 'train' && exercise ? exercise.turn : game?.playerColor || (color==='b'?'b':'w')
   const legal = tab === 'train' ? exercise?.legalMoves || [] : game?.legalMoves || []
-  const canMove = !busy && !jobId && (tab === 'train' ? !!exercise && !!session && !attempt?.closed && diagnosing !== session.id : tab === 'play' && !browsingHistory && !!game && !game.result && (game.source === 'maia' || game.source === 'stockfish') && game.turn === game.playerColor && !botThinking)
+  const canMove = !busy && !jobId && (tab === 'train' ? !!exercise && !!session && (!attempt?.closed || practicing && !practice?.result?.success) && diagnosing !== session.id : tab === 'play' && !browsingHistory && !!game && !game.result && (game.source === 'maia' || game.source === 'stockfish') && game.turn === game.playerColor && !botThinking)
   const decision = game?.analysis?.decisions.find(d=>d.ply === cursor)
   const visiblePrediction = predictionKey===boardFen+':'+reviewElo?prediction:null
   const reviewedMove=(game?.analysis?.moves||game?.analysis?.decisions)?.find(d=>d.ply===cursor)
   const moveHint=useMoveSuggestion(tab==='play'&&!browsingHistory?game:null)
   const analysisArrows:AnalysisArrow[]=[]
   if(tab==='play'&&game?.fen===boardFen)analysisArrows.push(...moveHint.arrows)
-  if(tab==='train'&&puzzleComparison.visible){
+  if(tab==='train'&&puzzleComparing){
     if(puzzleComparison.data?.played)analysisArrows.push({move:puzzleComparison.data.played,source:'played',rank:1})
     if(puzzleComparison.data?.maia)analysisArrows.push({move:puzzleComparison.data.maia,source:'maia',rank:1})
   }
@@ -217,7 +221,7 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
   useFlipShortcut()
   // Without a saved analysis (live game, unanalysed review) the bar asks Stockfish for a quick evaluation.
   const liveEval=usePositionEval(tab==='play'||tab==='review'?game:null,tab==='review'?cursor:playPly,showEval&&(tab==='play'||tab==='review'&&!point))
-  const evalValue:BarValue|null|undefined=!showEval?undefined:tab==='review'?(point?{cp:point.cp,mate:point.mate,mateIn:point.terminal&&point.mate?0:null}:liveEval):tab==='play'&&game?liveEval:tab==='train'&&exercise&&attempt?.closed&&!puzzleComparison.visible?((attempt.success?attempt.actual:attempt.best)?whiteValue((attempt.success?attempt.actual:attempt.best)!,exercise.turn):null):undefined
+  const evalValue:BarValue|null|undefined=!showEval?undefined:tab==='review'?(point?{cp:point.cp,mate:point.mate,mateIn:point.terminal&&point.mate?0:null}:liveEval):tab==='play'&&game?liveEval:tab==='train'&&exercise&&attempt?.closed&&!practicing&&!puzzleComparing?((attempt.success?attempt.actual:attempt.best)?whiteValue((attempt.success?attempt.actual:attempt.best)!,exercise.turn):null):undefined
   // Maia's value head: White's expected score for two humans of the review level, or of the game level while playing.
   const maiaPosition=showMaia&&game&&(tab==='play'||tab==='review')
   const maiaScore=useMaiaScore(maiaPosition?boardFen:null,tab==='review'?reviewElo:game?.elo??1500,!!maiaPosition)
@@ -297,6 +301,19 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
   }
   async function submitMove(move: string) {
     if (!canMove) return
+    if(tab==='train'&&exercise&&session&&practicing){
+      const ticket=puzzleMotion.start(move)
+      if(ticket===null)return
+      setBusy(true);setError('')
+      try{
+        const result=await api<Practice>(`/exercises/${exercise.id}/practice`,{move,session_id:session.id})
+        if(!puzzleMotion.current(ticket))return
+        setPractice({session:session.id,result})
+        await puzzleMotion.finish(ticket,result.success)
+      }catch(e){if(puzzleMotion.current(ticket)){fail(e);await puzzleMotion.finish(ticket,false)}}
+      finally{if(puzzleMotion.current(ticket))setBusy(false)}
+      return
+    }
     if(tab==='train'&&exercise&&session){
       const ticket=puzzleMotion.start(move)
       if(ticket===null)return
@@ -422,7 +439,7 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
           {/* Stockfish bar on the left of the board, Maia bar on the right. */}
           <div className={`board-stage ${evalValue!==undefined?'with-eval':''} ${maiaValue!==undefined?'with-maia':''}`}>
             {evalValue!==undefined&&<div className="eval-bars"><EvalBar value={evalValue} orientation={boardOrientation}/></div>}
-            <Board badge={moveBadge} analysisArrows={analysisArrows} reverseMove={tab==='train'&&puzzleMotion.reverse} animateMove={tab==='train'||tab==='play'&&!browsingHistory&&!!game&&game.turn===game.playerColor} fen={boardFen} orientation={boardOrientation} interactive={canMove} legalMoves={legal} onMove={submitMove} lastMove={tab==='train'?(puzzleComparison.visible?undefined:puzzleMotion.lastMove):tab==='play'?game?.moves[playPly-1]:tab==='review'&&game&&cursor>0?game.moves[cursor-1]:undefined}/>
+            <Board badge={moveBadge} analysisArrows={analysisArrows} reverseMove={tab==='train'&&puzzleMotion.reverse} animateMove={tab==='train'||tab==='play'&&!browsingHistory&&!!game&&game.turn===game.playerColor} fen={boardFen} orientation={boardOrientation} interactive={canMove} legalMoves={legal} onMove={submitMove} lastMove={tab==='train'?(puzzleComparing?undefined:puzzleMotion.lastMove):tab==='play'?game?.moves[playPly-1]:tab==='review'&&game&&cursor>0?game.moves[cursor-1]:undefined}/>
             {maiaValue!==undefined&&<div className="eval-bars"><MaiaBar score={maiaValue} orientation={boardOrientation}/></div>}
           </div>
           {flipped?opponentBar:playerBar}
@@ -432,7 +449,7 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
           {browsingHistory&&<div className="play-history-notice"><span>Posizione precedente · {playPly} / {game!.moves.length}</span><span className="play-history-actions">{playFromButton(game!,playPly)}<button className="primary" onClick={()=>setPlayPosition(null)}>Torna alla posizione corrente</button></span></div>}
           {tab==='review'&&game&&<div className="review-controls board-toolbar"><button aria-label="Posizione iniziale" onClick={()=>setCursor(0)} disabled={cursor===0}>⏮</button><button aria-label="Mossa precedente" onClick={()=>setCursor(c=>Math.max(0,c-1))} disabled={cursor===0}>◀</button><span>{cursor} / {game.version}</span><button aria-label="Mossa successiva" onClick={()=>setCursor(c=>Math.min(game.version,c+1))} disabled={cursor===game.version}>▶</button><button aria-label="Ultima posizione" onClick={()=>setCursor(game.version)} disabled={cursor===game.version}>⏭</button>{playFromButton(game,cursor)}</div>}
           {tab==='review'&&game&&<div className="analysis-arrow-controls" role="group" aria-label="Frecce di analisi">{([['stockfish','Stockfish · blu'],['maia','Maia · rosso'],['played','Giocata · bianco']] as const).map(([source,label])=><label key={source}><input type="checkbox" checked={arrowSources[source]} onChange={e=>setArrowSources(current=>({...current,[source]:e.target.checked}))}/><span className={'arrow-swatch source-'+source}/>{label}</label>)}</div>}
-          {tab==='train'&&attempt?.success&&<div className="panel" aria-label="Confronto del puzzle">
+          {tab==='train'&&attempt?.success&&!practicing&&<div className="panel" aria-label="Confronto del puzzle">
             <p>{puzzleComparison.visible?'Confronto dalla posizione iniziale del puzzle.':'La scacchiera mostra la tua soluzione.'}</p>
             <div className="analysis-arrow-controls"><span><i className="arrow-swatch source-played"/> Giocata in partita · bianco</span><span><i className="arrow-swatch source-maia"/> Maia {puzzleComparison.data?.elo??''} · rosso</span></div>
             {puzzleComparison.data?.loading&&<p role="status">Calcolo della prima scelta di Maia…</p>}
@@ -443,7 +460,7 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
           {((tab==='play'||tab==='review')&&game||tab==='train'&&exercise)&&<LichessAnalysis key={tab==='train'?exercise!.id:game!.id+':'+tab} fen={boardFen} orientation={orientation} game={tab==='train'?undefined:game} ply={tab==='review'?cursor:playPly}/>}
         </section>
         <aside className="coach-column">
-          {tab==='train'&&exercise&&<PuzzleFeedback onPlayFrom={{label:`Gioca da qui col ${exercise.turn==='w'?'Bianco':'Nero'}`,play:()=>{const number=exercise.fen.split(' ')[5]??'1';void playFromFen(exercise.fen,exercise.turn,elo,`Puzzle · ${exercise.gameTitle??exercise.theme} · ${number}${exercise.turn==='w'?'.':'…'}`)}}} canRestart={dueExercises.length>0} comparing={puzzleComparison.visible} motionMessage={puzzleMotion.message} attempt={attempt} busy={busy} ready={!!session} hasNext={!!nextPuzzle} onNext={()=>{if(nextPuzzle)void pickExercise(nextPuzzle)}} onRestart={()=>{setCompletedPuzzles([]);if(dueExercises[0])void pickExercise(dueExercises[0])}}/>}
+          {tab==='train'&&exercise&&<PuzzleFeedback onPlayFrom={{label:`Gioca da qui col ${exercise.turn==='w'?'Bianco':'Nero'}`,play:()=>{const number=exercise.fen.split(' ')[5]??'1';void playFromFen(exercise.fen,exercise.turn,elo,`Puzzle · ${exercise.gameTitle??exercise.theme} · ${number}${exercise.turn==='w'?'.':'…'}`)}}} canRestart={dueExercises.length>0} comparing={puzzleComparing} practice={practicing?practice!.result:undefined} onPractice={()=>{puzzleMotion.show(null);setPractice({session:session!.id,result:null})}} motionMessage={puzzleMotion.message} attempt={attempt} busy={busy} ready={!!session} hasNext={!!nextPuzzle} onNext={()=>{if(nextPuzzle)void pickExercise(nextPuzzle)}} onRestart={()=>{setCompletedPuzzles([]);if(dueExercises[0])void pickExercise(dueExercises[0])}}/>}
           {tab==='play'&&jobId&&<section className="panel" role="status"><p>Analisi automatica della partita… {progress}%</p><progress value={progress} max={100}/></section>}
           {tab==='review'&&<>
             <div className="review-toolbar"><div className="row"><button className="primary" onClick={analyze} disabled={!game?.version||busy||!!jobId}>{game?.analysis?'Ricalcola analisi':'Analizza partita'}</button>{(game?.source==='maia'||game?.source==='stockfish')&&!game.result&&<button disabled={!!jobId} onClick={()=>setTab('play')}>Continua partita</button>}</div>{jobId&&<div role="status"><p>Stockfish analizza la partita… {progress}%</p><progress value={progress} max={100}/></div>}</div>

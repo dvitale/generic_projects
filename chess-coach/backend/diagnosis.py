@@ -27,8 +27,9 @@ CONCRETE_DROP_CP = 150
 WINDOW = 30
 UCI = r'^[a-h][1-8][a-h][1-8][qrbn]?$'
 
-# kind -> resolver(con, target_id, session_id) returning {'board', 'accepts', 'themes'}.
-# 'accepts(board, move, evaluation, best)' applies the mode's own success criterion.
+# kind -> resolver(con, target_id, session_id) returning {'board', 'accepts', 'themes', 'tried'}.
+# 'accepts(board, move, evaluation, best)' applies the mode's own success criterion;
+# 'tried' lists the moves already played and rejected in this session, in order.
 RESOLVERS = {}
 
 
@@ -72,6 +73,12 @@ def threat_board(board):
 
 def moves(board):
     return [{'uci': m.uci(), 'san': board.san(m)} for m in board.legal_moves] if board else []
+
+
+def tried_moves(board, tried):
+    """Failed attempts of the session, once each: the first candidates the player thought of."""
+    legal = {m.uci() for m in board.legal_moves}
+    return [{'uci': u, 'san': board.san(chess.Move.from_uci(u))} for u in dict.fromkeys(tried) if u in legal]
 
 
 def player_view(evaluation):
@@ -185,10 +192,11 @@ def install(app, database, now):
             saved = existing(con, body)
             if saved:
                 return {'existing': saved}
-            board = resolve(con, body)['board']
+            position = resolve(con, body)
+        board = position['board']
         passed = threat_board(board)
         return {'existing': None, 'fen': board.fen(), 'color': 'w' if board.turn else 'b',
-                'playerMoves': moves(board), 'threatFen': passed.fen() if passed else None, 'threatMoves': moves(passed)}
+                'playerMoves': moves(board), 'tried': tried_moves(board, position.get('tried', [])), 'threatFen': passed.fen() if passed else None, 'threatMoves': moves(passed)}
 
     @app.post('/api/diagnoses')
     def diagnose(body: DiagnosisBody):
@@ -202,6 +210,8 @@ def install(app, database, now):
                   'threat': body.threat, 'candidate': body.candidate, 'candidateReason': body.candidate_reason,
                   'note': body.note.strip()}
         search, reading, evidence = classify(board, position['accepts'], answer)
+        # Played and rejected by the mode itself: they never turn a miss into a rejected solution.
+        evidence['tried'] = [m['san'] for m in tried_moves(board, position.get('tried', []))]
         with database() as con:
             con.execute('BEGIN IMMEDIATE')
             # The session must still be open: the diagnosis precedes the solution.

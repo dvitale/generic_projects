@@ -212,6 +212,10 @@ class SessionInput(BaseModel):
     session_id: str = Field(min_length=1, max_length=50)
 
 
+class PracticeInput(SessionInput):
+    move: str = Field(pattern=r"^[a-h][1-8][a-h][1-8][qrbn]?$")
+
+
 class DrillInput(BaseModel):
     color: Literal["w", "b"] = "w"
     elo: int = Field(default=1500, ge=600, le=2600)
@@ -902,6 +906,22 @@ def reveal(exercise_id: str, body: SessionInput):
             "version": session["guesses"], "closed": True, "message": "Soluzione mostrata. Riprova dopo una pausa per verificare cosa ricordi."}
 
 
+@app.post("/api/exercises/{exercise_id}/practice")
+def practice(exercise_id: str, body: PracticeInput):
+    """Free retry from the start once the session is closed: same criterion as an attempt, nothing is recorded."""
+    with database() as con:
+        row = dict(find_exercise(con, exercise_id))
+        session = con.execute("SELECT status FROM puzzle_sessions WHERE id=? AND exercise_id=?", (body.session_id, exercise_id)).fetchone()
+    if session is None or session["status"] == "active":
+        raise HTTPException(409, "La pratica libera si apre dopo aver chiuso il puzzle")
+    board = reconstruct(row["initial_fen"], json.loads(row["history"]))
+    move = chess.Move.from_uci(body.move)
+    if move not in board.legal_moves:
+        raise HTTPException(422, "Mossa non legale")
+    best, actual, loss = evaluator.compare(board, move, nodes=80000)
+    return {"success": loss < mistakes.PUZZLE_TOLERANCE_CP, "san": board.san(move), "actual": actual}
+
+
 def puzzle_diagnosis_position(con, exercise_id, session_id):
     row = find_exercise(con, exercise_id)
     active_session(con, exercise_id, session_id)
@@ -909,7 +929,8 @@ def puzzle_diagnosis_position(con, exercise_id, session_id):
     # Same criterion as an attempt: scores already include the engine's mate convention.
     def accepts(board, move, evaluation, best):
         return best['cp'] - evaluation['cp'] < mistakes.PUZZLE_TOLERANCE_CP
-    return {'board': reconstruct(row["initial_fen"], json.loads(row["history"])), 'accepts': accepts}
+    tried = [r[0] for r in con.execute("SELECT move FROM attempts WHERE session_id=? AND success=0 AND move!='reveal' ORDER BY id", (session_id,))]
+    return {'board': reconstruct(row["initial_fen"], json.loads(row["history"])), 'accepts': accepts, 'tried': tried}
 
 
 diagnosis.register('puzzle', puzzle_diagnosis_position)

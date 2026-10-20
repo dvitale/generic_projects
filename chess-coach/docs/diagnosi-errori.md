@@ -12,7 +12,7 @@ Il pulsante **Mostra soluzione** (in Blunder prevention **Mostra una mossa sicur
 
 1. **Come valuti la posizione?** Le cinque fasce di *Valuta la posizione* (forte svantaggio … forte vantaggio), quanto sei sicuro e, se è la tua impressione, **Mi sembra già persa**.
 2. **Quale minaccia temi?** Si indica muovendo un pezzo dell'avversario su una scacchiera dedicata (la stessa posizione con il tratto all'avversario), oppure **Non vedo minacce**. Sotto scacco la domanda non compare.
-3. **Quale mossa avevi considerato e scartato?** Facoltativa: si muove sulla scacchiera e si sceglie il motivo (materiale, matto o attacco, calcolo incompleto, altro).
+3. **Quale mossa avevi considerato e scartato?** Facoltativa: si muove sulla scacchiera e si sceglie il motivo (materiale, matto o attacco, calcolo incompleto, altro). Le mosse già provate e respinte nella sessione contano da sole fra le candidate: il riquadro le elenca, la domanda diventa **Quale altra mossa…?** e la scacchiera offre solo le mosse non ancora provate. Il server le legge dai tentativi salvati (nei Problemi, quelli della mossa in corso).
 
 **Confronta e mostra la soluzione** salva la diagnosi e poi mostra la soluzione come prima. **Salta: mostra subito** mostra la soluzione senza diagnosi, ed è sempre disponibile, anche se il server non risponde. **Torna alla posizione** chiude il riquadro e permette di continuare a cercare.
 
@@ -26,7 +26,7 @@ Decide Stockfish con regole fisse, non l'LLM. Il server ricostruisce la posizion
 
 | Categoria | Regola |
 |---|---|
-| Soluzione non vista | Nessuna candidata, oppure la candidata non soddisfa il criterio della modalità |
+| Soluzione non vista | Nessuna candidata, oppure la candidata non soddisfa il criterio della modalità. Le mosse provate e respinte compaiono nella spiegazione («Hai provato Qg8+, che non risolve…») ma non cambiano la categoria |
 | Vista ma scartata | La candidata soddisfa il criterio della modalità: l'avevi trovata e l'hai respinta |
 
 Il criterio è quello della modalità: nei Problemi la mossa della soluzione o qualsiasi matto; nei Puzzle una perdita inferiore a 0,70 rispetto alla migliore; in Blunder prevention almeno −1,00 senza matto contro.
@@ -73,7 +73,7 @@ API locali:
 
 ```bash
 .venv/bin/python -m pytest tests/test_diagnosis.py -q
-cd web && npm run build && npx playwright test tests/problems.spec.ts
+cd web && npm run build && npx playwright test tests/problems.spec.ts tests/puzzle-flow.spec.ts
 ```
 
-I test backend coprono la candidata vista e scartata, il pessimismo, la minaccia concreta (…Ra6+ che infilza re e donna in Blunder prevention) e quella fantasma, la diagnosi unica per sessione e il rifiuto di sessioni chiuse. Il test browser compila la diagnosi in un Problema e controlla il riepilogo.
+I test backend coprono la candidata vista e scartata, il pessimismo, la minaccia concreta (…Ra6+ che infilza re e donna in Blunder prevention) e quella fantasma, la diagnosi unica per sessione, il rifiuto di sessioni chiuse e le mosse già provate nelle tre modalità. I test browser compilano la diagnosi in un Problema e controllano il riepilogo, e in un Puzzle verificano che il tentativo fallito compaia fra le candidate.

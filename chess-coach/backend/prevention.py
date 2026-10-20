@@ -79,6 +79,11 @@ class AttemptBody(SessionBody):
     move: str = Field(pattern=r'^[a-h][1-8][a-h][1-8][qrbn]?$')
 
 
+class PracticeBody(BaseModel):
+    session_id: str = Field(min_length=1, max_length=50)
+    move: str = Field(pattern=r'^[a-h][1-8][a-h][1-8][qrbn]?$')
+
+
 def install(app, database, reconstruct, now):
     def find(con, position_id):
         row = con.execute('SELECT * FROM prevention_positions WHERE id=?', (position_id,)).fetchone()
@@ -113,7 +118,8 @@ def install(app, database, reconstruct, now):
     def diagnosis_position(con, position_id, session_id):
         row = find(con, position_id)
         active(con, position_id, session_id)
-        return {'board': board_for(row), 'accepts': lambda board, move, evaluation, best: safe(evaluation)}
+        tried = [r[0] for r in con.execute('SELECT move FROM prevention_attempts WHERE session_id=? AND success=0 AND assisted=0 ORDER BY id', (session_id,))]
+        return {'board': board_for(row), 'accepts': lambda board, move, evaluation, best: safe(evaluation), 'tried': tried}
 
     diagnosis.register('prevention', diagnosis_position)
 
@@ -175,6 +181,21 @@ def install(app, database, reconstruct, now):
         con.execute('UPDATE prevention_sessions SET guesses=guesses+1,status=? WHERE id=?',
                     ('revealed' if assisted else 'complete' if success else 'active', body.session_id))
         return {'scheduled':promoted,'dueAt':find(con,row['id'])['due_at'],'attemptId': inserted.lastrowid, 'closed': closed, 'version': s['guesses'] + 1, 'firstTry': first and s['exposure'] != 'practice' and not assisted}
+
+    @app.post('/api/prevention/{position_id}/practice')
+    def practice(position_id: str, body: PracticeBody):
+        """Free retry from the start once the session is closed: same criterion as an attempt, nothing is recorded."""
+        with database() as con:
+            row = dict(find(con, position_id))
+            s = con.execute('SELECT status FROM prevention_sessions WHERE id=? AND position_id=?', (body.session_id, position_id)).fetchone()
+        if s is None or s['status'] == 'active':
+            raise HTTPException(409, 'La pratica libera si apre dopo aver chiuso la posizione')
+        board = board_for(row)
+        move = chess.Move.from_uci(body.move)
+        if move not in board.legal_moves:
+            raise HTTPException(422, 'Mossa non legale')
+        _, actual = check(board, move)
+        return {'success': safe(actual), 'san': board.san(move), 'actual': actual}
 
     @app.post('/api/prevention/{position_id}/attempts')
     def attempt(position_id: str, body: AttemptBody):

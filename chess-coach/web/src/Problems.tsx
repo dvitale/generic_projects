@@ -76,6 +76,9 @@ export default function Problems(){
   // Session whose solution request opened the self-diagnosis: a new problem closes it.
   const [diagnosing,setDiagnosing]=useState<string|null>(null)
   const token=useRef(0)
+  // Free retry once the problem is over: the whole solution is known, so moves are checked here and never rated.
+  const [practice,setPractice]=useState<{line:string[];state:'solving'|'wrong'|'solved'}|null>(null)
+  const practiceTicket=useRef(0)
   const orientation=useBoardOrientation(problem?.puzzle.turn??'w')
 
   async function refresh(){const next=await api<Overview>('/problems');setOverview(next);return next}
@@ -84,7 +87,7 @@ export default function Problems(){
   async function start(){
     const ticket=++token.current
     if(problem&&phase!=='done'&&!failed&&problem.step===1)await api(`/problems/sessions/${problem.sessionId}/skip`,{}).catch(()=>{})
-    setBusy(true);setError('');setResult(null);setFailed(false);setCursor(null);setEstimate(null);setEstimateError('')
+    setBusy(true);setError('');setResult(null);setFailed(false);setCursor(null);setPractice(null);practiceTicket.current++;setEstimate(null);setEstimateError('')
     try{
       const next=await api<Problem>('/problems/next',{band,theme:theme||null})
       if(ticket!==token.current)return
@@ -144,7 +147,27 @@ export default function Problems(){
     finally{if(ticket===token.current)setBusy(false)}
   }
 
-  const shown=cursor===null?line:line.slice(0,cursor)
+  const solution=problem&&result?[problem.puzzle.opponentMove,...result.solution]:[]
+  function restart(){practiceTicket.current++;setCursor(null);setPractice({line:solution.slice(0,1),state:'solving'})}
+  async function practiceMove(uci:string){
+    if(!problem||practice?.state!=='solving')return
+    const ticket=++practiceTicket.current,played=[...practice.line,uci]
+    const after=boardAfter(problem.puzzle.fen,played)
+    // As in rated play: the stored move or any mate.
+    if(uci!==solution[played.length-1]&&!after.isCheckmate()){
+      setPractice({line:played,state:'wrong'})
+      await pause(900)
+      if(ticket===practiceTicket.current)setPractice({line:practice.line,state:'solving'})
+      return
+    }
+    const reply=after.isCheckmate()?undefined:solution[played.length]
+    setPractice({line:played,state:reply?'solving':'solved'})
+    if(!reply)return
+    await pause(450)
+    if(ticket===practiceTicket.current)setPractice({line:[...played,reply],state:'solving'})
+  }
+
+  const shown=practice?practice.line:cursor===null?line:line.slice(0,cursor)
   const board=problem?boardAfter(problem.puzzle.fen,shown):null
   const lastMove=shown.at(-1)
   const solverMoves=problem?.puzzle.length??0
@@ -179,18 +202,23 @@ export default function Problems(){
     :<div className="training-layout layout-prevention">
       <section className="board-column">
         <div className="player-row"><span className="avatar">{problem.puzzle.turn==='w'?'♙':'♟'}</span><div className="player-info"><strong>{problem.puzzle.turn==='w'?'Muove il Bianco':'Muove il Nero'}</strong><small>{phase==='done'?`Problema ${problem.puzzle.id}`:`Trova ${solverMoves===1?'la mossa vincente':`la sequenza vincente · ${solverMoves} mosse`}`}</small></div></div>
-        <Board fen={board!.fen()} orientation={orientation} legalMoves={legal} interactive={phase==='solving'&&!busy&&cursor===null&&diagnosing!==problem.sessionId} onMove={m=>void move(m)} lastMove={lastMove} animateMove/>
-        {phase==='done'&&<div className="board-toolbar review-controls"><button aria-label="Posizione iniziale" onClick={()=>setCursor(0)} disabled={cursor===0}>⏮</button><button aria-label="Mossa precedente" onClick={()=>setCursor(c=>Math.max(0,(c??line.length)-1))} disabled={cursor===0}>◀</button><span>{cursor??line.length} / {line.length}</span><button aria-label="Mossa successiva" onClick={()=>setCursor(c=>c===null||c+1>=line.length?null:c+1)} disabled={cursor===null}>▶</button><button aria-label="Ultima posizione" onClick={()=>setCursor(null)} disabled={cursor===null}>⏭</button></div>}
+        <Board fen={board!.fen()} orientation={orientation} legalMoves={practice?board!.moves({verbose:true}).map(m=>m.from+m.to+(m.promotion??'')):legal}
+          interactive={practice?practice.state==='solving'&&practice.line.length%2===1:phase==='solving'&&!busy&&cursor===null&&diagnosing!==problem.sessionId}
+          onMove={m=>void (practice?practiceMove(m):move(m))} lastMove={lastMove} animateMove/>
+        {phase==='done'&&!practice&&<div className="board-toolbar review-controls"><button aria-label="Posizione iniziale" onClick={()=>setCursor(0)} disabled={cursor===0}>⏮</button><button aria-label="Mossa precedente" onClick={()=>setCursor(c=>Math.max(0,(c??line.length)-1))} disabled={cursor===0}>◀</button><span>{cursor??line.length} / {line.length}</span><button aria-label="Mossa successiva" onClick={()=>setCursor(c=>c===null||c+1>=line.length?null:c+1)} disabled={cursor===null}>▶</button><button aria-label="Ultima posizione" onClick={()=>setCursor(null)} disabled={cursor===null}>⏭</button></div>}
       </section>
       <aside className="coach-column">
-        <section className={`puzzle-feedback ${phase==='done'?(result?.success?'solved':''):phase==='wrong'?'retry':''}`} aria-label="Esito del problema">
-          <div role="status" aria-live="polite">
+        <section className={`puzzle-feedback ${practice?(practice.state==='solved'?'solved':practice.state==='wrong'?'retry':''):phase==='done'?(result?.success?'solved':''):phase==='wrong'?'retry':''}`} aria-label="Esito del problema">
+          {practice?<div role="status" aria-live="polite">
+            <h3>{practice.state==='wrong'?'✗ Non è la mossa giusta':practice.state==='solved'?'✓ Sequenza completata':'↺ Pratica dalla posizione iniziale'}</h3>
+            <p>{practice.state==='wrong'?'La scacchiera torna alla posizione precedente.':practice.state==='solved'?'Puoi ricominciare quante volte vuoi.':'Rigioca la soluzione: la pratica non cambia il rating.'}</p>
+          </div>:<div role="status" aria-live="polite">
             <h3>{phase==='opponent'?'L’avversario muove…':phase==='checking'?'Verifica…':phase==='wrong'?'✗ Non è la mossa giusta':phase==='done'?(result?.success?'✓ Problema risolto!':'Soluzione completa'):failed?'↻ Riprova':'Tocca a te'}</h3>
             <p>{phase==='wrong'?'La scacchiera torna alla posizione precedente: il primo tentativo è già registrato, ma puoi continuare.':phase==='done'?(change!==null?`Rating ${result!.ratingBefore} → ${result!.ratingAfter} (${change>=0?'+':''}${change}).`:'Questo problema era già stato valutato.'):'Cerca catture, scacchi e minacce: il vantaggio nasce dall’ultima mossa dell’avversario.'}</p>
-          </div>
+          </div>}
           <div className="row">
             {phase!=='done'?<><button disabled={busy||phase!=='solving'||diagnosing===problem.sessionId} onClick={()=>setDiagnosing(problem.sessionId)}>Mostra soluzione</button><button disabled={busy} onClick={()=>void start()}>{failed||problem.step>1?'Prossimo problema':'Salta'}</button></>
-            :<button className="primary" disabled={busy} onClick={()=>void start()}>Prossimo problema →</button>}
+            :<><button className="primary" disabled={busy} onClick={()=>void start()}>Prossimo problema →</button><button title="Riporta la scacchiera alla posizione iniziale per riprovare: non cambia il rating" onClick={restart}>↺ Riprova da capo</button></>}
             <button className="quiet" disabled={busy&&phase!=='done'} onClick={()=>{token.current++;setProblem(null);setBusy(false)}}>Cambia fascia</button>
           </div>
           {problem.repeated&&phase!=='done'&&<p className="footnote">Hai già visto tutti i problemi di questa selezione: questo è una ripetizione.</p>}
