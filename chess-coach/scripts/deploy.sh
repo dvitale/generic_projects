@@ -24,12 +24,13 @@ fi
 
 echo "== Sincronizzo $DIR su $HOST"
 # Server-only state is excluded, so --delete never touches it: credentials, data, venv and the locally built Stockfish.
+# Local research (experiments/, several GB of datasets and models) is never published.
 # Code is owned by the remote user (root) and never group/world-writable, whatever the local checkout's modes are.
 "${WRAP[@]}" rsync -a --delete --no-owner --no-group --chmod=Dgo-w,Fgo-w -e "ssh ${SSH_OPTS[*]}" \
   --exclude='/.env' --exclude='/.env.*' --exclude='/.secrets/' --exclude='/data/' --exclude='/.venv/' \
   --exclude='/engine/' --exclude='/.run/' --exclude='/.pytest_cache/' --exclude='__pycache__/' \
   --exclude='/web/node_modules/' --exclude='/web/test-results/' --exclude='/web/playwright-report/' \
-  --exclude='/vendor/*.tar.gz' --exclude='.git' \
+  --exclude='/vendor/*.tar.gz' --exclude='/experiments/' --exclude='.git' \
   ./ "$HOST:$DIR/"
 
 # data/ is server-only, except the read-only problem database: it is built locally (make puzzles) and copied as is.

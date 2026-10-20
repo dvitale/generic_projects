@@ -58,6 +58,7 @@ Maia3 è basato su Transformer/Chessformer. Il riferimento iniziale a una CNN ri
 - Primo tentativo senza aiuti distinto da tentativi successivi, sessioni assistite e pratica anticipata.
 - Ripasso dopo 1, 3, 7, 14 e 30 giorni in base ai successi indipendenti consecutivi. Errori o aiuti nella prima prova riportano al giorno successivo. La pratica anticipata non aumenta la serie né rinvia il ripasso.
 - Le sessioni aperte vengono riprese per impedire che una ricarica azzeri il primo tentativo.
+- A puzzle chiuso, **Gioca da qui** avvia una partita contro Maia dalla posizione del puzzle; prima della chiusura non è disponibile, per non anticipare il tentativo.
 
 ### Profilo e piano
 

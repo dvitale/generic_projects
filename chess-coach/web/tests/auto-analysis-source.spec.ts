@@ -8,7 +8,7 @@ test('finishing a game starts analysis without leaving play or requesting it twi
   await page.goto('/')
   await page.getByRole('button',{name:'Continua partita',exact:true}).click()
   await page.locator('[data-square="g6"]').click();await page.locator('[data-square="g7"]').click()
-  await expect(page.getByText('Partita conclusa · 1-0')).toBeVisible()
+  await expect(page.getByText('Partita conclusa · Scacco matto · Hai vinto')).toBeVisible()
   await expect.poll(async()=>(await(await request.get('/api/games/'+game.id)).json()).analysis?.version).toBe(1)
   await expect(page.getByRole('button',{name:'Gioca',exact:true})).toHaveAttribute('aria-current','page')
   expect(manualRequests).toBe(0)

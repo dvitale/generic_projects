@@ -52,7 +52,7 @@ function Piece({code}:{code:string}) {
   return missing?<span aria-hidden="true" className={`piece ${code[0]==='w'?'white-piece':'black-piece'}`}>{symbols[code]}</span>:
     <img className="piece-image" src={`/pieces/neo/${code}.png`} alt="" aria-hidden="true" draggable={false} onError={()=>setMissing(true)}/>
 }
-export default function Board({fen, orientation, interactive, legalMoves, onMove, lastMove, animateMove=false,reverseMove=false,analysisArrows=[],badge}: {fen:string; orientation:Color; interactive:boolean; legalMoves:string[]; onMove:(uci:string)=>void; lastMove?:string;animateMove?:boolean;reverseMove?:boolean;analysisArrows?:AnalysisArrow[];badge?:{square:string;kind:MoveClass}}) {
+export default function Board({fen, orientation, interactive:enabled, legalMoves, onMove, lastMove, animateMove=false,reverseMove=false,analysisArrows=[],badge}: {fen:string; orientation:Color; interactive:boolean; legalMoves:string[]; onMove:(uci:string)=>void|Promise<unknown>; lastMove?:string;animateMove?:boolean;reverseMove?:boolean;analysisArrows?:AnalysisArrow[];badge?:{square:string;kind:MoveClass}}) {
   const {theme}=useBoardSettings()
   const [selected, setSelected] = useState<string | null>(null)
   const [promotion, setPromotion] = useState<string[]>([])
@@ -64,6 +64,13 @@ export default function Board({fen, orientation, interactive, legalMoves, onMove
   const previousFen=useRef(fen)
   const gesture=useRef<Gesture|null>(null)
   const suppressClick=useRef(false)
+  // The move just played here stays on the board until the parent has handled it: by then a
+  // new position has arrived, or the same position means it was rejected (or repeated).
+  const [pending,setPending]=useState<{base:string;move:string;fen:string}|null>(null)
+  const dropped=useRef<{base:string;move:string}|null>(null)
+  const optimistic=pending?.base===fen?pending:null
+  const shownFen=optimistic?.fen??fen,shownLastMove=optimistic?.move??lastMove
+  const interactive=enabled&&!optimistic
   function clearDrag() {
     const current=gesture.current
     gesture.current=null
@@ -80,6 +87,7 @@ export default function Board({fen, orientation, interactive, legalMoves, onMove
   function clearAnnotations(){cancelDrawing();setAnnotations([])}
   useEffect(() => { clearDrag(); setSelected(null); setPromotion([]) }, [fen,orientation,interactive])
   useEffect(()=>{clearAnnotations()},[fen,orientation])
+  useEffect(()=>{setPending(null)},[fen,orientation])
   useEffect(()=>{
     const cancel=()=>{cancelDrag();cancelDrawing()}
     const escape=(event:KeyboardEvent)=>{if(event.key==='Escape')clearAnnotations()}
@@ -87,12 +95,14 @@ export default function Board({fen, orientation, interactive, legalMoves, onMove
     window.addEventListener('keydown',escape)
     return()=>{window.removeEventListener('blur',cancel);window.removeEventListener('keydown',escape);gesture.current=null;drawing.current=null}
   },[])
-  const board = new Chess(fen)
+  const board = new Chess(shownFen)
   const files = orientation === 'w' ? 'abcdefgh' : 'hgfedcba'
   const ranks = orientation === 'w' ? '87654321' : '12345678'
   useLayoutEffect(()=>{
-    const previous=previousFen.current
+    const previous=previousFen.current,fen=shownFen,lastMove=shownLastMove
     previousFen.current=fen
+    const drop=dropped.current
+    dropped.current=null
     if(previous===fen||!lastMove)return
     const from=lastMove.slice(0,2),to=lastMove.slice(2,4)
     let castling=false
@@ -104,6 +114,8 @@ export default function Board({fen, orientation, interactive, legalMoves, onMove
       // Sound only for moves played forward, never for a puzzle resetting.
       if(!reverseMove)playMoveSound(before.inCheck()?'check':moved.captured?'capture':'move')
     }catch{return}
+    // A dragged piece is already on its destination: sliding it from the origin looks like a jump back.
+    if(!reverseMove&&drop?.base===previous&&drop.move===lastMove)return
     if(!animateMove||window.matchMedia('(prefers-reduced-motion: reduce)').matches)return
     const animations:Animation[]=[]
     function slide(origin:string,destination:string){
@@ -130,12 +142,24 @@ export default function Board({fen, orientation, interactive, legalMoves, onMove
       }
     }
     return()=>animations.forEach(animation=>animation.cancel())
-  },[fen,orientation,lastMove,animateMove,reverseMove])
+  },[shownFen,orientation,shownLastMove,animateMove,reverseMove])
   const targets = selected ? legalMoves.filter(m => m.startsWith(selected)).map(m => m.slice(2,4)) : []
-  function submit(from:string,to:string) {
+  function play(move:string,dragged=false){
+    let mine:typeof pending=null
+    try{
+      const next=new Chess(fen)
+      next.move({from:move.slice(0,2),to:move.slice(2,4),promotion:move[4]})
+      mine={base:fen,move,fen:next.fen()}
+      setPending(mine)
+      if(dragged)dropped.current={base:fen,move}
+    }catch{/* the parent decides on moves the board cannot replay */}
+    const done=()=>setPending(current=>current===mine?null:current)
+    Promise.resolve(onMove(move)).then(done,done)
+  }
+  function submit(from:string,to:string,dragged=false) {
       const candidates = legalMoves.filter(m => m.startsWith(from + to))
       if (candidates.length > 1) { setPromotion(candidates); return }
-      if (candidates.length === 1) { setSelected(null); onMove(candidates[0]); return }
+      if (candidates.length === 1) { setSelected(null); play(candidates[0],dragged); return }
       setSelected(null)
   }
   function click(square: string) {
@@ -199,7 +223,7 @@ export default function Board({fen, orientation, interactive, legalMoves, onMove
     setSelected(null)
     if(!interactive||fen!==current.fen||orientation!==current.orientation)return
     const to=squareAtPoint(event.clientX,event.clientY)
-    if(to)submit(current.from,to)
+    if(to)submit(current.from,to,true)
   }
   function squareAtPoint(x:number,y:number){
     const rect=boardElement.current?.getBoundingClientRect()
@@ -213,9 +237,10 @@ export default function Board({fen, orientation, interactive, legalMoves, onMove
       {Array.from(ranks).flatMap((rank, ri) => Array.from(files).map((file, fi) => {
         const square = file + rank
         const piece = board.get(square as Square)
-        const lit = lastMove?.slice(0,2) === square || lastMove?.slice(2,4) === square
+        const checked = piece?.type==='k' && piece.color===board.turn() && board.inCheck()
+        const lit = shownLastMove?.slice(0,2) === square || shownLastMove?.slice(2,4) === square
         return <button key={square} type="button" data-square={square} aria-label={`${square}${piece ? ` ${names[piece.type]} ${piece.color === 'w' ? 'bianco' : 'nero'}` : ''}`} aria-pressed={selected === square}
-          className={`square ${(ri+fi)%2 ? 'dark-square' : 'light-square'} ${selected === square ? 'selected-square' : ''} ${lit ? 'last-square' : ''} ${drag?.from===square?'drag-origin':''} ${interactive&&!promotion.length&&legalMoves.some(m=>m.startsWith(square))?'can-drag':''}`}
+          className={`square ${(ri+fi)%2 ? 'dark-square' : 'light-square'} ${selected === square ? 'selected-square' : ''} ${lit ? 'last-square' : ''} ${checked ? 'check-square' : ''} ${drag?.from===square?'drag-origin':''} ${interactive&&!promotion.length&&legalMoves.some(m=>m.startsWith(square))?'can-drag':''}`}
           draggable={false} onDragStart={event=>event.preventDefault()}
           onPointerDown={event=>pointerDown(event,square)} onPointerMove={pointerMove} onPointerUp={pointerUp}
           onPointerCancel={event=>{if(gesture.current?.id===event.pointerId)cancelDrag();if(drawing.current?.id===event.pointerId)cancelDrawing()}}
@@ -225,7 +250,7 @@ export default function Board({fen, orientation, interactive, legalMoves, onMove
           {ri === 7 && <span className="file-label">{file}</span>}
           {piece && <Piece key={piece.color+piece.type} code={piece.color+piece.type}/>}
           {targets.includes(square) && <span className={piece ? 'capture-ring' : 'move-dot'} aria-hidden="true"/>}
-          {badge?.square===square&&<span className={`move-badge move-class-${badge.kind}`} title={moveClassInfo[badge.kind].label} aria-hidden="true">{moveClassInfo[badge.kind].symbol}</span>}
+          {!optimistic&&badge?.square===square&&<span className={`move-badge move-class-${badge.kind}`} title={moveClassInfo[badge.kind].label} aria-hidden="true">{moveClassInfo[badge.kind].symbol}</span>}
         </button>
       }))}
       <svg className="board-annotations" viewBox="0 0 800 800" aria-hidden="true">
@@ -233,7 +258,7 @@ export default function Board({fen, orientation, interactive, legalMoves, onMove
         {(()=>{
           // Stacking order as on maiachess.com: Maia, Stockfish, then the played move on top.
           const order={maia:0,stockfish:1,played:2}
-          const sorted=[...analysisArrows].sort((a,b)=>b.rank-a.rank||order[a.source]-order[b.source])
+          const sorted=optimistic?[]:[...analysisArrows].sort((a,b)=>b.rank-a.rank||order[a.source]-order[b.source])
           const all=[...sorted.map(a=>({from:a.move.slice(0,2),to:a.move.slice(2,4)})),...annotations]
           return sorted.map(arrow=>{
             const from=arrow.move.slice(0,2),to=arrow.move.slice(2,4)
@@ -246,13 +271,13 @@ export default function Board({fen, orientation, interactive, legalMoves, onMove
             </g>
           })
         })()}
-        {annotations.map(a=><BoardAnnotation key={a.from+a.to} {...a} orientation={orientation} shorten={[...annotations,...analysisArrows.map(x=>({from:x.move.slice(0,2),to:x.move.slice(2,4)}))].some(b=>b.to===a.to&&b.from!==a.from)}/>)}
+        {annotations.map(a=><BoardAnnotation key={a.from+a.to} {...a} orientation={orientation} shorten={[...annotations,...(optimistic?[]:analysisArrows).map(x=>({from:x.move.slice(0,2),to:x.move.slice(2,4)}))].some(b=>b.to===a.to&&b.from!==a.from)}/>)}
         {preview&&<BoardAnnotation {...preview} orientation={orientation} preview/>}
       </svg>
     </div>
     {drag&&<div className="dragged-piece" aria-hidden="true" style={{left:drag.x,top:drag.y,width:drag.size,height:drag.size,fontSize:drag.size*.82}}><Piece code={drag.code}/></div>}
     {promotion.length > 0 && <div className={`promotion board-theme-${theme}`} role="dialog" aria-label="Scegli la promozione">
-      <p>Promuovi il pedone</p><div className="promotion-choices">{promotion.map(move => <button key={move} className="promotion-piece" aria-label={names[move[4]]} title={names[move[4]]} onClick={() => {setPromotion([]); setSelected(null); if(interactive&&legalMoves.includes(move))onMove(move)}}><Piece code={board.turn()+move[4]}/></button>)}</div><button className="promotion-cancel" onClick={()=>{setPromotion([]);setSelected(null)}}>Annulla</button>
+      <p>Promuovi il pedone</p><div className="promotion-choices">{promotion.map(move => <button key={move} className="promotion-piece" aria-label={names[move[4]]} title={names[move[4]]} onClick={() => {setPromotion([]); setSelected(null); if(interactive&&legalMoves.includes(move))play(move)}}><Piece code={board.turn()+move[4]}/></button>)}</div><button className="promotion-cancel" onClick={()=>{setPromotion([]);setSelected(null)}}>Annulla</button>
     </div>}
   </div>
 }

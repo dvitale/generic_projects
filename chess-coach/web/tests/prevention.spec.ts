@@ -1,7 +1,7 @@
 import {test,expect,type APIRequestContext} from '@playwright/test'
 
-async function seed(request:APIRequestContext,black=false){
-  const fen=black?'8/8/8/8/8/5kq1/8/R6K b - - 0 1':'r6k/8/5KQ1/8/8/8/8/8 w - - 0 1'
+async function seed(request:APIRequestContext,black=false,whiteFen='r6k/8/5KQ1/8/8/8/8/8 w - - 0 1'){
+  const fen=black?'8/8/8/8/8/5kq1/8/R6K b - - 0 1':whiteFen
   let game=await(await request.post('/api/games',{data:{fen,color:black?'b':'w'}})).json()
   game=await(await request.post(`/api/games/${game.id}/moves`,{data:{move:black?'g3g1':'g6g8',version:0,revision:0,actor:'human'}})).json()
   const job=await(await request.post(`/api/games/${game.id}/analysis`,{data:{}})).json()
@@ -67,4 +67,28 @@ test('empty catalog explains how personal positions are obtained',async({page})=
   await expect(page.getByText('Nessun blunder evitabile disponibile.',{exact:false})).toBeVisible()
   await page.getByRole('button',{name:'Apri le tue partite'}).click()
   await expect(page.getByRole('heading',{name:'Partite',exact:true,level:1})).toBeVisible()
+})
+
+test('Play from here appears only once the position is closed and starts a Maia game from it',async({page,request})=>{
+  const white=await seed(request,false,'1r5k/8/5KQ1/8/8/8/8/8 w - - 0 1')
+  await page.route('**/api/prevention',async route=>{
+    const catalog=await(await route.fetch()).json()
+    await route.fulfill({json:{...catalog,positions:catalog.positions.filter((p:{gameId:string})=>p.gameId===white.id)}})
+  })
+  let created:Record<string,unknown>|null=null
+  page.on('request',r=>{if(r.method()==='POST'&&r.url().endsWith('/api/games'))created=r.postDataJSON()})
+  await page.goto('/')
+  await page.getByRole('button',{name:'Blunder prevention',exact:false}).click()
+  await page.getByRole('button',{name:'Inizia Blunder prevention'}).click()
+  await expect(page.getByRole('heading',{name:'Evita il blunder',exact:true})).toBeVisible()
+  const play=page.getByRole('button',{name:'Gioca da qui col Bianco',exact:true})
+  await expect(play).toHaveCount(0)
+  await page.locator('[data-square="g6"]').click();await page.locator('[data-square="f5"]').click()
+  await expect(page.getByRole('heading',{name:'✓ Blunder evitato!'})).toBeVisible()
+  await play.click()
+  await expect(page.getByRole('heading',{name:'Gioca contro Maia',exact:true})).toBeVisible()
+  expect(created).toMatchObject({fen:'1r5k/8/5KQ1/8/8/8/8/8 w - - 0 1',color:'w'})
+  expect(String(created!.title)).toContain('Blunder prevention')
+  await expect(page.locator('[data-square="g6"] img')).toBeVisible()
+  await expect(page.getByText('Tocca a te · trascina un pezzo o usa due clic')).toBeVisible()
 })

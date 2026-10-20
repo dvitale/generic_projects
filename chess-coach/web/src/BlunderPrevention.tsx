@@ -18,7 +18,7 @@ interface Session {id:string;version:number;exposure:string;excluded?:boolean;me
 interface Result {success:boolean;assisted:boolean;closed:boolean;version:number;firstTry:boolean;move:string;san:string;actual:Evaluation;example:Evaluation|null;original:{move:string;san:string;evaluation:Evaluation}|null;message:string;insight?:Insight}
 const evaluation=(e:Evaluation)=>e.mate!==null?(e.mate>0?`Matto a tuo favore in ${e.mate}`:`Matto contro di te in ${Math.abs(e.mate)}`):`${e.cp>=0?'+':''}${(e.cp/100).toFixed(2)}`
 
-export default function BlunderPrevention({onArchive,onReview,onPlayMistake,startPositionId,onStarted}:{onArchive:()=>void;onReview:(id:string,ply:number)=>void;onPlayMistake?:(positionId:string,mistake:Mistake)=>void;startPositionId?:string|null;onStarted?:()=>void}) {
+export default function BlunderPrevention({onArchive,onReview,onPlayMistake,onPlayFrom,startPositionId,onStarted}:{onArchive:()=>void;onReview:(id:string,ply:number)=>void;onPlayMistake?:(positionId:string,mistake:Mistake)=>void;onPlayFrom?:(fen:string,color:Color,title:string)=>void;startPositionId?:string|null;onStarted?:()=>void}) {
   const [catalog,setCatalog]=useState<Catalog|null>(null)
   const [position,setPosition]=useState<Position|null>(null)
   const boardOrientation=useBoardOrientation(position?.turn??'w')
@@ -87,6 +87,8 @@ export default function BlunderPrevention({onArchive,onReview,onPlayMistake,star
       <aside className="coach-column">
         <section className={`puzzle-feedback ${result?.success?'solved':result&&!result.closed?'retry':''}`} aria-label="Esito Blunder prevention">
           <div role="status" aria-live="polite"><h3>{motion.message?'↻ Mossa da migliorare':busy?session?'Verifica della mossa…':'Verifica della posizione…':result?.success?'✓ Blunder evitato!':result?.closed?'Una mossa sicura':result?'↻ Riprova una mossa diversa':'Evita il blunder'}</h3><p>{motion.message|| (busy?'Stockfish sta controllando la posizione.':result?.message||'Cerca una mossa sicura. Più alternative possono essere corrette.')}</p></div>
+          {result?.closed&&onPlayFrom&&<button className="play-from" disabled={busy} title="Nuova partita contro Maia dalla posizione prima del tuo errore"
+            onClick={()=>onPlayFrom(position.fen,position.turn,`Blunder prevention · ${position.title} · ${position.moveNumber}${position.turn==='w'?'.':'…'}`)}>Gioca da qui col {position.turn==='w'?'Bianco':'Nero'}</button>}
           {result?.closed&&<div className="puzzle-next">{remaining.length?<button className="primary" disabled={busy} onClick={next}>Prossima posizione →</button>:<><p>Hai completato tutte le posizioni disponibili.</p><button onClick={()=>{setPosition(null);setSession(null);setResult(null)}}>Riepilogo della sessione</button></>}</div>}
         </section>
         <ExerciseSource title={position.title} createdAt={position.gameCreatedAt} fen={position.fen} disabled={busy} onReview={()=>onReview(position.gameId,position.ply)}/>

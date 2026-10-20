@@ -260,6 +260,12 @@ details.panel>summary{font-weight:650;font-size:var(--fs-lg)}
 .arrow-swatch.source-played{box-shadow:0 0 0 2px #4A8FB3}
 
 /* Controls under the board */
+.check-square{background:radial-gradient(ellipse at center,#ff0000 0%,#e70000 25%,#a9000000 89%,#9e000000 100%)}
+.game-over{display:flex;flex-direction:column;align-items:center;gap:2px;margin-top:12px;padding:12px 16px;border-radius:var(--r-md);border:1px solid var(--border-strong);border-left-width:5px;background:var(--surface-2);text-align:center}
+.game-over strong{font-family:var(--font-display);font-size:var(--fs-xl);line-height:1.2}
+.game-over span{font-size:var(--fs-sm);color:var(--text-2)}
+.game-over-win{background:var(--success-bg);border-color:#a8d1a4;border-left-color:var(--success)}.game-over-win strong{color:var(--success)}
+.game-over-loss{background:var(--error-bg);border-color:#f1c9c4;border-left-color:var(--error-border)}.game-over-loss strong{color:var(--error)}
 .board-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px}
 .board-actions button{min-height:36px;font-size:var(--fs-sm)}
 .review-controls{display:flex;justify-content:center;align-items:center;gap:6px;padding:4px 0}
@@ -412,6 +418,10 @@ details.panel>summary{font-weight:650;font-size:var(--fs-lg)}
 .chess-insight{margin:12px 0;font-size:var(--fs-sm);line-height:1.6;overflow-wrap:anywhere}
 .chess-insight ul{padding-left:18px;max-height:260px;overflow:auto}
 .chess-insight h4,.reasoning-sections h4{margin:12px 0 4px}
+.mistake-explanation{padding:12px 14px;margin:0 0 12px;border:1px solid var(--border);border-left:4px solid var(--error);border-radius:var(--r-md);background:var(--surface-2)}
+.mistake-explanation-text{font-size:var(--fs-md);font-weight:600;margin:6px 0}
+.mistake-explanation-board{margin-top:10px;max-width:340px}
+.mistake-explanation-board .review-step-controls{margin-top:8px}
 .insight-badge{display:inline-block;font-size:var(--fs-xs);font-weight:700;border-radius:var(--r-pill);padding:3px 10px;margin:4px 0;background:var(--surface-3);color:var(--text-2)}
 .insight-tactical{background:#fff0e3;color:#8b4820}
 .insight-positional{background:var(--info-bg);color:var(--info)}

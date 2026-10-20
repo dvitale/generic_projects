@@ -147,3 +147,40 @@ test('Touch dragging moves once without scrolling the page',async({page,request}
   expect(await page.evaluate(()=>scrollY)).toBe(scroll)
   await cdp.detach()
 })
+
+test('A dropped piece stays on its destination while the server answers',async({page,request})=>{
+  await prepare(page,request)
+  await play(page)
+  let release=()=>{}
+  await page.route('**/api/games/*/moves',async route=>{
+    if(route.request().postDataJSON().actor==='maia'){await route.abort();return}
+    await new Promise<void>(resolve=>{release=resolve})
+    await route.continue()
+  })
+  await drag(page,'e2','e4')
+  const piece=page.locator('[data-square="e4"] .piece-image')
+  await expect(piece).toHaveCount(1)
+  await expect(page.locator('[data-square="e2"] .piece-image')).toHaveCount(0)
+  // No slide back from e2: the piece was dropped where it belongs.
+  expect(await piece.evaluate(el=>el.getAnimations().length)).toBe(0)
+  await expect(page.locator('[data-square="e4"]')).toHaveClass(/last-square/)
+  release()
+  await expect(page.locator('[data-square="e4"]')).toHaveAttribute('aria-label',/pedone bianco/)
+  expect(await piece.evaluate(el=>el.getAnimations().length)).toBe(0)
+  await expect(page.locator('[data-square="e2"] .piece-image')).toHaveCount(0)
+})
+
+test('A rejected move puts the piece back on its origin',async({page,request})=>{
+  await prepare(page,request)
+  await play(page)
+  let release=()=>{}
+  await page.route('**/api/games/*/moves',async route=>{
+    await new Promise<void>(resolve=>{release=resolve})
+    await route.fulfill({status:409,contentType:'application/json',body:JSON.stringify({detail:'Partita aggiornata altrove'})})
+  })
+  await drag(page,'d2','d4')
+  await expect(page.locator('[data-square="d4"] .piece-image')).toHaveCount(1)
+  release()
+  await expect(page.locator('[data-square="d2"] .piece-image')).toHaveCount(1)
+  await expect(page.locator('[data-square="d4"] .piece-image')).toHaveCount(0)
+})
