@@ -112,6 +112,8 @@ test('Play from here starts a Maia game from the puzzle position once it is solv
   await page.goto('/')
   await page.getByRole('button',{name:/^Puzzle/}).click()
   const feedback=page.getByRole('region',{name:'Esito del puzzle'})
+  // The session must be open before the board accepts a move.
+  await expect(feedback).toContainText('Trova una buona mossa')
   await page.locator('[data-square="g6"]').click();await page.locator('[data-square="g7"]').click()
   await expect(feedback).toContainText('Mossa corretta!',{timeout:30000})
   await feedback.getByRole('button',{name:'Gioca da qui col Bianco',exact:true}).click()
@@ -134,6 +136,8 @@ test('the diagnosis before the solution counts the failed attempts as candidates
   await page.goto('/')
   await page.getByRole('button',{name:/^Puzzle/}).click()
   const feedback=page.getByRole('region',{name:'Esito del puzzle'})
+  // The session must be open before the board accepts a move.
+  await expect(feedback).toContainText('Trova una buona mossa')
   await page.locator('[data-square="g6"]').click();await page.locator('[data-square="g8"]').click()
   await expect(feedback).toContainText('La scacchiera è tornata alla posizione iniziale',{timeout:30000})
   await page.getByRole('button',{name:'Mostra soluzione',exact:true}).click()
