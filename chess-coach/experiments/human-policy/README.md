@@ -62,6 +62,37 @@ Non sono previsti processi automatici o addestramenti notturni.
 
 ## Dati e prevenzione delle valutazioni fuorvianti
 
+### Archivio mensile completo — 21 ottobre 2026
+
+È disponibile un download separato dell'intero settembre 2026, senza modificare
+i campioni e i checkpoint del pilota. Dimensione remota verificata:
+**29.224.520.887 byte**, circa 27,22 GiB, 89,6 milioni di partite di tutti i ritmi.
+Il download completo non equivale ancora a un dataset rapid pronto per il training.
+
+```bash
+make download-month MONTH=2026-09    # avvio o ripresa in primo piano
+make month-status MONTH=2026-09
+```
+
+- File in `data/monthly/`, esclusi da Git e dalla pubblicazione.
+- URL, dimensione, ETag e SHA256 ufficiale fissati nel manifest locale.
+- Il file rimane `.part` finché il checksum dell'intero archivio su disco non
+  coincide con quello ufficiale. Lo stato `complete` conferma questa verifica.
+- Ripresa HTTP dall'ultimo byte scritto, con controllo della risposta del server;
+  tentativi automatici limitati dopo errori di rete. Un blocco impedisce due download
+  contemporanei dello stesso mese. Ctrl+C conserva il file parziale.
+- Controllo dello spazio sia in Debian sia sul disco Windows `/mnt/c`: almeno
+  10 GiB devono rimanere liberi. Per una diversa collocazione di WSL specificare
+  `--host-disk` con il volume che contiene effettivamente il disco virtuale.
+- Stato in `2026-09.status.json`; il trasferimento avviato il 21 ottobre scrive
+  anche `2026-09.log` e continua in un processo locale indipendente dalla chat.
+  Spegnimento o sospensione possono interromperlo: lo stesso comando lo riprende.
+- Nessuna decompressione integrale, estrazione illimitata o nuova sessione di
+  training viene avviata automaticamente. L'estrazione successiva dovrà essere
+  progressiva, con un limite di spazio e un campionamento distribuito sul mese.
+
+### Campione pilota
+
 - Fonte: archivio pubblico Lichess standard rated, settembre 2026, CC0.
 - Il download è un **prefisso limitato** dell'archivio mensile, non un
   campione rappresentativo del mese. Un file già presente non viene sovrascritto.

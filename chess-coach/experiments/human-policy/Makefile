@@ -8,8 +8,9 @@ GAMES ?= 5000
 TOP_K ?= 5
 DATA ?= data/positions.sqlite
 OUTPUT ?= runs/comparison-pilot
+MONTH ?= 2026-09
 
-.PHONY: help setup download prepare test train resume status predict reference benchmark
+.PHONY: help setup download prepare test train resume status predict reference benchmark download-month month-status
 help:
 	@printf '%s\n' 'Modello sperimentale di mosse umane — GPU locale' 'make setup | download | prepare | test | train | resume | status | reference | benchmark' 'make predict FEN="..." ELO=800' 'Opzioni: STEPS=100 BATCH=16 PRESET=tiny|small RUN=runs/tiny GAMES=5000 DATA=data/positions.sqlite' 'Benchmark pilota: make benchmark DATA=data/pilot.sqlite' 'STEPS indica passi aggiuntivi. Ctrl+C salva e arresta dopo il batch.'
 setup:
@@ -22,7 +23,7 @@ download:
 prepare:
 	$(PY) dataset.py prepare --max-games $(GAMES) --output "$(DATA)"
 test:
-	$(PY) -m pytest -q test_policy.py test_benchmark.py
+	$(PY) -m pytest -q test_policy.py test_benchmark.py test_download_month.py
 train:
 	$(PY) train.py train --data "$(DATA)" --steps $(STEPS) --batch-size $(BATCH) --preset $(PRESET) --run $(RUN)
 resume:
@@ -35,3 +36,7 @@ reference:
 	$(PY) fetch_reference.py
 benchmark:
 	$(PY) benchmark.py --data "$(DATA)" --output "$(OUTPUT)"
+download-month:
+	$(PY) download_month.py --month "$(MONTH)"
+month-status:
+	@$(PY) -c "from pathlib import Path; p=Path('data/monthly/$(MONTH).status.json'); print(p.read_text() if p.exists() else 'Download non avviato; controllare anche il log')"
