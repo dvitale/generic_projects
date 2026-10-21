@@ -13,7 +13,7 @@ import time
 
 import torch
 from torch.nn import functional as F
-from torch.utils.data import DataLoader
+from torch.utils.data import ConcatDataset, DataLoader
 
 from dataset import Positions
 from policy import Config, Policy, collate, inputs, predict
@@ -39,12 +39,14 @@ def evaluate(model, dataset, device, batch_size=32):
         probs = logits.softmax(-1)
         confidence, choice = probs.max(-1)
         ranking = logits.topk(min(5, logits.shape[1]), dim=1).indices
-        matches = ranking.eq(target[:, None])
+        matches = ranking.eq(target[:, None]).cpu()
+        correct_items = choice.eq(target).cpu().tolist()
+        confidence_items = confidence.cpu().tolist()
         counts = (batch["legal"] >= 0).sum(-1).tolist()
         for i, (elo, loss, choices) in enumerate(zip(batch["elo"].tolist(), losses, counts)):
             bucket = str(elo // 200 * 200)
-            correct = int(choice[i] == target[i])
-            conf = float(confidence[i])
+            correct = int(correct_items[i])
+            conf = confidence_items[i]
             bin_item = bins[min(9, int(conf * 10))]
             bin_item["n"] += 1
             bin_item["confidence"] += conf
@@ -75,12 +77,19 @@ def train(args):
     if device.type == "cuda":
         torch.cuda.reset_peak_memory_stats()
     cfg = Config() if args.preset == "tiny" else Config(dim=256, layers=6, heads=8, head_dim=64)
-    train_data, validation = Positions(args.data, "train"), Positions(args.data, "validation")
+    validation_path = getattr(args, "validation_data", None) or args.data
+    replay_path = getattr(args, "replay_data", None)
+    initialize_from = getattr(args, "initialize_from", None)
+    if args.resume and initialize_from:
+        raise ValueError("Scegliere ripresa oppure passaggio da un checkpoint precedente")
+    train_data, validation = Positions(args.data, "train"), Positions(validation_path, "validation")
     if not len(train_data) or not len(validation):
         raise ValueError("Servono posizioni sia train sia validation: ampliare il campione")
     with sqlite3.connect(args.data) as db:
         settings = json.loads(db.execute("SELECT value FROM meta WHERE key='settings'").fetchone()[0])
     signature = fingerprint(args.data)
+    validation_signature = fingerprint(validation_path)
+    replay_signature = fingerprint(replay_path) if replay_path else None
     run = Path(args.run)
     run.mkdir(parents=True, exist_ok=True)
     checkpoint = run / "last.pt"
@@ -90,11 +99,36 @@ def train(args):
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=0.01)
     start_step = 0
     sampler = torch.Generator().manual_seed(args.seed)
-    band_counts = Counter(elo // 200 for _, elo in train_data.records)
+    records = list(train_data.records)
+    band_counts = Counter(elo // 200 for _, elo in records)
     sampling = "sqrt_inverse_frequency_capped_4_v1"
     largest_band = max(band_counts.values())
     weights = torch.tensor([min(4., math.sqrt(largest_band / band_counts[elo // 200]))
                             for _, elo in train_data.records], dtype=torch.double)
+    replay_count = 0
+    if replay_path:
+        replay = Positions(replay_path, "train")
+        replay_count = len(replay)
+        if replay_count:
+            replay_bands = Counter(elo // 200 for _, elo in replay.records)
+            largest = max(replay_bands.values())
+            replay_weights = torch.tensor([min(4., math.sqrt(largest/replay_bands[elo//200]))
+                                           for _, elo in replay.records], dtype=torch.double)
+            weights = torch.cat((.8*weights/weights.sum(), .2*replay_weights/replay_weights.sum()))
+            records += replay.records
+            train_data = ConcatDataset([train_data, replay])
+            sampling += "_replay20"
+    parent_sha256 = None
+    previous_bounds = []
+    if initialize_from:
+        state = torch.load(initialize_from, map_location="cpu", weights_only=True)
+        if state["config"] != asdict(cfg) or state["dataset"]["speed"] != settings["speed"]:
+            raise ValueError("Checkpoint precedente incompatibile con rete o ritmo di gioco")
+        model.load_state_dict(state["model"])
+        optimizer.load_state_dict(state["optimizer"])
+        start_step = state["step"]
+        previous_bounds = state["rating_bounds"]
+        parent_sha256 = fingerprint(initialize_from)
     if args.resume:
         state = torch.load(checkpoint, map_location="cpu", weights_only=True)
         if state["dataset_sha256"] != signature or state["config"] != asdict(cfg):
@@ -103,9 +137,14 @@ def train(args):
             raise ValueError("Ripresa: mantenere la stessa batch size")
         if state.get("sampling") != sampling:
             raise ValueError("Campionamento cambiato: iniziare una nuova run")
+        if (state.get("validation_sha256", state["dataset_sha256"]) != validation_signature
+            or state.get("replay_sha256") != replay_signature):
+            raise ValueError("Validation o memoria dei mesi precedenti cambiata")
         model.load_state_dict(state["model"])
         optimizer.load_state_dict(state["optimizer"])
         start_step = state["step"]
+        parent_sha256 = state.get("parent_sha256")
+        previous_bounds = state["rating_bounds"]
         sampler.set_state(state["sampler_rng"])
         torch.set_rng_state(state["cpu_rng"])
         if device.type == "cuda" and state["cuda_rng"] is not None:
@@ -118,12 +157,14 @@ def train(args):
 
     for sig in (signal.SIGINT, signal.SIGTERM):
         signal.signal(sig, on_stop)
-    rating_bounds = [min(elo for _, elo in train_data.records), max(elo for _, elo in train_data.records)]
+    ratings = [elo for _, elo in records] + previous_bounds
+    rating_bounds = [min(ratings), max(ratings)]
     setup = dict(device=str(device), gpu=torch.cuda.get_device_name() if device.type == "cuda" else None,
                  parameters=sum(p.numel() for p in model.parameters()),
                  train_positions=len(train_data), validation_positions=len(validation),
                  rating_counts={str(k * 200): v for k, v in sorted(band_counts.items())},
-                 preset=args.preset, batch_size=args.batch_size, sampling=sampling)
+                 preset=args.preset, batch_size=args.batch_size, sampling=sampling,
+                 replay_positions=replay_count, parent_sha256=parent_sha256)
     print(json.dumps(setup), flush=True)
     t0, completed, step = time.monotonic(), 0, start_step
 
@@ -132,7 +173,9 @@ def train(args):
                      step=step, dataset=settings, dataset_sha256=signature, batch_size=args.batch_size,
                      rating_bounds=rating_bounds, cpu_rng=torch.get_rng_state(),
                      cuda_rng=torch.cuda.get_rng_state() if device.type == "cuda" else None,
-                     sampler_rng=sampler.get_state(), setup=setup, sampling=sampling)
+                     sampler_rng=sampler.get_state(), setup=setup, sampling=sampling,
+                     validation_sha256=validation_signature, replay_sha256=replay_signature,
+                     parent_sha256=parent_sha256)
         temp = checkpoint.with_suffix(".tmp")
         torch.save(state, temp)
         temp.replace(checkpoint)
@@ -168,9 +211,11 @@ def train(args):
     report = dict(**setup, step=step, additional_steps=completed, training_seconds=elapsed,
                   positions_per_second=completed * args.batch_size / elapsed,
                   gpu_peak_mib=torch.cuda.max_memory_allocated() / 1024**2 if device.type == "cuda" else None,
-                  validation=metrics, dataset_sha256=signature)
+                  validation=metrics, dataset_sha256=signature, interrupted=stop,
+                  validation_sha256=validation_signature, replay_sha256=replay_signature)
     (run / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps(report, indent=2), flush=True)
+    return report
 
 
 if __name__ == "__main__":
@@ -188,6 +233,9 @@ if __name__ == "__main__":
     t.add_argument("--save-every", type=int, default=50)
     t.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
     t.add_argument("--resume", action="store_true")
+    t.add_argument("--initialize-from", help="Nuovo mese: conserva rete e ottimizzatore; nuovo campionamento")
+    t.add_argument("--validation-data", help="Dataset di verifica fisso, separato dai mesi")
+    t.add_argument("--replay-data", help="Memoria train dei mesi precedenti: 20%% dei campionamenti")
     p = sub.add_parser("predict")
     p.add_argument("--checkpoint", default="runs/tiny/last.pt")
     p.add_argument("--fen", required=True)

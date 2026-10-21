@@ -9,10 +9,13 @@ TOP_K ?= 5
 DATA ?= data/positions.sqlite
 OUTPUT ?= runs/comparison-pilot
 MONTH ?= 2026-09
+MONTHS ?= 2026-09
+CYCLE_STEPS ?= 10000
 
-.PHONY: help setup download prepare test train resume status predict reference benchmark download-month month-status
+.PHONY: help setup download prepare test train resume status predict reference benchmark download-month month-status cycle cycle-status
 help:
 	@printf '%s\n' 'Modello sperimentale di mosse umane — GPU locale' 'make setup | download | prepare | test | train | resume | status | reference | benchmark' 'make predict FEN="..." ELO=800' 'Opzioni: STEPS=100 BATCH=16 PRESET=tiny|small RUN=runs/tiny GAMES=5000 DATA=data/positions.sqlite' 'Benchmark pilota: make benchmark DATA=data/pilot.sqlite' 'STEPS indica passi aggiuntivi. Ctrl+C salva e arresta dopo il batch.'
+	@printf '%s\n' 'Ciclo mensile: make cycle MONTHS=2026-09 CYCLE_STEPS=10000 | make cycle-status'
 setup:
 	python3 -m venv .venv
 	$(PY) -m pip install --upgrade pip
@@ -23,7 +26,7 @@ download:
 prepare:
 	$(PY) dataset.py prepare --max-games $(GAMES) --output "$(DATA)"
 test:
-	$(PY) -m pytest -q test_policy.py test_benchmark.py test_download_month.py
+	$(PY) -m pytest -q test_policy.py test_benchmark.py test_download_month.py test_monthly_cycle.py
 train:
 	$(PY) train.py train --data "$(DATA)" --steps $(STEPS) --batch-size $(BATCH) --preset $(PRESET) --run $(RUN)
 resume:
@@ -40,3 +43,7 @@ download-month:
 	$(PY) download_month.py --month "$(MONTH)"
 month-status:
 	@$(PY) -c "from pathlib import Path; p=Path('data/monthly/$(MONTH).status.json'); print(p.read_text() if p.exists() else 'Download non avviato; controllare anche il log')"
+cycle:
+	$(PY) monthly_cycle.py run --months "$(MONTHS)" --max-steps "$(CYCLE_STEPS)"
+cycle-status:
+	$(PY) monthly_cycle.py status

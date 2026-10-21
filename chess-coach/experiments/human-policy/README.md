@@ -58,7 +58,8 @@ periodico, scritto atomicamente ogni 50 passi.
 La ripresa conserva rete, ottimizzatore, generatore di campionamento, stato
 casuale e contatore. Richiede lo stesso dataset, configurazione e batch size.
 Per modificare il dataset dopo una prova, usare una nuova cartella `RUN`.
-Non sono previsti processi automatici o addestramenti notturni.
+Non è configurato alcuno scheduler. Il ciclo mensile descritto sotto viene
+avviato esplicitamente e può proseguire in un processo locale separato dalla chat.
 
 ## Dati e prevenzione delle valutazioni fuorvianti
 
@@ -87,9 +88,32 @@ make month-status MONTH=2026-09
 - Stato in `2026-09.status.json`; il trasferimento avviato il 21 ottobre scrive
   anche `2026-09.log` e continua in un processo locale indipendente dalla chat.
   Spegnimento o sospensione possono interromperlo: lo stesso comando lo riprende.
-- Nessuna decompressione integrale, estrazione illimitata o nuova sessione di
-  training viene avviata automaticamente. L'estrazione successiva dovrà essere
-  progressiva, con un limite di spazio e un campionamento distribuito sul mese.
+- Il solo comando di download non avvia estrazione o training. Per concatenare
+  queste operazioni utilizzare il ciclo mensile esplicito descritto sotto.
+
+### Ciclo mensile sequenziale
+
+Procedura completa e limiti: [CICLO-MENSILE.md](CICLO-MENSILE.md).
+
+```bash
+make cycle MONTHS=2026-09 CYCLE_STEPS=10000
+make cycle-status
+```
+
+Il ciclo scarica/riprende un solo mese, verifica il checksum, scorre l'intero
+archivio in streaming, estrae fino a un milione di posizioni, allena il modello
+tiny e lo confronta sulla validation fissa. Conserva una memoria fino a 100.000
+posizioni train dei mesi precedenti, utilizzata per il 20% dei campionamenti.
+Solo dopo salvataggio, confronto favorevole e verifica degli hash rimuove
+l'archivio grezzo. Conserva i checkpoint/campioni dei due mesi più recenti.
+Il test finale non viene valutato. Un fallimento interrompe il ciclo senza
+cancellare l'archivio.
+
+La ripresa del training sullo stesso dataset resta `--resume`. Il passaggio
+intenzionale a un dataset nuovo usa `--initialize-from`, preservando rete e
+ottimizzatore ma creando un nuovo campionamento e registrando il checkpoint padre.
+Il primo mese parte da zero: i pesi del pilota non vengono riutilizzati, per
+evitare contaminazione della nuova verifica fissa.
 
 ### Campione pilota
 
