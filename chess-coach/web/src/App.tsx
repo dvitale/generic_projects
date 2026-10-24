@@ -62,6 +62,17 @@ function position(game: Game, ply: number) {
   for (const move of game.moves.slice(0, ply)) board.move({from:move.slice(0,2),to:move.slice(2,4),promotion:move[4]})
   return board
 }
+/** "16. Bb3": the move played from the position after `ply` half-moves, the one Review compares. */
+function nextMove(game: Game, ply: number) {
+  if (ply >= game.moves.length) return null
+  const board = position(game, ply), number = board.moveNumber(), dot = board.turn() === 'w' ? '.' : '…', uci = game.moves[ply]
+  return `${number}${dot} ${board.move({from:uci.slice(0,2),to:uci.slice(2,4),promotion:uci[4]}).san}`
+}
+/** Full-move number of the half-move `ply`: White and Black share it, as in "16. Bb3 Rfe8". */
+function moveNumber(game: Game, ply: number) {
+  const [, side, , , , number] = game.initialFen.split(' ')
+  return Number(number || 1) + Math.floor((ply + (side === 'b' ? 1 : 0)) / 2)
+}
 function score(evaluation: Evaluation) { return evaluation.mate !== null ? `Matto ${evaluation.mate > 0 ? '+' : ''}${evaluation.mate}` : (evaluation.cp / 100).toFixed(2) }
 
 export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
@@ -208,6 +219,7 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
   const canMove = !busy && !jobId && (tab === 'train' ? !!exercise && !!session && (!attempt?.closed || practicing && !practice?.result?.success) && diagnosing !== session.id : tab === 'play' && !browsingHistory && !!game && !game.result && (game.source === 'maia' || game.source === 'stockfish') && game.turn === game.playerColor && !botThinking)
   const decision = game?.analysis?.decisions.find(d=>d.ply === cursor)
   const visiblePrediction = predictionKey===boardFen+':'+reviewElo?prediction:null
+  const reviewMove=tab==='review'&&game?nextMove(game,cursor):null
   const reviewedMove=(game?.analysis?.moves||game?.analysis?.decisions)?.find(d=>d.ply===cursor)
   const moveHint=useMoveSuggestion(tab==='play'&&!browsingHistory?game:null)
   const analysisArrows:AnalysisArrow[]=[]
@@ -420,7 +432,7 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
     aside={tab==='play'&&botThinking&&<span className="thinking" role="status">{opponentName} sta pensando…</span>}/>
   const outcome=tab==='play'&&game&&!browsingHistory?gameOutcome(game):null
   const playerBar=<PlayerBar key="player" lower={!flipped} avatar={orientation==='w'?'♙':'♟'} name={tab==='train'?(attempt?.closed?(attempt.success?'Puzzle risolto':'Soluzione del puzzle'):exercise?.turn==='b'?'Muove il Nero':'Muove il Bianco'):'Tu'}
-    detail={tab==='play'?(browsingHistory?`Stai rivedendo la posizione dopo ${playPly} semimosse`:outcome?`Partita conclusa · ${outcome.title}`:game?.result?`Partita conclusa · ${game.result}`:canMove?'Tocca a te · trascina un pezzo o usa due clic':game?'Attendi la risposta':'Pronto per iniziare'):tab==='review'?`Posizione dopo ${cursor} semimosse`:attempt?.closed?'Esercizio concluso':'Cerca una buona mossa'}
+    detail={tab==='play'?(browsingHistory?`Stai rivedendo la posizione dopo ${playPly} semimosse`:outcome?`Partita conclusa · ${outcome.title}`:game?.result?`Partita conclusa · ${game.result}`:canMove?'Tocca a te · trascina un pezzo o usa due clic':game?'Attendi la risposta':'Pronto per iniziare'):tab==='review'?(reviewMove?`Posizione prima di ${reviewMove}`:'Posizione finale'):attempt?.closed?'Esercizio concluso':'Cerca una buona mossa'}
     captured={tab==='train'?[]:balance.captured(orientation)} advantage={balance.advantage(orientation)} time={thinkingTime(orientation)} active={!!shownGame&&!shownGame.result&&sideToMove===orientation}
     aside={<span className="mode-label">{tab==='play'?'PARTITA LIBERA':tab==='review'?'ANALISI':'ESERCIZIO'}</span>}/>
   return <div className="app-shell">
@@ -460,7 +472,7 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
           {tab==='play'&&game&&<div className="board-actions"><button className="primary" title="Nuova partita con livello, colore e motore scelti nel pannello" disabled={busy||!!jobId||botThinking||engine==='experimental'&&!opponents.status?.available} onClick={startGame}><span aria-hidden="true">＋</span> Nuova partita</button><button title={`Ritorna alla tua ultima scelta e annulla anche la risposta di ${game.source==='stockfish'?'Stockfish':game.engineLabel??'Maia'}.`} disabled={!game.canUndo||busy||!!jobId||browsingHistory} onClick={undo}><span aria-hidden="true">↶</span> Annulla ultima mossa</button>{!game.result&&<button disabled={!canMove||!!moveHint.suggestion?.loading} onClick={()=>void moveHint.request()} title="Prima scelta di Stockfish (blu) e di Maia (rosso) nella posizione attuale"><span aria-hidden="true">💡</span> Suggerisci mossa</button>}{(game.source==='maia'||game.source==='stockfish')&&!game.result&&<button className="danger" disabled={busy||!!jobId} onClick={resign}><span aria-hidden="true">⚑</span> Abbandona partita</button>}</div>}
           {tab==='play'&&game&&<SuggestionBox suggestion={moveHint.suggestion} elo={game.elo}/>}
           {browsingHistory&&<div className="play-history-notice"><span>Posizione precedente · {playPly} / {game!.moves.length}</span><span className="play-history-actions">{playFromButton(game!,playPly)}<button className="primary" onClick={()=>setPlayPosition(null)}>Torna alla posizione corrente</button></span></div>}
-          {tab==='review'&&game&&<div className="review-controls board-toolbar"><button aria-label="Posizione iniziale" onClick={()=>setCursor(0)} disabled={cursor===0}>⏮</button><button aria-label="Mossa precedente" onClick={()=>setCursor(c=>Math.max(0,c-1))} disabled={cursor===0}>◀</button><span>{cursor} / {game.version}</span><button aria-label="Mossa successiva" onClick={()=>setCursor(c=>Math.min(game.version,c+1))} disabled={cursor===game.version}>▶</button><button aria-label="Ultima posizione" onClick={()=>setCursor(game.version)} disabled={cursor===game.version}>⏭</button>{playFromButton(game,cursor)}</div>}
+          {tab==='review'&&game&&<div className="review-controls board-toolbar"><button aria-label="Posizione iniziale" onClick={()=>setCursor(0)} disabled={cursor===0}>⏮</button><button aria-label="Mossa precedente" onClick={()=>setCursor(c=>Math.max(0,c-1))} disabled={cursor===0}>◀</button><span className="review-step" title="La scacchiera mostra la posizione prima della mossa indicata">{reviewMove??'Fine'}{game.version>0&&<small>mossa {moveNumber(game,Math.min(cursor,game.version-1))} / {moveNumber(game,game.version-1)}</small>}</span><button aria-label="Mossa successiva" onClick={()=>setCursor(c=>Math.min(game.version,c+1))} disabled={cursor===game.version}>▶</button><button aria-label="Ultima posizione" onClick={()=>setCursor(game.version)} disabled={cursor===game.version}>⏭</button>{playFromButton(game,cursor)}</div>}
           {tab==='review'&&game&&<div className="analysis-arrow-controls" role="group" aria-label="Frecce di analisi">{([['stockfish','Stockfish · blu'],['maia','Maia · rosso'],['played','Giocata · bianco']] as const).map(([source,label])=><label key={source}><input type="checkbox" checked={arrowSources[source]} onChange={e=>setArrowSources(current=>({...current,[source]:e.target.checked}))}/><span className={'arrow-swatch source-'+source}/>{label}</label>)}</div>}
           {tab==='train'&&attempt?.success&&!practicing&&<div className="panel" aria-label="Confronto del puzzle">
             <p>{puzzleComparison.visible?'Confronto dalla posizione iniziale del puzzle.':'La scacchiera mostra la tua soluzione.'}</p>

@@ -270,6 +270,7 @@ details.panel>summary{font-weight:650;font-size:var(--fs-lg)}
 .board-actions button{min-height:36px;font-size:var(--fs-sm)}
 .review-controls{display:flex;justify-content:center;align-items:center;gap:6px;padding:4px 0}
 .review-controls span{font-size:var(--fs-sm);min-width:64px;text-align:center;color:var(--text-2);font-weight:600}
+.review-controls .review-step{display:grid;line-height:1.15;color:var(--text)}.review-step small{font-weight:500;color:var(--text-2)}
 .review-controls button{min-width:44px;min-height:38px;padding:6px 10px}
 .board-toolbar{margin-top:10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:6px;box-shadow:var(--shadow-sm)}
 .board-toolbar button{flex:1;border-color:transparent;background:var(--surface-2);font-size:var(--fs-lg)}
