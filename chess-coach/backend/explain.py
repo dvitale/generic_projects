@@ -120,13 +120,16 @@ def walk(board, pv):
     return positions, taken
 
 
-def settled(positions, pv, me):
-    """Material for `me` at the end of the line, counting the recapture still pending on the last move's square."""
+def settled(positions, pv, me, taken):
+    """Material for `me` at the end of the line, counting the recapture still pending on the last move's square.
+
+    The piece that recapture wins is added to `taken`, so the text names every piece behind the balance."""
     end, balance = positions[-1], material(positions[-1], me)
     if len(positions) < 2:
         return balance
     square = chess.Move.from_uci(pv[len(positions) - 2]).to_square
-    gain = see(end, square, end.turn)
+    if gain := see(end, square, end.turn):
+        taken[end.turn].append(end.piece_at(square))
     return balance + gain if end.turn == me else balance - gain
 
 
@@ -271,8 +274,8 @@ def explain(fen, played, best, actual):
         return None
     san, best_san = board.san(chess.Move.from_uci(played)), board.san(chess.Move.from_uci(best_pv[0]))
     # A line cut in the middle of an exchange would otherwise look like a loss of material.
-    net = settled(positions, pv, me) - material(board, me)
-    best_net = settled(best_positions, best_pv, me) - material(board, me)
+    net = settled(positions, pv, me, taken) - material(board, me)
+    best_net = settled(best_positions, best_pv, me, best_taken) - material(board, me)
     line_text, best_text = sans(positions, pv, 1), sans(best_positions, best_pv, 0)
     focus, motif, text = [], None, None
     if mated:

@@ -74,3 +74,9 @@ def test_a_line_cut_in_the_middle_of_an_exchange_does_not_hide_a_lost_piece():
     assert result['motif'] == 'material'
     assert result['text'].startswith('Dopo Ba4 la risposta più forte del Nero (18… Bxa4 19. Nxa4 Qf4')
     assert 'ti costa un cavallo e un alfiere, in cambio di un alfiere' in result['text']
+
+
+def test_a_loss_found_only_in_the_pending_recapture_still_names_the_piece():
+    # The line ends with the queen landing on h5, where the knight takes it: nothing is captured inside the line.
+    result = why('6k1/8/5n2/8/8/8/7P/3Q2K1 w - - 0 1', ['d1d2', 'g8h8'], ['h2h3', 'g8h8', 'd1h5'], best_cp=900, actual_cp=0)
+    assert result is not None and 'donna' in result['text']
