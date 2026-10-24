@@ -63,4 +63,14 @@ def test_small_losses_and_best_moves_have_no_explanation():
 def test_insights_carry_the_explanation():
     b = chess.Board('4r1k1/5ppp/8/4B3/8/8/5PPP/6K1 w - - 0 1')
     result = insights.public(insights.compare(b.fen(), 'h2h3', value(b, ['e5c3', 'e8e2'], 0), value(b, ['h2h3', 'e8e5'], -400)))
-    assert insights.VERSION == 3 and result['explanation']['motif'] == 'ignored_threat'
+    assert insights.VERSION == 4 and result['explanation']['motif'] == 'ignored_threat'
+
+
+def test_a_line_cut_in_the_middle_of_an_exchange_does_not_hide_a_lost_piece():
+    # Real game: Ba4 drops the knight, while Stockfish's Rad1 line stops before White recaptures on d5.
+    fen = 'r3r1k1/5pp1/p1bb1q1p/2p5/8/1BN5/PPP2PPP/R3RQK1 w - - 0 18'
+    result = why(fen, ['a1d1', 'e8e1', 'f1e1', 'a8e8', 'e1d2', 'd6e5', 'c3d5', 'c6d5'],
+                 ['b3a4', 'c6a4', 'c3a4', 'f6f4', 'g2g3', 'f4a4', 'b2b3', 'a4c6'], best_cp=21, actual_cp=-570)
+    assert result['motif'] == 'material'
+    assert result['text'].startswith('Dopo Ba4 la risposta più forte del Nero (18… Bxa4 19. Nxa4 Qf4')
+    assert 'ti costa un cavallo e un alfiere, in cambio di un alfiere' in result['text']

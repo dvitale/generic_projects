@@ -3,10 +3,10 @@ PORT ?= 8033
 STOP_TIMEOUT ?= 60
 PYTHON ?= python3
 
-.PHONY: help start status restart stop build logs deploy puzzles
+.PHONY: help start status restart stop build logs deploy puzzles experimental
 
 help:
-	@printf '%s\n' 'SparringMate — comandi WSL Debian' '  make start    Avvia in background' '  make status   Mostra stato, indirizzo e log' '  make restart  Arresta con attesa e riavvia' '  make stop     Arresta senza cancellare dati' '  make build    Ricompila l’interfaccia' '  make logs     Mostra le ultime righe del log' '  make deploy   Pubblica su sparringmate.u-s.it (vedi deploy/SERVER.md)' '  make puzzles  Scarica i problemi Lichess per fasce di rating (PER_BAND=3000)' 'Opzioni: PORT=8033 STOP_TIMEOUT=60'
+	@printf '%s\n' 'SparringMate — comandi WSL Debian' '  make start    Avvia in background' '  make status   Mostra stato, indirizzo e log' '  make restart  Arresta con attesa e riavvia' '  make stop     Arresta senza cancellare dati' '  make build    Ricompila l’interfaccia' '  make logs     Mostra le ultime righe del log' '  make deploy   Pubblica su sparringmate.u-s.it (vedi deploy/SERVER.md)' '  make puzzles  Scarica i problemi Lichess per fasce di rating (PER_BAND=3000)' '  make experimental  Avvia in primo piano il motore sperimentale (porta 8044)' 'Opzioni: PORT=8033 STOP_TIMEOUT=60'
 
 start status restart stop logs:
 	@$(PYTHON) "$(CURDIR)/scripts/service.py" $@ --port "$(PORT)" --stop-timeout "$(STOP_TIMEOUT)"
@@ -20,3 +20,8 @@ deploy:
 PER_BAND ?= 3000
 puzzles:
 	@"$(CURDIR)/.venv/bin/python" "$(CURDIR)/scripts/import_lichess_puzzles.py" --per-band "$(PER_BAND)"
+
+# Local only: needs experiments/human-policy with its own .venv; Play shows it when .env sets SPARRINGMATE_EXPERIMENTAL_ENGINE.
+CHECKPOINT ?= runs/monthly/2026-09/best.pt
+experimental:
+	@cd "$(CURDIR)/experiments/human-policy" && .venv/bin/python serve.py --checkpoint "$(CHECKPOINT)" --port 8044

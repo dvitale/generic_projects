@@ -3,6 +3,7 @@ import hashlib
 import io
 import json
 import os
+import secrets
 import sqlite3
 import threading
 import uuid
@@ -30,8 +31,10 @@ from . import study
 from . import problems
 from . import diagnosis
 from . import auth
+from . import opponents
 from .rating import rating_plan, summarize_rating, RATING_LEVELS, RATING_METHOD
 
+ENV_PATH = ROOT / ".env"
 DB_PATH = Path(os.environ.get("CHESS_COACH_DATA", str(ROOT / "data"))) / "coach.sqlite3"
 jobs = {}
 jobs_lock = threading.Lock()
@@ -96,7 +99,9 @@ def init_db():
         if 'revision' not in {r[1] for r in con.execute('PRAGMA table_info(games)')}:
             con.execute('ALTER TABLE games ADD COLUMN revision INTEGER NOT NULL DEFAULT 0')
         columns = {r[1] for r in con.execute('PRAGMA table_info(games)')}
-        for name, declaration in {'move_times': "TEXT NOT NULL DEFAULT '[]'", 'pgn_headers': "TEXT NOT NULL DEFAULT '{}'", 'termination': 'TEXT', 'assisted_plies': "TEXT NOT NULL DEFAULT '[]'"}.items():
+        # engine/engine_version/move_selection are fixed when a bot game starts; move_choices has one entry per ply.
+        for name, declaration in {'move_times': "TEXT NOT NULL DEFAULT '[]'", 'pgn_headers': "TEXT NOT NULL DEFAULT '{}'", 'termination': 'TEXT', 'assisted_plies': "TEXT NOT NULL DEFAULT '[]'",
+                                  'engine': 'TEXT', 'engine_version': 'TEXT', 'move_selection': 'TEXT', 'move_choices': "TEXT NOT NULL DEFAULT '[]'"}.items():
             if name not in columns:
                 con.execute(f'ALTER TABLE games ADD COLUMN {name} {declaration}')
         if 'last_shown_at' not in {r[1] for r in con.execute('PRAGMA table_info(exercises)')}:
@@ -169,6 +174,9 @@ class NewGame(BaseModel):
     # A refutation game starts after the player's rejected training move and is answered by Stockfish.
     opponent: Literal["maia", "stockfish"] = "maia"
     moves: list[str] = Field(default_factory=list, max_length=1)
+    # The human-like model answering a "maia" game; the browser declares the Maia model it loads.
+    engine: Literal["maia", "experimental"] = "maia"
+    engine_version: str | None = Field(default=None, max_length=80)
 
 
 class MoveInput(BaseModel):
@@ -267,10 +275,18 @@ def game_pgn(row, include_times=True):
         pgn.headers['Event'] = row['title']
         pgn.headers['Site'] = 'SparringMate locale'
         pgn.headers['Date'] = row['created_at'][:10].replace('-', '.')
-        pgn.headers['White'] = 'Tu' if row['player_color'] == 'w' else f"Maia {row['elo']}"
-        pgn.headers['Black'] = f"Maia {row['elo']}" if row['player_color'] == 'w' else 'Tu'
+        bot = f"{opponents.label(row)} {row['elo']}"
+        pgn.headers['White'] = 'Tu' if row['player_color'] == 'w' else bot
+        pgn.headers['Black'] = bot if row['player_color'] == 'w' else 'Tu'
         pgn.headers['TimeControl'] = '-'  # Free play, without a countdown clock.
     pgn.headers['GameId'] = row['id']
+    if row['engine']:
+        # Which model answered, at which requested level and how its moves were chosen.
+        pgn.headers['OpponentEngine'] = row['engine']
+        if row['engine_version']:
+            pgn.headers['OpponentEngineVersion'] = row['engine_version']
+        pgn.headers['OpponentElo'] = str(row['elo'])
+        pgn.headers['MoveSelection'] = row['move_selection'] or opponents.SELECTION
     pgn.headers['Result'] = game_result(row, board, stored_headers)
     if row['termination'] == 'resign':
         pgn.headers['Termination'] = 'normal'
@@ -316,6 +332,8 @@ def game_view(row):
             "moveTimes": [t.get('emt') if t else None for t in json.loads(row['move_times'])],
             "turn": "w" if board.turn else "b", "legalMoves": [m.uci() for m in board.legal_moves],
             "result": pgn.headers['Result'] if pgn.headers['Result'] != '*' else None, "source": row["source"], "drill": drill,
+            "engine": row['engine'], "engineLabel": opponents.label(row) if row['source'] == 'maia' else None,
+            "engineVersion": row['engine_version'], "moveSelection": row['move_selection'],
             "analysis": insights.enrich(json.loads(row["analysis"])) if row["analysis"] and row["analysis_version"] == len(moves) else None}
 
 
@@ -342,12 +360,32 @@ def new_game(body: NewGame):
         board.push(move)
     if board.is_game_over(claim_draw=True):
         raise HTTPException(422, 'La mossa conclude già la partita: non c’è nulla da confutare')
-    default_title = 'Contro Stockfish' if body.opponent == 'stockfish' else f"Allenamento con Maia {body.elo}"
+    engine = version = selection = None
+    if body.opponent == 'maia':
+        engine, version, selection = body.engine, body.engine_version, opponents.SELECTION
+        if engine == opponents.EXPERIMENTAL:
+            state = opponents.status(ENV_PATH)
+            if not state['enabled']:
+                raise HTTPException(409, 'Il motore sperimentale è disattivato nella configurazione')
+            if not state['available']:
+                raise HTTPException(503, state['error'])
+            low, high = state['ratingBounds']
+            if not low <= body.elo <= high:
+                raise HTTPException(422, f'Il motore sperimentale accetta livelli fra {low} e {high}')
+            # Fixed for the whole game: a later checkpoint never answers this game silently.
+            version = state['version']
+    default_title = 'Contro Stockfish' if body.opponent == 'stockfish' else f"Allenamento con {opponents.ENGINES[body.engine]} {body.elo}"
     game_id = str(uuid.uuid4())
     with database() as con:
-        con.execute("INSERT INTO games(id,initial_fen,moves,player_color,elo,title,created_at,analysis,analysis_version,source) VALUES(?,?,?,?,?,?,?,?,?,?)",
-                    (game_id, body.fen, json.dumps(body.moves), body.color, body.elo, body.title or default_title, now(), None, None, body.opponent))
+        con.execute("INSERT INTO games(id,initial_fen,moves,player_color,elo,title,created_at,analysis,analysis_version,source,engine,engine_version,move_selection) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (game_id, body.fen, json.dumps(body.moves), body.color, body.elo, body.title or default_title, now(), None, None, body.opponent,
+                     engine, version, selection))
         return game_view(find_game(con, game_id))
+
+
+@app.get('/api/opponents')
+def opponent_engines():
+    return {'maia': {'enabled': True, 'available': True}, 'experimental': opponents.status(ENV_PATH)}
 
 
 @app.get("/api/games")
@@ -363,6 +401,7 @@ def games():
         analyzed = bool(r["analysis"]) and r["analysis_version"] == len(moves)
         result.append({"id": r["id"], "title": r["title"], "createdAt": r["created_at"],
                        "plies": len(moves), "source": r["source"], "playerColor": r["player_color"], "elo": r["elo"],
+                       "engine": r["engine"], "engineLabel": opponents.label(r) if r["source"] == 'maia' else None, "engineVersion": r["engine_version"],
                        "result": None if outcome == '*' else outcome, "fen": board.fen(),
                        "quality": learning.quality(learning.decisions(r, r["start_ply"])) if analyzed else None})
     return result
@@ -395,6 +434,8 @@ def make_move(game_id: str, body: MoveInput):
             raise HTTPException(409, "La partita importata è disponibile in revisione")
         if row["source"] == "stockfish" and body.actor != "human":
             raise HTTPException(409, "Le risposte di Stockfish sono calcolate dal server")
+        if row["engine"] == opponents.EXPERIMENTAL and body.actor != "human":
+            raise HTTPException(409, "Le risposte del motore sperimentale sono calcolate dal server")
         moves = json.loads(row["moves"])
         if len(moves) != body.version or row['revision'] != body.revision:
             raise HTTPException(409, "La posizione è cambiata: ricarica la partita")
@@ -414,7 +455,8 @@ def make_move(game_id: str, body: MoveInput):
         times = json.loads(row['move_times'])
         times = (times + [None] * body.version)[:body.version]
         times.append({'emt': round(body.elapsed_seconds, 3)} if body.elapsed_seconds is not None else None)
-        con.execute("UPDATE games SET moves=?,move_times=? WHERE id=?", (json.dumps(moves), json.dumps(times), game_id))
+        choice = {'engine': row['engine'] or opponents.MAIA, 'version': row['engine_version'], 'selection': opponents.SELECTION} if body.actor == 'maia' else None
+        con.execute("UPDATE games SET moves=?,move_times=?,move_choices=? WHERE id=?", (json.dumps(moves), json.dumps(times), json.dumps(aligned(row['move_choices'], body.version) + [choice]), game_id))
         snapshot = dict(find_game(con, game_id))
     # Commit the final move before the worker reads it; analysis survives closing the browser.
     board.push(move)
@@ -451,7 +493,54 @@ def engine_move(game_id: str, body: UndoInput):
         row = find_game(con, game_id)
         times = json.loads(row['move_times'])
         times = (times + [None] * len(moves))[:len(moves)] + [None]
-        con.execute('UPDATE games SET moves=?,move_times=? WHERE id=?', (json.dumps(moves + reply), json.dumps(times), game_id))
+        con.execute('UPDATE games SET moves=?,move_times=?,move_choices=? WHERE id=?',
+                    (json.dumps(moves + reply), json.dumps(times), json.dumps(aligned(row['move_choices'], len(moves)) + [None]), game_id))
+    return get_game(game_id)
+
+
+def aligned(choices, plies):
+    """Per-ply entries padded or cut to the moves already played."""
+    return (json.loads(choices) + [None] * plies)[:plies]
+
+
+@app.post('/api/games/{game_id}/policy-move')
+def policy_move(game_id: str, body: UndoInput):
+    """The experimental opponent's reply: drawn on the server from the whole distribution, with a recorded seed."""
+    def opponent_position(con):
+        row = find_game(con, game_id)
+        if row['source'] != 'maia' or row['engine'] != opponents.EXPERIMENTAL or row['termination']:
+            raise HTTPException(409, 'Il motore sperimentale risponde solo nelle sue partite in corso')
+        moves = json.loads(row['moves'])
+        if len(moves) != body.version or row['revision'] != body.revision:
+            raise HTTPException(409, 'La posizione è cambiata: ricarica la partita')
+        board = reconstruct(row['initial_fen'], moves)
+        if board.is_game_over(claim_draw=True) or len(moves) >= 600:
+            raise HTTPException(409, 'Partita conclusa')
+        if board.turn == (row['player_color'] == 'w'):
+            raise HTTPException(409, 'Tocca a te')
+        return row, moves, board
+    with database() as con:
+        row, moves, board = opponent_position(con)
+    # The service is called outside the transaction; the position is checked again before committing.
+    try:
+        distribution = opponents.predict(ENV_PATH, board, row['elo'], row['engine_version'],
+                                         {'gameId': game_id, 'ply': len(moves), 'playerColor': row['player_color']})
+    except opponents.PolicyError as error:
+        raise HTTPException(503, str(error)) from error
+    seed = secrets.randbits(63)
+    move, probability = opponents.sample(distribution, seed)
+    choice = {'engine': opponents.EXPERIMENTAL, 'version': row['engine_version'], 'selection': opponents.SELECTION,
+              'seed': seed, 'probability': round(probability, 6)}
+    with database() as con:
+        con.execute('BEGIN IMMEDIATE')
+        row, moves, board = opponent_position(con)
+        times = (json.loads(row['move_times']) + [None] * len(moves))[:len(moves)] + [None]
+        con.execute('UPDATE games SET moves=?,move_times=?,move_choices=? WHERE id=?',
+                    (json.dumps(moves + [move]), json.dumps(times), json.dumps(aligned(row['move_choices'], len(moves)) + [choice]), game_id))
+        snapshot = dict(find_game(con, game_id))
+    board.push(chess.Move.from_uci(move))
+    if board.is_game_over(claim_draw=True):
+        queue_analysis(snapshot, automatic=True)
     return get_game(game_id)
 
 
@@ -502,7 +591,8 @@ def preserve_review(con, row, session):
         VALUES(?,?,?,?,?,?,?,?,?,?,?)''',
         (archive_id, row['initial_fen'], row['moves'], row['player_color'], row['elo'],
          row['title'] + ' · prima dell’annullamento', now(), row['analysis'], row['analysis_version'], 'snapshot', row['revision']))
-    con.execute('UPDATE games SET move_times=?,pgn_headers=?,assisted_plies=? WHERE id=?', (row['move_times'], row['pgn_headers'], row['assisted_plies'], archive_id))
+    con.execute('UPDATE games SET move_times=?,pgn_headers=?,assisted_plies=?,engine=?,engine_version=?,move_selection=?,move_choices=? WHERE id=?',
+                (row['move_times'], row['pgn_headers'], row['assisted_plies'], row['engine'], row['engine_version'], row['move_selection'], row['move_choices'], archive_id))
     if session:
         con.execute('INSERT INTO drill_sessions VALUES(?,?,?,?,?,?,?)',
                     (archive_id, session['template_id'], session['template_name'], session['theme'], session['goal'], session['start_ply'], session['target']))
@@ -576,8 +666,8 @@ def undo_move(game_id: str, body: UndoInput):
         if row['revision'] != body.revision or len(moves) not in {body.version, body.version + 1} or ply is None or ply >= body.version:
             raise HTTPException(409, 'Nessuna mossa da annullare in questa posizione: ricarica la partita')
         preserve_review(con, row, session)
-        con.execute('UPDATE games SET moves=?,move_times=?,assisted_plies=?,revision=revision+1,analysis=NULL,analysis_version=NULL WHERE id=?',
-                    (json.dumps(moves[:ply]), json.dumps(json.loads(row['move_times'])[:ply]),
+        con.execute('UPDATE games SET moves=?,move_times=?,move_choices=?,assisted_plies=?,revision=revision+1,analysis=NULL,analysis_version=NULL WHERE id=?',
+                    (json.dumps(moves[:ply]), json.dumps(json.loads(row['move_times'])[:ply]), json.dumps(json.loads(row['move_choices'])[:ply]),
                      json.dumps([p for p in json.loads(row['assisted_plies']) if p < ply]), game_id))
         con.execute('DELETE FROM game_ratings WHERE game_id=?', (game_id,))
     return get_game(game_id)
@@ -1084,7 +1174,7 @@ prevention.install(app, database, reconstruct, now)
 mistakes.install(app, database, tutor_lock)
 final_review.install(app, database, find_game, game_pgn, now, tutor_lock)
 study.install(app, database, find_game, now, tutor_lock)
-auth.install(app, ROOT / ".env", lambda: DB_PATH.parent)
+auth.install(app, ENV_PATH, lambda: DB_PATH.parent)
 problems.install(app, database, lambda: DB_PATH.parent, now)
 diagnosis.install(app, database, now)
 

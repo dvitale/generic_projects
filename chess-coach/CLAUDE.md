@@ -11,11 +11,13 @@ make build                                    # ricompila l'interfaccia (web/dis
 cd web && npm run build && npx playwright test [tests/<file>.spec.ts]
 make deploy                                   # pubblica su https://sparringmate.u-s.it
 make puzzles PER_BAND=3000                    # importa i problemi Lichess
+make experimental                             # servizio del motore sperimentale (porta 8044, solo PC)
 ```
 
 - Le prove Playwright avviano da sole un server sulla porta 8011, con dati temporanei e `CHESS_COACH_DISABLE_AUTH=1` e `CHESS_COACH_DISABLE_LLM=1`, e usano `/usr/bin/chromium`. Prima va fatto `npm run build`: il server di prova serve `web/dist`.
 - `tests/test_static_cache.py` viene saltato se l'interfaccia non è compilata.
-- Variabili d'ambiente: `CHESS_COACH_DATA` (cartella dei dati), `STOCKFISH_PATH`, `SPARRINGMATE_USER`/`SPARRINGMATE_PASSWORD` (login, anche da `.env`), `DEEPSEEK_API_KEY`/`DEEPSEEK_MODEL` (tutor).
+- Variabili d'ambiente: `CHESS_COACH_DATA` (cartella dei dati), `STOCKFISH_PATH`, `SPARRINGMATE_USER`/`SPARRINGMATE_PASSWORD` (login, anche da `.env`), `DEEPSEEK_API_KEY`/`DEEPSEEK_MODEL` (tutor), `SPARRINGMATE_EXPERIMENTAL_ENGINE` (URL del motore sperimentale, anche da `.env`; senza, il selettore in Gioca non compare).
+- La suite Playwright avvia anche `tests/fixtures/fake_policy_service.py` sulla porta 8012, al posto del motore sperimentale.
 
 ## Produzione
 
@@ -28,7 +30,7 @@ make puzzles PER_BAND=3000                    # importa i problemi Lichess
 ## Trappole note
 
 - Nella suite Playwright completa, `evaluation-chart.spec.ts`, `refutation.spec.ts`, `puzzle-flow.spec.ts`, `training-plan.spec.ts` e `undo-rating.spec.ts` a volte falliscono, ma passano se eseguiti da soli.
-- `experiments/` (ricerca locale, diversi GB) è esclusa dal deploy: se `make deploy` resta fermo su «Sincronizzo», cerca nuove cartelle pesanti non escluse in `scripts/deploy.sh`.
+- `experiments/` (ricerca locale: in git solo il codice; dati, pesi e `.venv`, diversi GB, sono esclusi dal suo `.gitignore`) è esclusa dal deploy, quindi in produzione il motore sperimentale non esiste: se `make deploy` resta fermo su «Sincronizzo», cerca nuove cartelle pesanti non escluse in `scripts/deploy.sh`.
 - `docs/training-guide.html` si genera da `docs/training-guide.md` con `pwsh -File scripts/build_training_guide.ps1`. Se pwsh non è installato, l'HTML va aggiornato a mano con lo stesso contenuto.
 - Nelle prove, `exercises` e `prevention_positions` hanno `UNIQUE(game_id, ply)`: per creare più esercizi della stessa partita servono ply diversi.
 - I problemi Lichess importati sono un campione ordinato per ID: gli ID iniziano tutti per "0".

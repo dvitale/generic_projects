@@ -54,3 +54,10 @@ per recuperare effettivamente lo spazio fisico quando vengono eliminati.
 La procedura è stata verificata con due mesi sintetici e prove di interruzione,
 replay, holdout e cancellazioni protette. Non rappresenta ancora un risultato
 di training sul mese reale completo. Nessuna integrazione in SparringMate.
+
+## Uso in Gioca — 23 ottobre 2026
+
+Il checkpoint del ciclo mensile può rispondere come avversario in Gioca, in alternativa a Maia, tramite
+`experiments/human-policy/serve.py` (`make experimental`) e l'opzione
+`SPARRINGMATE_EXPERIMENTAL_ENGINE`. Solo sul PC; Puzzle, Blunder prevention, tutor e stima del profilo
+restano invariati. Dettagli in [`motore-sperimentale.md`](motore-sperimentale.md).

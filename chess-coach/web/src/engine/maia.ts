@@ -3,6 +3,8 @@
 import { Chess } from 'chess.js'
 import mapping from './data/all_moves_maia3.json'
 
+const MAIA_WEIGHTS = 'official-browser-2026-09-23'
+
 const indices = mapping as Record<string, number>
 type Pending = { resolve: (value: {logitsMove: Float32Array; logitsValue: Float32Array}) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }
 /** Game outcome probabilities from White's point of view, as predicted by Maia's value head. */
@@ -97,7 +99,7 @@ class MaiaEngine {
           }
         }
       }
-      worker.postMessage({ type: 'init', modelUrl: '/maia3/maia3_simplified.onnx', modelVersion: 'official-browser-2026-09-23' })
+      worker.postMessage({ type: 'init', modelUrl: '/maia3/maia3_simplified.onnx', modelVersion: MAIA_WEIGHTS })
     })
     return this.ready
   }
@@ -155,6 +157,8 @@ class MaiaEngine {
   }
 }
 export const maia = new MaiaEngine()
+/** Recorded with each new Maia game: the model the browser loads for Play. */
+export const MAIA_MODEL_VERSION = `maia3_simplified.onnx@${MAIA_WEIGHTS}`
 export function sample(prediction: Prediction) {
   let draw = Math.random()
   for (const move of prediction.moves) { draw -= move.probability; if (draw <= 0) return move.uci }

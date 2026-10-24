@@ -35,9 +35,9 @@ Compare per ogni mossa che perde almeno 0,80 rispetto alla migliore, oppure quan
 | Svantaggio di posizione | Nessuna perdita di materiale: re meno protetto, pedone passato concesso, pedoni isolati o doppiati, pezzi meno attivi rispetto all'alternativa |
 | Causa non immediata | Nessuno dei casi precedenti è verificato |
 
-I motivi tattici richiedono che la variante perda almeno 2 punti di materiale rispetto all'alternativa, oppure che la variante si fermi subito dopo la risposta con una perdita di almeno 1,50: una forchetta parata da un controattacco non viene dichiarata. Una seconda frase indica l'alternativa: «Con Rxa8+ vincevi una torre» se vinceva materiale, altrimenti la linea preferita da Stockfish.
+I motivi tattici richiedono che la variante perda almeno 2 punti di materiale rispetto all'alternativa, oppure che la variante si fermi subito dopo la risposta con una perdita di almeno 1,50: una forchetta parata da un controattacco non viene dichiarata. Il materiale a fine variante conta anche la ripresa ancora in sospeso sull'ultima casa (scambio statico): una linea che si ferma a metà di un cambio, come «Nd5 Bxd5» prima di riprendere, non sembra una perdita e non nasconde il pezzo perso dall'altra variante. Una seconda frase indica l'alternativa: «Con Rxa8+ vincevi una torre» se vinceva materiale, altrimenti la linea preferita da Stockfish.
 
-Il risultato sta nel campo `explanation` dell'insight (`motif`, `title`, `text`, `better`, `focus`, `fen`, `line`, `bestLine`). Con `insights.VERSION = 3` le analisi già salvate ricevono la spiegazione in lettura, senza riscrivere l'archivio. Il tutor DeepSeek riceve la frase insieme agli altri fatti.
+Il risultato sta nel campo `explanation` dell'insight (`motif`, `title`, `text`, `better`, `focus`, `fen`, `line`, `bestLine`). Con `insights.VERSION = 4` le analisi già salvate ricevono la spiegazione in lettura, senza riscrivere l'archivio. Il tutor DeepSeek riceve la frase insieme agli altri fatti.
 
 ## Limiti
 
@@ -53,4 +53,4 @@ Il risultato sta nel campo `explanation` dell'insight (`motif`, `title`, `text`,
 cd web && npm run build && npx playwright test tests/insights.spec.ts
 ```
 
-I test backend coprono donna in presa, difesa tolta, minaccia non parata, forchetta di cavallo con alternativa vincente, alfiere intrappolato lentamente, matto sulla traversa, matto mancato, svantaggio di posizione e mosse senza spiegazione. Il test browser seleziona `3. Qxe5+` nel riepilogo e nella revisione passo passo, controlla la frase e scorre la variante.
+I test backend coprono donna in presa, difesa tolta, minaccia non parata, forchetta di cavallo con alternativa vincente, alfiere intrappolato lentamente, matto sulla traversa, matto mancato, svantaggio di posizione, una variante interrotta a metà di un cambio (Ba4 di una partita reale, che perde il cavallo) e mosse senza spiegazione. Il test browser seleziona `3. Qxe5+` nel riepilogo e nella revisione passo passo, controlla la frase e scorre la variante.

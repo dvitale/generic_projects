@@ -49,6 +49,11 @@ def pieces_text(pieces):
     return parts[0] if len(parts) == 1 else ', '.join(parts[:-1]) + ' e ' + parts[-1]
 
 
+def articled(preposition, side):
+    """'del Nero' from 'il Nero': Italian merges the preposition with the article."""
+    return side.replace('il ', preposition + ' ', 1)
+
+
 def value(piece):
     return KING_VALUE if piece.piece_type == chess.KING else VALUES[piece.piece_type]
 
@@ -113,6 +118,16 @@ def walk(board, pv):
         following.push(move)
         positions.append(following)
     return positions, taken
+
+
+def settled(positions, pv, me):
+    """Material for `me` at the end of the line, counting the recapture still pending on the last move's square."""
+    end, balance = positions[-1], material(positions[-1], me)
+    if len(positions) < 2:
+        return balance
+    square = chess.Move.from_uci(pv[len(positions) - 2]).to_square
+    gain = see(end, square, end.turn)
+    return balance + gain if end.turn == me else balance - gain
 
 
 def sans(positions, pv, start, count=6):
@@ -228,7 +243,7 @@ def positional(board, played, best_move, opponent):
     if board.queens and len(mine['kingShield']) < len(mine_alt['kingShield']):
         reasons.append('indebolisce i pedoni davanti al tuo re')
     if new := [s for s in theirs['passed'] if s not in theirs_alt['passed']]:
-        reasons.append(f"concede a {opponent} un pedone passato in {', '.join(new)}")
+        reasons.append(f"concede {articled('al', opponent)} un pedone passato in {', '.join(new)}")
     if new := [s for s in mine['isolated'] if s not in mine_alt['isolated']]:
         reasons.append(f"ti lascia un pedone isolato in {', '.join(new)}")
     if mine['doubled'] > mine_alt['doubled']:
@@ -236,7 +251,7 @@ def positional(board, played, best_move, opponent):
     if mine_alt['pieceReach'] - mine['pieceReach'] >= 4:
         reasons.append('lascia i tuoi pezzi meno attivi')
     if theirs['pieceReach'] - theirs_alt['pieceReach'] >= 4:
-        reasons.append(f"dà più spazio ai pezzi di {opponent}")
+        reasons.append(f"dà più spazio ai pezzi {articled('del', opponent)}")
     return reasons[:2]
 
 
@@ -255,8 +270,9 @@ def explain(fen, played, best, actual):
     if len(positions) < 2 or len(best_positions) < 2:
         return None
     san, best_san = board.san(chess.Move.from_uci(played)), board.san(chess.Move.from_uci(best_pv[0]))
-    net = material(positions[-1], me) - material(board, me)
-    best_net = material(best_positions[-1], me) - material(board, me)
+    # A line cut in the middle of an exchange would otherwise look like a loss of material.
+    net = settled(positions, pv, me) - material(board, me)
+    best_net = settled(best_positions, best_pv, me) - material(board, me)
     line_text, best_text = sans(positions, pv, 1), sans(best_positions, best_pv, 0)
     focus, motif, text = [], None, None
     if mated:
@@ -274,10 +290,10 @@ def explain(fen, played, best, actual):
         motif, text, focus = found
     elif net - best_net <= -2 and net < 0:
         if any(chess.Move.from_uci(pv[i]).promotion for i in range(1, len(positions) - 1) if positions[i].turn != me):
-            motif, text = 'promotion', f"Dopo {san} il pedone di {opponent} arriva a promozione: {line_text}."
+            motif, text = 'promotion', f"Dopo {san} il pedone {articled('del', opponent)} arriva a promozione: {line_text}."
         else:
             won = f", in cambio di {pieces_text(taken[me])}" if taken[me] else ''
-            motif, text = 'material', f"Dopo {san} la risposta più forte di {opponent} ({line_text}) ti costa {pieces_text(taken[not me])}{won}."
+            motif, text = 'material', f"Dopo {san} la risposta più forte {articled('del', opponent)} ({line_text}) ti costa {pieces_text(taken[not me])}{won}."
     else:
         # Checks that trade or win pieces are an exchange, not an attack on the king.
         checks = [i for i in range(1, len(positions) - 1) if positions[i].turn != me and positions[i + 1].is_check()

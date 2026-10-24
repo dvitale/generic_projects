@@ -13,7 +13,7 @@
   --inaccuracy:#8a5a00;--inaccuracy-bg:#fff5da;--inaccuracy-border:#d9a21b;
   --error:#a8302a;--error-bg:#fdecea;--error-border:#d0463c;
   --info:#2b5a8a;--info-bg:#e8f0fb;
-  --mc-best:#5c9a3a;--mc-good:#8aa87a;--mc-inaccuracy:#e0a800;--mc-error:#d9412e;--mc-forced:#8a948c;
+  --mc-best:#5c9a3a;--mc-good:#8aa87a;--mc-inaccuracy:#e0a800;--mc-error:#d9412e;--mc-blunder:#8f1d12;--mc-forced:#8a948c;
   --fs-xs:12px;--fs-sm:13px;--fs-md:14px;--fs-lg:16px;--fs-xl:20px;--fs-2xl:28px;
   --r-sm:6px;--r-md:10px;--r-lg:14px;--r-pill:999px;
   --shadow-sm:0 1px 2px #12261a0f;--shadow-md:0 6px 20px #12261a14;
@@ -233,7 +233,7 @@ details.panel>summary{font-weight:650;font-size:var(--fs-lg)}
 
 /* Move classification colours (board badge, lists) */
 .move-class{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 3px;border-radius:var(--r-pill);font-size:11px;font-weight:800;color:#fff;line-height:1;background:var(--mc-good)}
-.move-class-best{background:var(--mc-best)}.move-class-good{background:var(--mc-good)}.move-class-inaccuracy{background:var(--mc-inaccuracy);color:#3d2b00}.move-class-error{background:var(--mc-error)}.move-class-forced{background:var(--mc-forced)}
+.move-class-best{background:var(--mc-best)}.move-class-good{background:var(--mc-good)}.move-class-inaccuracy{background:var(--mc-inaccuracy);color:#3d2b00}.move-class-error{background:var(--mc-error)}.move-class-blunder{background:var(--mc-blunder)}.move-class-forced{background:var(--mc-forced)}
 .move-badge.move-class-inaccuracy{color:#3d2b00}
 
 /* Evaluation bar */
@@ -286,6 +286,9 @@ details.panel>summary{font-weight:650;font-size:var(--fs-lg)}
 .play-history-notice button{min-height:34px;font-size:var(--fs-sm)}
 .engine-status{font-size:var(--fs-xs);color:var(--muted);margin-top:14px;padding-top:12px;border-top:1px solid var(--border)}
 .engine-status small{display:block;margin-top:2px}
+.opponent-choice{margin-bottom:12px}
+.opponent-status p{margin:8px 0 0;font-size:var(--fs-xs);color:var(--muted);display:flex;flex-wrap:wrap;align-items:center;gap:6px;overflow-wrap:anywhere}
+.opponent-status .footnote{display:block}
 
 /* Play setup */
 .play-setup h2{font-size:22px}

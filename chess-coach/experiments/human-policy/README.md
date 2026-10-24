@@ -11,9 +11,24 @@ attuale (normalmente qualche decina). La rappresentazione teorica comprende
 punteggio solo per i candidati legali.
 
 **Non è ancora un avversario calibrato, non stima l'Elo dell'utente e non
-sostituisce il motore attuale di SparringMate.** L'integrazione richiede una
-successiva autorizzazione esplicita dell'utente. La prima prova verifica il
+sostituisce il motore attuale di SparringMate.** Dal 23 ottobre 2026 è
+selezionabile in Gioca come alternativa a Maia, tramite il servizio descritto
+sotto e un'opzione di configurazione dell'app. La prima prova verifica il
 procedimento di addestramento; non dimostra qualità scacchistica.
+
+## Servizio per SparringMate
+
+```bash
+make -C ../.. experimental                       # dalla cartella dell'app: porta 8044
+.venv/bin/python serve.py --checkpoint runs/monthly/2026-09/best.pt --port 8044
+.venv/bin/python -m pytest -q test_serve.py
+```
+
+`serve.py` carica il checkpoint una volta, ascolta solo su 127.0.0.1 e risponde a
+`GET /health` (motore, versione, rating ammessi) e `POST /predict` (tutte le
+mosse legali con probabilità, senza troncare alle prime 5). La versione include
+cartella, passo e hash dei pesi. Integrazione, verifiche e limiti lato app:
+[`docs/motore-sperimentale.md`](../../docs/motore-sperimentale.md).
 
 ## Hardware rilevato il 20 ottobre 2026
 

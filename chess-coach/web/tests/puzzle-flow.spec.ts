@@ -2,6 +2,9 @@ import {test,expect} from '@playwright/test'
 import {readFileSync} from 'node:fs'
 const mapping=JSON.parse(readFileSync(new URL('../src/engine/data/all_moves_maia3.json',import.meta.url),'utf8'))
 
+// Background refreshes may still be routed after a test ends: drop the routes so they cannot fail it.
+test.afterEach(async({page})=>{await page.unrouteAll({behavior:'ignoreErrors'})})
+
 test('Puzzle feedback distinguishes retry, success and reveal and advances without repeating completed puzzles',async({page,request})=>{
   await page.addInitScript(({index})=>{
     ;(window as any).puzzlePredictions=[]

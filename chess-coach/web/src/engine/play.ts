@@ -10,6 +10,12 @@ function pause(milliseconds:number,signal:AbortSignal):Promise<void> {
   })
 }
 
+/** Same pacing as Maia for a reply computed on the server; waiting first means a cancelled turn commits nothing. */
+export async function paceServerReply<T>(reply:()=>Promise<T>,signal:AbortSignal) {
+  await pause(1200+(Math.random()+Math.random())*1000,signal)
+  return reply()
+}
+
 /** Presentation pacing only: preserve Maia's move distribution and count inference time. */
 export async function chooseMaiaMove(fen:string,elo:number,signal:AbortSignal) {
   const started=performance.now()

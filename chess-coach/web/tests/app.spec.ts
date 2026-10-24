@@ -21,7 +21,7 @@ test('Real Maia play, black orientation, drill and mobile layout',async({page,re
   expect(maiaRequestAt-humanResponseAt).toBeGreaterThanOrEqual(1150)
   await page.getByRole('group',{name:'Il tuo colore'}).getByRole('button',{name:'Nero'}).click()
   page.once('dialog',dialog=>dialog.dismiss())
-  await page.getByRole('button',{name:'Nuova partita'}).click()
+  await page.getByRole('button',{name:'Nuova partita',exact:true}).click()
   expect(await page.evaluate(()=>localStorage.getItem('chess-coach-game'))).toBe(id)
   page.once('dialog',async dialog=>{
     expect(dialog.type()).toBe('confirm')
@@ -29,7 +29,7 @@ test('Real Maia play, black orientation, drill and mobile layout',async({page,re
     await dialog.accept()
   })
   const newResponse=page.waitForResponse(r=>r.url().endsWith('/api/games')&&r.request().method()==='POST')
-  await page.getByRole('button',{name:'Nuova partita'}).click();await newResponse
+  await page.getByRole('button',{name:'Nuova partita',exact:true}).click();await newResponse
   await expect(page.getByText('Tocca a te · trascina un pezzo o usa due clic')).toBeVisible({timeout:60000})
   const blackId=await page.evaluate(()=>localStorage.getItem('chess-coach-game'))
   const black=await(await request.get('/api/games/'+blackId)).json()

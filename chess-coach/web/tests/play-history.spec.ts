@@ -54,8 +54,11 @@ test('Live move list revisits positions without modifying the game and retains h
   await page.getByRole('button',{name:'Annulla ultima mossa',exact:true}).click()
   await expect(history.getByRole('button',{name:'3. Bc4',exact:true})).toHaveCount(0)
   await expect(history.locator('.review-controls')).toContainText('4 / 4')
+  // The new-game button leads the board toolbar and stands out from the other actions.
+  const first=page.locator('.board-actions button').first()
+  await expect(first).toHaveText(/Nuova partita/);await expect(first).toHaveClass(/primary/)
   page.once('dialog',dialog=>dialog.accept())
-  await page.getByRole('button',{name:'Nuova partita'}).click()
+  await page.getByRole('button',{name:'Nuova partita',exact:true}).click()
   await expect(history).toContainText('Le mosse appariranno qui.')
   await expect(page.getByRole('button',{name:'Torna alla posizione corrente'})).toHaveCount(0)
   await expect(page.getByRole('alert')).toHaveCount(0)

@@ -6,7 +6,7 @@ import {classifyMove,MoveClassIcon,moveClassInfo,type MoveClass} from './moveCla
 import {evaluationSeries,type EvaluationPoint} from './evaluationSeries'
 import {gameAccuracy} from './accuracy'
 
-const kinds:MoveClass[]=['best','good','inaccuracy','error']
+const kinds:MoveClass[]=['best','good','inaccuracy','error','blunder']
 
 function moveName(d:Decision){const f=d.fen.split(' ');return `${f[5]}${f[1]==='w'?'.':'…'} ${d.playedSan}`}
 
@@ -65,12 +65,12 @@ export default function ReviewSummary({game,cursor,onPosition}:{game:Game;cursor
   const sides=(['w','b'] as Color[]).map(color=>{
     const moves=[...byPly.values()].filter(d=>d.ply>=start&&!d.forced&&!assisted.has(d.ply)&&d.fen.split(' ')[1]===color)
     const count=Object.fromEntries(kinds.map(k=>[k,moves.filter(d=>classifyMove(d)===k).length])) as Record<MoveClass,number>
-    return {color,name:color===game.playerColor?'Tu':game.source==='pgn'?(color==='w'?'Bianco':'Nero'):game.source==='stockfish'?'Stockfish':`Maia ${game.elo}`,total:moves.length,count,
+    return {color,name:color===game.playerColor?'Tu':game.source==='pgn'?(color==='w'?'Bianco':'Nero'):game.source==='stockfish'?'Stockfish':`${game.engineLabel??'Maia'} ${game.elo}`,total:moves.length,count,
       sound:moves.length?Math.round(100*(count.best+count.good)/moves.length):null}
   })
   const {points}=useMemo(()=>evaluationSeries(game),[game.initialFen,game.moves,game.analysis])
   const accuracy=useMemo(()=>gameAccuracy(game,points.filter(p=>p.position>=start),new Set(game.assistedPlies??[])),[points,start,game.initialFen,game.assistedPlies])
-  const marks=[...byPly.values()].filter(d=>d.ply>=start&&!assisted.has(d.ply)&&['inaccuracy','error'].includes(classifyMove(d)))
+  const marks=[...byPly.values()].filter(d=>d.ply>=start&&!assisted.has(d.ply)&&['inaccuracy','error','blunder'].includes(classifyMove(d)))
   const current=byPly.get(cursor)
   const lines=current?(current.stockfishCandidates??[current.best]).filter(e=>e.san.length):[]
   const mover:Color=current?.fen.split(' ')[1]==='b'?'b':'w'

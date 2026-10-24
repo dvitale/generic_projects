@@ -1,6 +1,7 @@
 import {test,expect} from '@playwright/test'
 import {gameAccuracy,moveAccuracy,winPercent} from '../src/accuracy'
 import type {Game} from '../src/types'
+import {classifyMove} from '../src/moveClass'
 
 test('accuracy follows the Lichess win-percentage formula',()=>{
   expect(winPercent({cp:0,mate:null})).toBe(50)
@@ -23,6 +24,11 @@ test('accuracy follows the Lichess win-percentage formula',()=>{
   expect(gameAccuracy(game,[point(0,20),point(2,20),point(3,20)],new Set()).w).toBeNull()
 })
 
+test('move classes separate errors from blunders that lose three points or allow mate',()=>{
+  const move=(loss:number)=>classifyMove({loss,played:'e2e4',best:{pv:['d2d4']} as never,forced:false})
+  expect([79,80,179,180,299,300,99395].map(move)).toEqual(['good','inaccuracy','inaccuracy','error','error','blunder','blunder'])
+})
+
 test('review summary compares both sides, marks mistakes on the graph and lists Stockfish lines',async({page,request})=>{
   const imported=await(await request.post('/api/import',{data:{pgn:'1. e4 e5 2. Qh5 Nc6 3. Bc4 Nf6 4. Qxf7# 1-0',color:'w'}})).json()
   await page.addInitScript(id=>localStorage.setItem('chess-coach-game',id),imported.id)
@@ -35,7 +41,7 @@ test('review summary compares both sides, marks mistakes on the graph and lists 
   await expect(table.getByRole('rowheader',{name:'Precisione',exact:true})).toBeVisible()
   await expect(table.locator('.score-chip-w')).toHaveText(/^\d+%$/)
   await expect(table.locator('.score-chip-b')).toHaveText(/^\d+%$/)
-  const mark=summary.getByRole('button',{name:'Grafico: 3… Nf6 · Errore rilevante'})
+  const mark=summary.getByRole('button',{name:'Grafico: 3… Nf6 · Errore grave'})
   await expect(mark).toBeVisible()
   await mark.click()
   await expect(mark).toHaveAttribute('aria-current','step')

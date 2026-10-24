@@ -46,8 +46,9 @@ import Study from './study/Study'
 import {ExamProgress} from './study/MockExam'
 import type {StudySection,Refutation} from './study/types'
 import { api } from './api'
-import { maia, type Prediction } from './engine/maia'
-import { chooseMaiaMove } from './engine/play'
+import { maia, MAIA_MODEL_VERSION, type Prediction } from './engine/maia'
+import { chooseMaiaMove, paceServerReply } from './engine/play'
+import OpponentChoice,{useOpponents,experimentalRange,type Engine} from './OpponentChoice'
 import type { Game, Color, Exercise, Attempt, Profile, Analysis, Evaluation, PuzzleSession, Practice } from './types'
 
 type Tab = 'schedule' | 'play' | 'review' | 'drill' | 'train' | 'problems' | 'progress' | 'archive' | 'prevention' | 'study'
@@ -93,6 +94,12 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
   const [color, setColor] = useState<Color|'random'>('w')
   const [moreOpen,setMoreOpen]=useState(false)
   const [elo, setElo] = useState(1500)
+  // Engine for the next game only: the current game keeps the one it started with.
+  const [engine, setEngine] = useState<Engine>('maia')
+  const opponents=useOpponents(tab==='play')
+  // Switching the option off in the configuration brings the selector back to Maia.
+  useEffect(()=>{if(opponents.status&&!opponents.status.enabled)setEngine('maia')},[opponents.status])
+  const eloRange:[number,number]=engine==='experimental'?experimentalRange(opponents.status):[600,2600]
   const [busy, setBusy] = useState(false)
   const [botThinking, setBotThinking] = useState(false)
   const [error, setError] = useState('')
@@ -147,6 +154,7 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
     ;(async () => {
       let updated: Game
       if (snapshot.source === 'stockfish') updated = await api<Game>(`/games/${snapshot.id}/engine-move`, {version:snapshot.version, revision:snapshot.revision})
+      else if (snapshot.engine === 'experimental') updated = await paceServerReply(()=>api<Game>(`/games/${snapshot.id}/policy-move`, {version:snapshot.version, revision:snapshot.revision}), controller.signal)
       else {
         const move = await chooseMaiaMove(snapshot.fen, snapshot.elo, controller.signal)
         if (cancelled || controller.signal.aborted || !move) return
@@ -239,7 +247,7 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
     shownGame.moveTimes.slice(0,shownPly).forEach((t,i)=>{if(((i%2===0)===(first==='w')?'w':'b')===side&&t!=null){total+=t;known=true}})
     return known?total:null
   }
-  const opponentName=tab==='train'?'Posizione di allenamento':shownGame?.source==='pgn'?(opponent==='w'?'Bianco':'Nero'):shownGame?.source==='stockfish'?'Stockfish':'Maia'
+  const opponentName=tab==='train'?'Posizione di allenamento':shownGame?.source==='pgn'?(opponent==='w'?'Bianco':'Nero'):shownGame?.source==='stockfish'?'Stockfish':shownGame?.engineLabel??'Maia'
 
   useEffect(()=>{
     if(tab!=='review'||!game)return
@@ -273,7 +281,10 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
   async function startGame() {
     if ((game?.source === 'maia'||game?.source === 'stockfish') && !game.result && !window.confirm('Vuoi iniziare una nuova partita? La partita attuale resterà salvata e potrai riprenderla dall’archivio.')) return
     setBusy(true); setError(''); setNotice('')
-    try { const next = await api<Game>('/games',{color:color==='random'?(Math.random()<.5?'w':'b'):color,elo}); keepGame(next,true); setTab('play'); setCursor(0); await refresh(); maia.load().catch(fail) }
+    try {
+      const next = await api<Game>('/games',{color:color==='random'?(Math.random()<.5?'w':'b'):color,elo,engine,engine_version:engine==='maia'?MAIA_MODEL_VERSION:undefined})
+      keepGame(next,true); setTab('play'); setCursor(0); await refresh(); if(engine==='maia')maia.load().catch(fail)
+    }
     catch (e) {fail(e)} finally {setBusy(false)}
   }
   /** New game against Maia from a position of the shown game; the user plays the side at the bottom of the board. */
@@ -285,7 +296,7 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
     if ((game?.source === 'maia'||game?.source === 'stockfish') && !game.result && game.id !== sourceId && !window.confirm('Vuoi iniziare una nuova partita? La partita attuale resterà salvata e potrai riprenderla dall’archivio.')) return
     setBusy(true); setError(''); setNotice('')
     try {
-      const next = await api<Game>('/games',{color,elo:gameElo,fen,title:title.slice(0,160)})
+      const next = await api<Game>('/games',{color,elo:gameElo,fen,title:title.slice(0,160),engine_version:MAIA_MODEL_VERSION})
       keepGame(next,true); resetBoardFlip(); setPlayPosition(null); setTab('play'); setCursor(0); await refresh(); maia.load().catch(fail)
     } catch (e) {fail(e)} finally {setBusy(false)}
   }
@@ -394,6 +405,8 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
       else{const result=await api<{hint:string}>(`/exercises/${exercise.id}/hint`,{session_id:session.id});setHint(result.hint)}
     }catch(e){fail(e)}finally{setBusy(false)}
   }
+  // Opening Puzzle before the list has loaded must still start the first due puzzle once it arrives.
+  useEffect(()=>{if(tab==='train'&&!exercise&&!busy&&dueExercises[0])void pickExercise(dueExercises[0])},[tab,exercise,busy,dueExercises[0]?.id])
   function navigate(next: Tab) {if(busy)return;setMoreOpen(false);setTab(next); setError(''); setNotice(''); if(next==='review'&&game)setCursor(game.version); if(next==='train'&&!exercise&&dueExercises[0])pickExercise(dueExercises[0]); refresh().catch(fail)}
 
   const playFromButton=(source:Game,ply:number)=>{
@@ -419,7 +432,7 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
       <div className="local-status"><span className="status-dot"/> Spazio personale locale<small>Partite archiviate su questo computer.</small></div>
     </aside>
     <main className={'page-'+tab}>
-      <header className="topbar"><div className="topbar-title"><span className="crumb">SparringMate <span aria-hidden="true">/</span></span><h1>{titles[tab]}</h1></div><div className="topbar-actions"><button className="quiet" onClick={()=>setShowImport(!showImport)}>↑ <span className="label-long">Importa </span>PGN</button>{onLogout&&<button className="quiet" aria-label="Esci" title="Esci" onClick={onLogout}>⏻<span className="label-long"> Esci</span></button>}{['play','review','train','drill','prevention','study','problems'].includes(tab)&&<FlipBoardButton/>}<BoardSettingsMenu/><span className="pill engine-pill">Maia + Stockfish <span className="status-dot"/></span></div></header>
+      <header className="topbar"><div className="topbar-title"><span className="crumb">SparringMate <span aria-hidden="true">/</span></span><h1>{tab==='play'&&game?.source==='maia'&&game.engineLabel?`Gioca contro ${game.engineLabel==='Maia'?'Maia':'lo '+game.engineLabel}`:titles[tab]}</h1></div><div className="topbar-actions"><button className="quiet" onClick={()=>setShowImport(!showImport)}>↑ <span className="label-long">Importa </span>PGN</button>{onLogout&&<button className="quiet" aria-label="Esci" title="Esci" onClick={onLogout}>⏻<span className="label-long"> Esci</span></button>}{['play','review','train','drill','prevention','study','problems'].includes(tab)&&<FlipBoardButton/>}<BoardSettingsMenu/><span className="pill engine-pill">Maia + Stockfish <span className="status-dot"/></span></div></header>
       {!['play','review','train','prevention','problems'].includes(tab)&&<p className="page-subtitle">{subtitles[tab]}</p>}
       {error&&<div className="alert" role="alert">{error}<button onClick={()=>{setError('');setRetry(x=>x+1)}}>Riprova</button></div>}
       {notice&&<div className="notice" role="status">{notice}</div>}
@@ -444,7 +457,7 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
           </div>
           {flipped?opponentBar:playerBar}
           {outcome&&<div className={`game-over game-over-${outcome.tone}`} role="status"><strong>{outcome.title}</strong><span>{outcome.detail}</span></div>}
-          {tab==='play'&&game&&<div className="board-actions"><button title={`Ritorna alla tua ultima scelta e annulla anche la risposta di ${game.source==='stockfish'?'Stockfish':'Maia'}.`} disabled={!game.canUndo||busy||!!jobId||browsingHistory} onClick={undo}><span aria-hidden="true">↶</span> Annulla ultima mossa</button>{!game.result&&<button disabled={!canMove||!!moveHint.suggestion?.loading} onClick={()=>void moveHint.request()} title="Prima scelta di Stockfish (blu) e di Maia (rosso) nella posizione attuale"><span aria-hidden="true">💡</span> Suggerisci mossa</button>}{(game.source==='maia'||game.source==='stockfish')&&!game.result&&<button className="danger" disabled={busy||!!jobId} onClick={resign}><span aria-hidden="true">⚑</span> Abbandona partita</button>}</div>}
+          {tab==='play'&&game&&<div className="board-actions"><button className="primary" title="Nuova partita con livello, colore e motore scelti nel pannello" disabled={busy||!!jobId||botThinking||engine==='experimental'&&!opponents.status?.available} onClick={startGame}><span aria-hidden="true">＋</span> Nuova partita</button><button title={`Ritorna alla tua ultima scelta e annulla anche la risposta di ${game.source==='stockfish'?'Stockfish':game.engineLabel??'Maia'}.`} disabled={!game.canUndo||busy||!!jobId||browsingHistory} onClick={undo}><span aria-hidden="true">↶</span> Annulla ultima mossa</button>{!game.result&&<button disabled={!canMove||!!moveHint.suggestion?.loading} onClick={()=>void moveHint.request()} title="Prima scelta di Stockfish (blu) e di Maia (rosso) nella posizione attuale"><span aria-hidden="true">💡</span> Suggerisci mossa</button>}{(game.source==='maia'||game.source==='stockfish')&&!game.result&&<button className="danger" disabled={busy||!!jobId} onClick={resign}><span aria-hidden="true">⚑</span> Abbandona partita</button>}</div>}
           {tab==='play'&&game&&<SuggestionBox suggestion={moveHint.suggestion} elo={game.elo}/>}
           {browsingHistory&&<div className="play-history-notice"><span>Posizione precedente · {playPly} / {game!.moves.length}</span><span className="play-history-actions">{playFromButton(game!,playPly)}<button className="primary" onClick={()=>setPlayPosition(null)}>Torna alla posizione corrente</button></span></div>}
           {tab==='review'&&game&&<div className="review-controls board-toolbar"><button aria-label="Posizione iniziale" onClick={()=>setCursor(0)} disabled={cursor===0}>⏮</button><button aria-label="Mossa precedente" onClick={()=>setCursor(c=>Math.max(0,c-1))} disabled={cursor===0}>◀</button><span>{cursor} / {game.version}</span><button aria-label="Mossa successiva" onClick={()=>setCursor(c=>Math.min(game.version,c+1))} disabled={cursor===game.version}>▶</button><button aria-label="Ultima posizione" onClick={()=>setCursor(game.version)} disabled={cursor===game.version}>⏭</button>{playFromButton(game,cursor)}</div>}
@@ -476,13 +489,14 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
           {tab==='play'&&<>
             {game?.source==='stockfish'&&<section className="panel refutation-panel" aria-label="Confutazione"><span className="eyebrow">IMPARA DAL TENTATIVO</span><h3>Difendi {refutationOrigin?.gameId===game.id?refutationOrigin.san:'la tua mossa'} contro Stockfish</h3><p className="muted">La partita parte dopo la mossa che l’esercizio ha rifiutato. Stockfish gioca a piena forza: la sua prima risposta è di solito ciò che non avevi visto. Annulla e prova altre difese per capire se il problema si può riparare.</p><small className="footnote">Partita di studio: non crea puzzle e non entra nei Progressi.</small>{refutationOrigin?.gameId===game.id&&<button className="full" disabled={busy} onClick={()=>{const origin=refutationOrigin;if(origin.kind==='study')navigate('study');else if(origin.kind==='puzzle'&&exercise?.id===origin.targetId)setTab('train');else void openTraining(origin.kind,origin.targetId)}}>← Torna {refutationOrigin.kind==='puzzle'?'al puzzle':refutationOrigin.kind==='study'?'allo studio':'all’esercizio'}</button>}</section>}
             {game&&<MoveHistory key={game.id} game={game} ply={playPly} onPosition={showPlayPosition} onReview={analyze} reviewDisabled={!game.version||busy||botThinking||!!jobId}/>}
-            <section className="panel play-setup"><span className="eyebrow">IL TUO SPARRING PARTNER</span><h2>{game?'Nuova partita':'Gioca contro Maia'}</h2><p className="muted">Mosse e imperfezioni ispirate al gioco umano.</p>
+            <section className="panel play-setup"><span className="eyebrow">IL TUO SPARRING PARTNER</span><h2>{game?'Nuova partita':engine==='experimental'?'Gioca contro lo Sperimentale':'Gioca contro Maia'}</h2><p className="muted">Mosse e imperfezioni ispirate al gioco umano.</p>
+              <OpponentChoice engine={engine} onEngine={choose=>{setEngine(choose);if(choose==='experimental'){const [low,high]=experimentalRange(opponents.status);setElo(e=>Math.min(high,Math.max(low,e)))}}} status={opponents.status} checking={opponents.checking} onRefresh={opponents.refresh} disabled={busy}/>
               <div className="field-label">Livello di riferimento <strong>{elo}</strong></div>
-              <div className="chip-row" role="group" aria-label="Livelli consigliati">{levels.map(level=><button key={level} className="chip" aria-pressed={elo===level} onClick={()=>setElo(level)}>{level}</button>)}</div>
-              <input className="level-range" aria-label="Livello Maia" type="range" min="600" max="2600" step="100" value={elo} onChange={e=>setElo(Number(e.target.value))}/><div className="range-labels"><span>600</span><span>2600</span></div>
+              <div className="chip-row" role="group" aria-label="Livelli consigliati">{levels.map(level=><button key={level} className="chip" aria-pressed={elo===level} disabled={level<eloRange[0]||level>eloRange[1]} onClick={()=>setElo(level)}>{level}</button>)}</div>
+              <input className="level-range" aria-label={engine==='experimental'?'Livello Sperimentale':'Livello Maia'} type="range" min={eloRange[0]} max={eloRange[1]} step="100" value={elo} onChange={e=>setElo(Number(e.target.value))}/><div className="range-labels"><span>{eloRange[0]}</span><span>{eloRange[1]}</span></div>
               <div className="field-label">Il tuo colore</div>
               <div className="segmented color-choice" role="group" aria-label="Il tuo colore">{([['w','♔','Bianco'],['b','♚','Nero'],['random','⚄','Casuale']] as const).map(([value,icon,label])=><button key={value} aria-pressed={color===value} onClick={()=>setColor(value)}><span aria-hidden="true">{icon}</span>{label}</button>)}</div>
-              <button className="primary full big" onClick={startGame} disabled={busy||!!jobId||botThinking}>{game?'Nuova partita':'Inizia partita'} →</button>
+              <button className="primary full big" onClick={startGame} disabled={busy||!!jobId||botThinking||engine==='experimental'&&!opponents.status?.available}>{game?'Nuova partita':'Inizia partita'} →</button>
               <small className="footnote">Il livello guida il modello; non equivale a un rating agonistico certificato.</small>
               {!game&&<p className="tutor-tip"><strong>Il tutor osserva.</strong> Alla fine rivedremo le decisioni più interessanti e creeremo esercizi dalle tue posizioni.</p>}
               <div className="engine-status"><span className={maiaStatus==='Maia pronto'?'status-dot':'status-dot waiting'}/>{maiaStatus}<small>{stockfish}</small></div>
