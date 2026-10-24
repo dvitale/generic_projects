@@ -32,6 +32,7 @@ from . import problems
 from . import diagnosis
 from . import auth
 from . import opponents
+from . import alternatives
 from .rating import rating_plan, summarize_rating, RATING_LEVELS, RATING_METHOD
 
 ENV_PATH = ROOT / ".env"
@@ -118,6 +119,7 @@ def init_db():
         study.init_schema(con)
         problems.init_schema(con)
         diagnosis.init_schema(con)
+        alternatives.init_schema(con)
         for row in con.execute('SELECT * FROM games WHERE analysis IS NOT NULL').fetchall():
             if row['analysis_version'] == len(json.loads(row['moves'])):
                 prevention.seed_game(con, row, json.loads(row['analysis']), now())
@@ -604,6 +606,7 @@ def preserve_review(con, row, session):
     con.execute('UPDATE position_judgments SET game_id=? WHERE game_id=?', (archive_id, row['id']))
     con.execute('UPDATE study_cards SET game_id=? WHERE game_id=?', (archive_id, row['id']))
     con.execute('UPDATE study_quizzes SET game_id=? WHERE game_id=?', (archive_id, row['id']))
+    con.execute('UPDATE stuck_episodes SET game_id=? WHERE game_id=?', (archive_id, row['id']))
 
 
 def suggestion_position(con, game_id, body):
@@ -1177,6 +1180,11 @@ study.install(app, database, find_game, now, tutor_lock)
 auth.install(app, ENV_PATH, lambda: DB_PATH.parent)
 problems.install(app, database, lambda: DB_PATH.parent, now)
 diagnosis.install(app, database, now)
+# A move found in the guided path reaches the game only through the usual checks on version and revision.
+alternatives.install(app, database, now, find_game, PLAYABLE,
+                     lambda game_id, move, version, revision: make_move(game_id, MoveInput(move=move, version=version, actor='human', revision=revision)),
+                     lambda: DB_PATH.parent / problems.PUZZLES_FILE)
+training_schedule.PROVIDERS.append(alternatives.plan_rows)
 
 DIST = ROOT / "web" / "dist"
 @app.get('/api/training-guide')

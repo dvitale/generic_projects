@@ -14,7 +14,7 @@ import torch
 
 from dataset import Positions
 from download_month import check_space, download, write_json
-from monthly_data import copy_rows, fixed_and_training, heldout_keys, prepare_month
+from monthly_data import copy_rows, fixed_and_training, get_meta, heldout_keys, prepare_month
 from policy import Config, Policy
 from train import evaluate, fingerprint, train
 
@@ -51,7 +51,7 @@ def acceptance(candidate, previous=None):
     if previous and not reasons:
         if values['nll'] > previous['all']['nll'] + .03:
             reasons.append('Peggioramento NLL globale oltre 0,03')
-        for band in ('all', '600', '800', '1000'):
+        for band in ('all', '600', '800', '1000', '1200', '1400'):
             old, new = previous.get(band), candidate.get(band)
             if old and new and min(old['count'], new['count']) >= 100 and new['top1'] < old['top1'] - .05:
                 reasons.append(f'Calo top-1 oltre 5 punti percentuali nella fascia {band}')
@@ -81,6 +81,12 @@ def guarded_remove_archive(root, month, record):
         or fingerprint(fixed) != record.get('fixed_sha256')
         or fingerprint(replay) != record.get('replay_sha256')):
         raise ValueError('Checkpoint, verifica o dati permanenti non corrispondenti: archivio conservato')
+    bounds = record.get('rating_range', [600, 2600])
+    if bounds != [600, 2600]:
+        validation = root/'data/cycles'/f'fixed-{bounds[0]}-{bounds[1]}.sqlite'
+        if (not validation.exists() or fingerprint(validation) != record.get('validation_sha256')
+            or verification.get('validation_sha256') != record.get('validation_sha256')):
+            raise ValueError('Sottoinsieme di verifica modificato: archivio conservato')
     archive_dir = root/'data/monthly'
     archive = archive_dir/f'lichess_db_standard_rated_{month}.pgn.zst'
     if archive.is_symlink() or archive.resolve().parent != archive_dir.resolve():
@@ -174,14 +180,29 @@ def run_month(root, month, args):
     ledger_path = cycles/'ledger.json'
     ledger = read_json(ledger_path, dict(months={}, active_month=None, fixed_sha256=None))
     status = cycles/'status.json'
+    request_path = root/'runs/monthly'/month/'request.json'
+    saved_request = read_json(request_path)
     existing = ledger['months'].get(month)
+    parent_record = ledger['months'].get(ledger['active_month'], {})
+    inherited = (saved_request or existing or parent_record).get('rating_range', [600, 2600])
+    low = getattr(args, 'min_elo', None)
+    high = getattr(args, 'max_elo', None)
+    bounds = [inherited[0] if low is None else low, inherited[1] if high is None else high]
+    if not 600 <= bounds[0] <= bounds[1] <= 2600:
+        raise ValueError('Intervallo rating non valido: 600 <= minimo <= massimo <= 2600')
+    if saved_request and saved_request['rating_range'] != bounds:
+        raise ValueError('Fascia del ciclo già fissata: ripresa con filtri diversi rifiutata')
+    if existing and existing.get('rating_range', [600, 2600]) != bounds:
+        raise ValueError('Mese già elaborato con una fascia diversa')
+    focused = bounds != [600, 2600]
     if existing and existing['state'] == 'complete':
         if not args.keep_archive and (root/'data/monthly'/f'lichess_db_standard_rated_{month}.pgn.zst').exists():
             guarded_remove_archive(root, month, existing)
         write_json(status, dict(month=month, stage='complete', checkpoint=existing['checkpoint']))
         return
-    if ledger['active_month'] and month <= ledger['active_month']:
-        raise ValueError('Scegliere un mese successivo a quello già accettato')
+    if (ledger['active_month'] and month <= max(ledger['months'])
+        and not getattr(args, 'allow_earlier_month', False)):
+        raise ValueError('Mese storico: richiede --allow-earlier-month esplicito')
     parent = root/ledger['months'][ledger['active_month']]['checkpoint'] if ledger['active_month'] else None
     if parent and fingerprint(parent) != ledger['months'][ledger['active_month']]['checkpoint_sha256']:
         raise ValueError('Checkpoint precedente modificato')
@@ -193,7 +214,9 @@ def run_month(root, month, args):
     if ledger['fixed_sha256'] and fingerprint(fixed) != ledger['fixed_sha256']:
         raise ValueError('Holdout fisso modificato')
     storage_budget(root, args.host_disk)
-    write_json(status, dict(month=month, stage='download'))
+    request_path.parent.mkdir(parents=True, exist_ok=True)
+    write_json(request_path, dict(rating_range=bounds))
+    write_json(status, dict(month=month, stage='download', rating_range=bounds))
     download(month, root/'data/monthly', args.host_disk)
     archive_meta = read_json(root/'data/monthly'/f'{month}.manifest.json')
     archive = root/'data/monthly'/archive_meta['name']
@@ -201,7 +224,7 @@ def run_month(root, month, args):
     training_data = cycles/'months'/f'{month}.train.sqlite'
     replay_input = cycles/'months'/f'{month}.replay.sqlite'
     write_json(status, dict(month=month, stage='sampling'))
-    prepare_month(archive, month_data, month, args.host_disk)
+    prepare_month(archive, month_data, month, args.host_disk, low=bounds[0], high=bounds[1])
     if not training_data.exists():
         fixed_and_training(month_data, fixed, training_data)
     if saved_plan and saved_plan['replay_sha256'] and not replay_input.exists():
@@ -209,17 +232,30 @@ def run_month(root, month, args):
     if parent and replay_pool.exists() and not replay_input.exists():
         blocked = heldout_keys(fixed)
         copy_rows(replay_input, [replay_pool], ['train'], 100000,
-                  dict(speed='rapid', purpose='replay_input', month=month), exclude_keys=blocked)
+                  dict(speed='rapid', purpose='replay_input', month=month, low=bounds[0], high=bounds[1]),
+                  exclude_keys=blocked, rating_range=bounds)
     if not ledger['fixed_sha256']:
         ledger['fixed_sha256'] = fingerprint(fixed)
         write_json(ledger_path, ledger)
-    write_json(status, dict(month=month, stage='training'))
-    best = train_month(root, month, training_data, fixed, replay_input if replay_input.exists() else None, parent, args)
-    write_json(status, dict(month=month, stage='validation'))
-    candidate = metrics(best, fixed)
-    old = metrics(parent, fixed) if parent else None
+    validation = fixed
+    if focused:
+        validation = cycles/f'fixed-{bounds[0]}-{bounds[1]}.sqlite'
+        view_settings = dict(purpose='fixed_rating_view', fixed_sha256=fingerprint(fixed), rating_range=bounds)
+        if not validation.exists():
+            copy_rows(validation, [fixed], ['validation'], 10000, view_settings, rating_range=bounds)
+        with sqlite3.connect(f'file:{validation.resolve()}?mode=ro', uri=True) as db:
+            if get_meta(db, 'settings') != view_settings:
+                raise ValueError('Sottoinsieme di verifica non coerente con holdout e fascia')
+    write_json(status, dict(month=month, stage='training', rating_range=bounds))
+    best = train_month(root, month, training_data, validation, replay_input if replay_input.exists() else None, parent, args)
+    write_json(status, dict(month=month, stage='validation', rating_range=bounds))
+    candidate = metrics(best, validation)
+    old = metrics(parent, validation) if parent else None
     decision = acceptance(candidate, old)
     verification = dict(**decision, validation=candidate, previous_validation=old,
+                        rating_range=bounds, validation_sha256=fingerprint(validation),
+                        global_validation=metrics(best, fixed) if focused else candidate,
+                        previous_global_validation=metrics(parent, fixed) if focused and parent else old,
                         month_validation=metrics(best, month_data), test='Not evaluated',
                         month_validation_warning='May contain positions seen in current or earlier training; fixed validation is the quality gate',
                         checkpoint_sha256=fingerprint(best), fixed_sha256=fingerprint(fixed),
@@ -231,8 +267,11 @@ def run_month(root, month, args):
     blocked = heldout_keys(fixed)
     # Use the immutable input snapshot: safe to repeat after a crash before ledger commit.
     sources = ([replay_input] if replay_input.exists() else []) + [training_data]
-    copy_rows(replay_pool, sources, ['train'], 100000, dict(speed='rapid', purpose='replay', through_month=month), blocked)
-    record = dict(state='complete', checkpoint=str(best.relative_to(root)), checkpoint_sha256=fingerprint(best),
+    copy_rows(replay_pool, sources, ['train'], 100000,
+              dict(speed='rapid', purpose='replay', through_month=month, low=bounds[0], high=bounds[1]),
+              blocked, rating_range=bounds)
+    record = dict(state='complete', rating_range=bounds, validation_sha256=fingerprint(validation),
+                  checkpoint=str(best.relative_to(root)), checkpoint_sha256=fingerprint(best),
                   archive_sha256=archive_meta['sha256'], fixed_sha256=fingerprint(fixed),
                   replay_sha256=fingerprint(replay_pool), verification_sha256=fingerprint(best.parent/'verification.json'))
     ledger['months'][month] = record
@@ -254,10 +293,14 @@ if __name__ == '__main__':
     parser.add_argument('command', choices=['run', 'status'])
     parser.add_argument('--months', default='2026-09', help='Mesi espliciti, disponibili e in ordine cronologico')
     parser.add_argument('--host-disk', default='/mnt/c')
+    parser.add_argument('--min-elo', type=int, help='Rating minimo incluso; eredita ciclo o modello precedente')
+    parser.add_argument('--max-elo', type=int, help='Rating massimo incluso; eredita ciclo o modello precedente')
     parser.add_argument('--max-steps', type=int, default=10000)
     parser.add_argument('--chunk-steps', type=int, default=1000)
     parser.add_argument('--patience', type=int, default=3)
     parser.add_argument('--keep-archive', action='store_true')
+    parser.add_argument('--allow-earlier-month', action='store_true',
+                        help='Consente un mese storico non ancora elaborato, continuando dal modello attivo')
     args = parser.parse_args()
     cycles = ROOT/'data/cycles'
     cycles.mkdir(parents=True, exist_ok=True)

@@ -18,6 +18,7 @@ test('Real Maia play, black orientation, drill and mobile layout',async({page,re
   await expect(page.getByText('Tocca a te · trascina un pezzo o usa due clic')).toBeVisible({timeout:60000})
   const id=await page.evaluate(()=>localStorage.getItem('chess-coach-game'))
   await expect.poll(async()=>(await (await request.get('/api/games/'+id)).json()).version).toBe(2)
+  expect((await (await request.get('/api/games/'+id)).json()).elo).toBe(600)
   expect(maiaRequestAt-humanResponseAt).toBeGreaterThanOrEqual(1150)
   await page.getByRole('group',{name:'Il tuo colore'}).getByRole('button',{name:'Nero'}).click()
   page.once('dialog',dialog=>dialog.dismiss())

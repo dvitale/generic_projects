@@ -22,6 +22,6 @@ puzzles:
 	@"$(CURDIR)/.venv/bin/python" "$(CURDIR)/scripts/import_lichess_puzzles.py" --per-band "$(PER_BAND)"
 
 # Local only: needs experiments/human-policy with its own .venv; Play shows it when .env sets SPARRINGMATE_EXPERIMENTAL_ENGINE.
-CHECKPOINT ?= runs/monthly/2026-09/best.pt
+CHECKPOINT ?= latest
 experimental:
 	@cd "$(CURDIR)/experiments/human-policy" && .venv/bin/python serve.py --checkpoint "$(CHECKPOINT)" --port 8044

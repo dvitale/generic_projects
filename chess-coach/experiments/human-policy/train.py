@@ -157,7 +157,12 @@ def train(args):
 
     for sig in (signal.SIGINT, signal.SIGTERM):
         signal.signal(sig, on_stop)
-    ratings = [elo for _, elo in records] + previous_bounds
+    ratings = [elo for _, elo in records]
+    if settings.get('restrict_rating_bounds'):
+        if any(not settings['low'] <= elo <= settings['high'] for elo in ratings):
+            raise ValueError('Train o replay fuori dalla fascia richiesta')
+    else:
+        ratings += previous_bounds
     rating_bounds = [min(ratings), max(ratings)]
     setup = dict(device=str(device), gpu=torch.cuda.get_device_name() if device.type == "cuda" else None,
                  parameters=sum(p.numel() for p in model.parameters()),

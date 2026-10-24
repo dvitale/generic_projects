@@ -1,7 +1,8 @@
 # Ciclo mensile del laboratorio — 21 ottobre 2026
 
-Questa procedura è esclusa da gioco, analisi, interfaccia e deploy di SparringMate.
-Qualsiasi integrazione richiede una nuova conferma dell'utente.
+Il training resta separato da gioco, analisi e deploy di SparringMate.
+Dal 23 ottobre il servizio locale può usare un checkpoint esplicito per Gioca;
+un ciclo di training non cambia né riavvia quel servizio.
 
 ## Avvio e ripresa
 
@@ -26,7 +27,7 @@ rilegge il flusso compresso fino al punto salvato. Non è un accesso casuale al 
 ## Campione distribuito sull'intero mese
 
 - Lettura dell'intero `.pgn.zst` in streaming, senza PGN decompresso su disco.
-- Filtro: standard rated rapid, 600–2600, nessun titolo BOT, risultato presente
+- Filtro: standard rated rapid, rating del giocatore al tratto nella fascia scelta (inizialmente 600–2600), nessun titolo BOT, risultato presente
   nel movetext e data coerente con il mese. Rating provvisori non identificabili.
 - Prima selezione deterministica per hash della partita: circa una su 64;
   una su 16 quando almeno uno dei giocatori è nella fascia 600–1199.
@@ -76,7 +77,7 @@ vengono pesate moderatamente all'interno di ciascun gruppo.
 - Il primo checkpoint deve avere NLL finita e migliore della policy uniforme.
 - I successivi non devono peggiorare la NLL globale di oltre 0,03 né perdere
   oltre 5 punti percentuali di top-1 globale o nelle fasce 600–799, 800–999,
-  1000–1199, quando la fascia contiene almeno 100 posizioni di verifica.
+  1000–1199, 1200–1399 e 1400–1599 (entro il limite scelto), quando la fascia contiene almeno 100 posizioni di verifica.
 
 Queste soglie sono protezioni esplorative, non una certificazione statistica
 di superiorità o di forza Elo. La selezione ripetuta sulla validation può
@@ -119,3 +120,68 @@ la continuità dell'ottimizzatore, il replay, l'immutabilità del holdout, la ri
 dell'estrazione, il rifiuto di regressioni e i blocchi alla cancellazione.
 Queste prove verificano il procedimento; non rappresentano un training sui mesi
 reali. Il download reale va completato e verificato prima di eseguire quel training.
+
+
+## Secondo ciclo: agosto dopo settembre — 23 ottobre 2026
+
+Settembre è completato (10.000 passi); ottobre non è ancora pubblicato.
+Per aggiungere agosto senza ripartire da zero:
+
+```bash
+.venv/bin/python monthly_cycle.py run --months 2026-08 --allow-earlier-month --min-elo 600 --max-elo 1500
+```
+
+L'opzione autorizza un mese storico non ancora elaborato. Senza opzione si
+accettano soltanto mesi successivi a tutti quelli nel registro. I mesi completati
+restano idempotenti: ripetere il comando non li scarica e non li allena di nuovo.
+La lista in una singola invocazione deve comunque essere distinta e ordinata.
+
+Il padre è il checkpoint attivo di settembre: pesi e ottimizzatore continuano,
+con al massimo 10.000 nuovi passi, 80% campionamenti agosto e 20% memoria train.
+Validation/test di settembre restano congelati e le loro posizioni sono escluse
+da train e replay. Questo confronto non è una verifica temporale prospettica.
+L'ordine del registro rappresenta l'ordine di addestramento: si conservano gli
+ultimi due cicli accettati, anche se i mesi di origine sono in ordine inverso.
+In questo secondo ciclo settembre e agosto restano entrambi disponibili.
+
+Il servizio di gioco resta fissato a `runs/monthly/2026-09/best.pt`.
+Il nuovo candidato sarà in `runs/monthly/2026-08/best.pt`; il superamento della
+verifica aggiorna solo il registro del laboratorio, non il servizio in uso.
+Prima di provarlo in Gioca confrontare `verification.json` (globale e fasce
+600–1199) con settembre. Le soglie proteggono da regressioni ampie, ma accettato
+non significa necessariamente migliore. Non cambiare pesi durante una partita.
+
+
+## Specializzazione richiesta: 600–1500 inclusi — 23 ottobre 2026
+
+Dal secondo ciclo si escludono le mosse dei giocatori sopra 1500. Il rating è
+quello del giocatore al tratto: in una partita 1200 contro 1700 si apprendono
+solo le mosse del 1200. Quelle dell'avversario vengono lette per ricostruire
+la posizione, ma non costituiscono bersagli del training. Anche 1500 è incluso.
+Il download pubblico rimane l'intero mese; il filtro si applica nell'estrazione.
+
+- Quote di campionamento ricalcolate sulle cinque fasce presenti, anziché
+  riservare metà della capacità alle fasce escluse. Limite totale invariato.
+- Memoria precedente e memoria aggiornata filtrate prima del limite di
+  100.000 posizioni: nessuna mossa sopra 1500 viene reintrodotta dal replay.
+- I pesi e AdamW di settembre continuano: il modello ha quindi un pretraining
+  più ampio, che non viene cancellato. Tutti i nuovi bersagli sono 600–1500.
+- Il master `fixed.sqlite` resta identico. Si crea una vista materializzata
+  `fixed-600-1500.sqlite` contenente solo la validation della fascia, senza
+  selezionare nuove posizioni né valutare il test. Tutte le posizioni del
+  master, anche fuori fascia, restano escluse dal training e dal replay.
+- Arresto anticipato, scelta del checkpoint e accettazione confrontano padre
+  e candidato sulla stessa vista 600–1500. Le metriche globali su tutti i
+  rating sono diagnostiche e non guidano questa specializzazione.
+- Il nuovo checkpoint dichiara soltanto l'intervallo osservato nel nuovo
+  train/replay, comunque entro 600–1500. Il servizio legge quei limiti quando
+  verrà avviato con il nuovo checkpoint; la versione di settembre resta intatta.
+- `runs/monthly/<mese>/request.json` fissa la fascia prima del download.
+  La ripresa eredita questi limiti se omessi e rifiuta limiti diversi.
+  I futuri mesi ereditano la fascia dell'ultimo ciclo accettato, salvo una
+  scelta esplicita diversa. Il vecchio modello è conservato per il confronto.
+
+La verifica della rimozione dell'archivio controlla anche l'hash della vista
+di validation usata dal modello specializzato. Nessun dato personale viene letto.
+Prove: `make test`, comprese `test_rating_focus.py` (limite incluso, giocatore
+al tratto, replay, holdout, continuità e ripresa coerente). 55 test passati.

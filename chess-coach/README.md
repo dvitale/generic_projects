@@ -77,11 +77,12 @@ Verifica del motore e differenze rispetto al gioco sul sito ufficiale: [audit Ma
 - **Annulla ultima mossa:** in Gioca e Drill ritorna alla tua ultima decisione, togliendo anche la risposta di Maia o interrompendola se ancora in preparazione. Nei Drill conserva la sequenza iniziale. Disponibile anche dopo la conclusione; PGN importati e copie archiviate restano in sola revisione.
 - **Decisioni, non Elo:** il riepilogo principale mostra scelte senza perdite rilevanti, errori e vantaggi conservati. La somiglianza con Maia è facoltativa, in un pannello secondario chiuso: il profilo più probabile non indica quanto bene hai giocato, non assegna titoli e non parte automaticamente. Il calcolo rimane compatibile con i dati salvati. Metodo matematico in [docs/elo-partita.md](docs/elo-partita.md).
 - **Ritmo Maia:** risposte con attesa variabile di circa 1,2–3,2 secondi, comprendente il tempo di inferenza, e breve animazione del pezzo. Il caricamento iniziale del modello può richiedere più tempo. Lo stesso ritmo vale nei Drill; il cambio di sezione annulla le risposte ancora in preparazione.
-- **Gioca:** bianco, nero o colore casuale contro il vero modello Maia3 del sito; livello con scelte rapide (800–2300) o cursore 600–2600, mosse legali e salvataggio automatico. Sotto la scacchiera, durante una partita, ci sono **Nuova partita** (per prima e in evidenza; usa livello, colore e motore scelti nel pannello e chiede conferma se la partita in corso non è finita), **Annulla ultima mossa**, **Suggerisci mossa** e **Abbandona partita**. Puoi trascinare i pezzi con mouse o touch oppure usare due clic; le promozioni si scelgono cliccando l’immagine del pezzo. La mossa compare subito sulla scacchiera, senza attendere il server: un pezzo trascinato resta dove lo lasci, mentre con due clic scivola dalla casa di partenza; se il server rifiuta la mossa, il pezzo torna al suo posto. A fine partita un riquadro sotto la scacchiera dice com’è finita (scacco matto, stallo, materiale insufficiente, ripetizione, regola delle 50 mosse o abbandono) e chi ha vinto; il re sotto scacco è sempre evidenziato in rosso, anche nella posizione di matto.
+- **Gioca:** bianco, nero o colore casuale contro il vero modello Maia3 del sito; livello predefinito 600, con scelte rapide (600–2300) o cursore 600–2600, mosse legali e salvataggio automatico. Sotto la scacchiera, durante una partita, ci sono **Nuova partita** (per prima e in evidenza; usa livello, colore e motore scelti nel pannello e chiede conferma se la partita in corso non è finita), **Annulla ultima mossa**, **Suggerisci mossa** e **Abbandona partita**. Puoi trascinare i pezzi con mouse o touch oppure usare due clic; le promozioni si scelgono cliccando l’immagine del pezzo. La mossa compare subito sulla scacchiera, senza attendere il server: un pezzo trascinato resta dove lo lasci, mentre con due clic scivola dalla casa di partenza; se il server rifiuta la mossa, il pezzo torna al suo posto. A fine partita un riquadro sotto la scacchiera dice com’è finita (scacco matto, stallo, materiale insufficiente, ripetizione, regola delle 50 mosse o abbandono) e chi ha vinto; il re sotto scacco è sempre evidenziato in rosso, anche nella posizione di matto.
 - **Rivedi:** revisione passo passo di entrambe le parti. Ogni posizione confronta mossa giocata, scelta Stockfish e mossa più probabile di Maia al livello selezionato, con probabilità e varianti. Le frecce e il selettore delle mosse mostrano la scacchiera prima della decisione. Restano importazione/esportazione PGN e momenti critici personali. Per vecchie analisi, ricalcolare per includere tutte le mosse.
 - **Drill:** aperture, finale di torre e posizioni delle proprie partite, mostrate con un’anteprima della posizione; 3–12 decisioni contro Maia e revisione dedicata.
 - **Puzzle:** decisioni critiche personali, alternative verificate, tentativi, indizi, soluzione e ripassi distanziati. Fra i puzzle da ripassare si parte da quelli mai mostrati, poi da quelli visti meno di recente: aprire un puzzle senza rispondere lo sposta in fondo, così all'apertura non ricompaiono sempre gli stessi.
 - **Problemi:** problemi tattici da partite reali del database Lichess, per fasce di rating, con rating personale e stima Maia per livello. Vedi [Problemi da partite reali](#problemi-da-partite-reali).
+- **Trova un’alternativa:** quando tutte le mosse ti sembrano perdenti, **Qui mi sento bloccato** (in Gioca) o **Qui mi sentivo bloccato** (in Rivedi, anche su partite di Maia online) segna il momento senza aiuti oppure apre una ricerca guidata su una scacchiera separata. Prima rispondi a due domande brevi (che cosa temi, quali mosse hai considerato); poi cerchi da solo una mossa che tenga la partita, con aiuti progressivi solo su richiesta. Stockfish accetta più alternative, non solo la prima scelta. Dopo la soluzione racconti che cosa l’ha resa convincente; la posizione torna in ripasso, con posizioni analoghe e controesempi verificati. Vedi [Trova un’alternativa](#trova-unalternativa).
 - **Diagnosi prima della soluzione:** in Puzzle, Problemi e Blunder prevention, chiedendo la soluzione compaiono tre domande rapide (valutazione, minaccia temuta, candidata scartata); le mosse già provate e respinte contano da sole fra le candidate. Stockfish le confronta con la posizione e distingue soluzione non vista o scartata, valutazione pessimista o ottimista, minaccia non vista o fantasma; l'andamento è in Progressi. Si può saltare. Vedi [`docs/diagnosi-errori.md`](docs/diagnosi-errori.md).
 - **Studio:** sezione separata con sei schede: Flashcard, Quiz, Esame di prova, Impara da una partita, Chiedi al tutor e Quaderno. Vedi [Studio](#studio).
 - **Commento finale:** in Rivedi, su richiesta e dopo l’analisi Stockfish, DeepSeek riassume andamento della partita, punti riusciti e priorità di allenamento collegati alle posizioni. Solo al clic invia l’andamento delle valutazioni e fino a sei posizioni con le varianti, senza nomi dei giocatori; il commento viene salvato finché partita e analisi non cambiano.
@@ -134,10 +135,11 @@ Le richieste Maia di gioco, revisione ed Elo condividono una coda: non vengono e
 | `docs/drill-puzzle-personalizzati.md` | Analisi del sito e progetto evolutivo del tutor |
 | `backend/study.py` | API della sezione Studio: flashcard, quiz, esami, pacchetto partita, domande al tutor, quaderno |
 | `web/src/study/` | Interfaccia della sezione Studio |
+| `backend/alternatives.py`, `web/src/FindAlternative.tsx` | Trova un’alternativa: episodi di blocco, verdetti, aiuti progressivi, ripetizioni e casi analoghi |
 | `backend/auth.py`, `web/src/Login.tsx` | Login con credenziali da `.env` e cookie di sessione firmato |
 | `deploy/` | Unit systemd e virtual host nginx dell’istanza pubblica |
 
-Questo è un prototipo funzionante ed estendibile. Non include ancora un modello calibrato delle competenze, un generatore tattico a più mosse o verifiche di apprendimento su posizioni nuove. L'analisi individua fino a tre momenti critici per partita con budget limitato; i temi sono indicativi. Il piano attuale è semplice e trasparente, non un tutor autonomo completo.
+Questo è un prototipo funzionante ed estendibile. Non include ancora un modello calibrato delle competenze, o un generatore tattico a più mosse; le verifiche su posizioni nuove si limitano ai casi analoghi e ai controesempi di Trova un’alternativa, scelti fra le partite analizzate e i problemi importati. L'analisi individua fino a tre momenti critici per partita con budget limitato; i temi sono indicativi. Il piano attuale è semplice e trasparente, non un tutor autonomo completo.
 
 Progetto indipendente, senza affiliazione a Maia Chess. Attribuzioni e licenze in `THIRD_PARTY.md`; sorgenti applicativi GPL-3.0, artefatti esterni con le rispettive condizioni.
 
@@ -199,6 +201,30 @@ I tentativi e i ripassi sono separati dai Puzzle. Dopo una scelta corretta o la 
 
 In **Puzzle** e **Blunder prevention**, la mossa tentata viene mostrata subito e, se sbagliata, annullata lentamente dopo una breve pausa. Il pannello **Tentativi sbagliati** conserva gli errori della posizione con valutazione e perdita rispetto alla migliore alternativa. **Spiega motivo** richiede a DeepSeek una spiegazione basata sulle varianti Stockfish salvate; le spiegazioni vengono conservate per evitare richieste ripetute. Serve la configurazione DeepSeek già usata dal tutor. La spiegazione si apre in un pannello flottante che resta fermo mentre la pagina scorre: si trascina dalla barra del titolo, si ridimensiona dall’angolo e ricorda la posizione. **Gioca … contro Stockfish** apre in Gioca una partita che parte subito dopo il tentativo sbagliato: Stockfish risponde a piena forza (400.000 nodi per mossa), **Annulla ultima mossa** torna alla tua ultima scelta senza mai togliere il tentativo, e **Torna al puzzle** riporta all’esercizio. Queste partite compaiono nell’archivio e si possono analizzare, ma non generano puzzle né posizioni di Blunder prevention e non entrano nei Progressi. Nei Puzzle una mossa è rifiutata quando perde 0,70 o più rispetto alla migliore di Stockfish. Le nuove evidenze vengono registrate da questa versione; i tentativi storici senza valutazioni dettagliate rimangono conservati nei dati originali.
 
+
+## Trova un’alternativa
+
+Per le posizioni in cui ogni mossa sembra perdere. Come iniziare:
+
+1. Durante una partita, quando tocca a te, premi **Qui mi sento bloccato**. **Segna e continua** salva il momento senza aiuti e lascia la partita com’è. **Aiutami a ragionare** apre l’esercizio nella pagina di Gioca, su una scacchiera separata: la partita aspetta e il tempo di riflessione continua a contare.
+2. Oppure, in **Rivedi**, porta la scacchiera sulla posizione e premi **Qui mi sentivo bloccato**. Funziona anche con le partite importate da Maia online.
+3. Rispondi alle due domande, anche con «Non ne vedo nessuna», e muovi sulla scacchiera la mossa che proponi.
+4. Se serve, chiedi un aiuto alla volta: domanda sulla minaccia, direzione della ricerca, pezzo da osservare, mossa suggerita (con la previsione della risposta), spiegazione completa.
+5. Dopo la soluzione rispondi alle due domande finali. La ripetizione viene programmata in **Allenamento**; **Cerca una posizione analoga e un controesempio** prepara casi nuovi verificati.
+
+Ogni mossa riceve uno di quattro verdetti: alternativa valida, giocabile con una concessione, non risolve il problema, verdetto non affidabile. Durante la ricerca non compaiono valutazioni numeriche. Le soglie sono configurabili con `SPARRINGMATE_ALTERNATIVE_THRESHOLDS`.
+
+Gli aiuti chiesti durante la partita rendono assistita quella decisione; la sola segnalazione no. **Gioca … nella partita** applica la mossa trovata solo se la partita è ancora in quella posizione.
+
+La sezione è sotto **Altro → Trova un’alternativa**, con gli episodi da esaminare, quelli pronti oggi, quelli in programma e quelli completati. In **Progressi** trovi:
+
+- l’autonomia sulle posizioni nuove;
+- l’aiuto necessario;
+- le difficoltà più frequenti;
+- la ricorrenza della stessa idea nelle partite;
+- i risultati contro Maia online per livello e cadenza.
+
+Posizioni nuove e ripetizioni sono sempre conteggiate a parte. [Regole, dati e limiti](docs/trova-alternativa.md).
 
 ## Tattica, posizione e strategia
 
@@ -286,3 +312,24 @@ servizio non risponde o restituisce dati non validi, la partita si ferma con un
 messaggio e **Riprova**: non si passa mai a Maia di nascosto. Dettagli:
 [scheda del motore sperimentale](docs/motore-sperimentale.md).
 
+
+
+### Scelta del motore locale — 24 ottobre 2026
+
+`make experimental` carica l'ultimo modello accettato nel registro del laboratorio,
+verificandone pesi e rapporto. Attualmente è il ciclo agosto, 20.000 passi totali,
+specializzato 600–1500. Per confrontare la versione precedente:
+`make experimental CHECKPOINT=runs/monthly/2026-09/best.pt`.
+La selezione avviene all'avvio del servizio; una nuova sessione di training non
+cambia i pesi di un servizio già attivo.
+
+In Gioca, «Partita attuale» indica il motore fissato nella partita; «Prossima
+partita» indica la scelta che verrà applicata premendo Inizia/Nuova partita.
+La preferenza Maia/Sperimentale viene ricordata dopo una ricarica. Un servizio
+indisponibile non cambia automaticamente la preferenza in Maia.
+
+### Ricerca sullo sparring partner umano
+
+Il laboratorio offre un [banco di prova tattico](experiments/human-policy/TATTICA.md)
+per distinguere accuratezza sulle mosse umane e gestione delle minacce.
+Gli esperimenti non modificano il motore selezionato per giocare.

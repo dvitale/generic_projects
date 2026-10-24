@@ -16,7 +16,7 @@ make experimental                             # servizio del motore sperimentale
 
 - Le prove Playwright avviano da sole un server sulla porta 8011, con dati temporanei e `CHESS_COACH_DISABLE_AUTH=1` e `CHESS_COACH_DISABLE_LLM=1`, e usano `/usr/bin/chromium`. Prima va fatto `npm run build`: il server di prova serve `web/dist`.
 - `tests/test_static_cache.py` viene saltato se l'interfaccia non è compilata.
-- Variabili d'ambiente: `CHESS_COACH_DATA` (cartella dei dati), `STOCKFISH_PATH`, `SPARRINGMATE_USER`/`SPARRINGMATE_PASSWORD` (login, anche da `.env`), `DEEPSEEK_API_KEY`/`DEEPSEEK_MODEL` (tutor), `SPARRINGMATE_EXPERIMENTAL_ENGINE` (URL del motore sperimentale, anche da `.env`; senza, il selettore in Gioca non compare).
+- Variabili d'ambiente: `CHESS_COACH_DATA` (cartella dei dati), `STOCKFISH_PATH`, `SPARRINGMATE_USER`/`SPARRINGMATE_PASSWORD` (login, anche da `.env`), `DEEPSEEK_API_KEY`/`DEEPSEEK_MODEL` (tutor), `SPARRINGMATE_EXPERIMENTAL_ENGINE` (URL del motore sperimentale, anche da `.env`; senza, il selettore in Gioca non compare), `SPARRINGMATE_ALTERNATIVE_THRESHOLDS` (JSON con le soglie di «Trova un’alternativa», vedi `docs/trova-alternativa.md`).
 - La suite Playwright avvia anche `tests/fixtures/fake_policy_service.py` sulla porta 8012, al posto del motore sperimentale.
 
 ## Produzione

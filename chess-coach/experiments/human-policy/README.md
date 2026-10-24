@@ -232,3 +232,32 @@ non una classifica delle architetture neurali.
 
 Questa rete è un prototipo nuovo; non contiene pesi Maia o codice copiato
 dai repository confrontati. Il motore dell'app e i dati personali non vengono usati.
+
+
+### Secondo mese disponibile: agosto 2026
+
+Per continuare da settembre su agosto, senza modificare il servizio di gioco:
+`.venv/bin/python monthly_cycle.py run --months 2026-08 --allow-earlier-month --min-elo 600 --max-elo 1500`.
+Pesi e ottimizzatore proseguono; replay 20%, verifica fissa, due versioni conservate.
+Il checkpoint accettato nel laboratorio non viene caricato automaticamente in Gioca.
+Dettagli, ordine dei cicli e limiti del confronto: [CICLO-MENSILE.md](CICLO-MENSILE.md).
+
+
+Il secondo ciclo è specializzato su **600–1500 inclusi**: solo mosse del
+giocatore al tratto in questa fascia, anche nel replay. Le quote di campionamento
+sono ricalcolate sulle fasce ammesse. Il confronto usa lo stesso sottoinsieme
+600–1500 della validation congelata, lasciando il master e il test invariati.
+La ripresa eredita i limiti fissati; i prossimi mesi ereditano quelli del modello
+accettato. Il pretraining più ampio di settembre rimane nei pesi, ma i nuovi
+bersagli e i limiti di utilizzo del candidato sono ristretti alla fascia scelta.
+
+## Banco di prova tattico e addestramento mirato
+
+`make tactical-pilot` avvia un confronto locale isolato fra prosecuzione normale,
+campionamento delle urgenze e apprendimento ausiliario degli attacchi.
+`make tactical-status` mostra il rapporto quando completo. Dettagli, criteri e limiti
+in [TATTICA.md](TATTICA.md). Nessuna promozione del checkpoint attivo.
+
+Primo pilota completato: [risultati e limiti](RISULTATI-TATTICA.md).
+La corrispondenza con le mosse umane migliora, ma non la gestione della donna in
+presa; nessuna variante è stata attivata nel gioco.

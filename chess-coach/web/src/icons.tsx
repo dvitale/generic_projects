@@ -9,6 +9,7 @@ const paths:Record<string,string>={
   progress:'M4 19h16M6 15l4-4 3 3 6-7M15 7h4v4',
   archive:'M4 5h16v4H4zM5 9v10h14V9M10 13h4',
   study:'M12 6.5C10 5 7.5 4.5 4 4.5v13c3.5 0 6 .5 8 2 2-1.5 4.5-2 8-2v-13c-3.5 0-6 .5-8 2Zm0 0v13',
+  alternative:'M4 12h6l3-6M13 6h7M10 12l3 6h7M4 12',
   more:'M5 12h.01M12 12h.01M19 12h.01',
 }
 

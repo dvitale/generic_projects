@@ -2,7 +2,7 @@ import {useEffect,useState,useRef,type ReactNode} from 'react'
 import {api} from './api'
 import InfoNote from './InfoNote'
 
-type Item={kind:'puzzle'|'prevention';id:string;title:string;theme:string;stage:number;new:boolean;readyAt:string}
+type Item={kind:'puzzle'|'prevention'|'alternative';id:string;title:string;theme:string;stage:number;new:boolean;readyAt:string}
 type Settings={minutes:number;newLimit:number;weekdays:number[];timezone:string}
 type Plan={settings:Settings;today:string;activeDay:boolean;target:number;completed:number;successful:number;practice:number;ready:number;waiting:number;total:number;queue:Item[];calendar:{date:string;planned:boolean;due:number}[];nextDue:string|null}
 const days=['Lun','Mar','Mer','Gio','Ven','Sab','Dom']
@@ -43,7 +43,7 @@ export default function TrainingPlan({onOpen,onImport,judgment,focusJudgment,onF
       </div>}
     </section>
     <section className="panel"><div className="section-head"><h3>In coda</h3>{plan&&<span className="count-chip">{plan.queue.length}</span>}</div>
-      {plan&&<><div className="exercise-list">{plan.queue.map(item=><button key={item.kind+item.id} onClick={()=>onOpen(item.kind,item.id)}><strong><span className={`kind-tag kind-${item.kind}`}>{item.kind==='puzzle'?'Puzzle':'Blunder prevention'}</span> {item.new?'Nuovo':`Ripasso ${item.stage}`}</strong><small>{item.title} · {item.theme}</small></button>)}</div>
+      {plan&&<><div className="exercise-list">{plan.queue.map(item=><button key={item.kind+item.id} onClick={()=>onOpen(item.kind,item.id)}><strong><span className={`kind-tag kind-${item.kind}`}>{item.kind==='puzzle'?'Puzzle':item.kind==='prevention'?'Blunder prevention':'Trova un’alternativa'}</span> {item.new?'Nuovo':`Ripasso ${item.stage}`}</strong><small>{item.title} · {item.theme}</small></button>)}</div>
         {!plan.queue.length&&<p className="empty-text">Nessun esercizio in coda.</p>}
         <p className="footnote">{plan.ready} esercizi pronti · {plan.waiting} in attesa di una verifica a distanza.</p>
         <InfoNote summary="Perché non vedo lo stesso errore due volte">Il piano evita di proporre due volte la stessa decisione attraverso Puzzle e Blunder prevention.</InfoNote></>}

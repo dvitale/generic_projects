@@ -24,13 +24,13 @@ export function experimentalRange(status:ExperimentalStatus|null):[number,number
 
 export default function OpponentChoice({engine,onEngine,status,checking,onRefresh,disabled}:{engine:Engine;onEngine:(engine:Engine)=>void;status:ExperimentalStatus|null;checking:boolean;onRefresh:()=>void;disabled?:boolean}){
   // The selector exists only where the reversible configuration option enables the experimental engine.
-  if(!status?.enabled)return null
+  if(!status?.enabled&&engine!=='experimental')return null
   return <div className="opponent-choice">
-    <div className="field-label">Motore</div>
+    <div className="field-label">Motore della prossima partita</div>
     <div className="segmented" role="group" aria-label="Motore">{([['maia','Maia'],['experimental','Sperimentale']] as const).map(([value,label])=>
       <button key={value} aria-pressed={engine===value} disabled={disabled} onClick={()=>onEngine(value)}>{label}</button>)}</div>
     {engine==='experimental'&&<div className="opponent-status" role="status">
-      <p><span className={status.available?'status-dot':'status-dot waiting'}/>{checking?'Controllo del servizio…':status.available?`Servizio disponibile · ${status.version}`:`Servizio non disponibile: ${status.error}`}
+      <p><span className={status?.available?'status-dot':'status-dot waiting'}/>{checking?'Controllo del servizio…':status?.available?`Servizio disponibile · ${status?.version}`:`Servizio non disponibile: ${status?.error??'Il collegamento sperimentale non è configurato'}`}
         <button className="quiet" disabled={checking} onClick={onRefresh}>Ricontrolla</button></p>
       <p className="footnote">Livello Elo non ancora calibrato: il numero guida il modello, che è stato addestrato su rating Lichess rapid, ma non garantisce quella forza di gioco. Motore e versione restano fissati per tutta la partita.</p>
     </div>}

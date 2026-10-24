@@ -52,7 +52,7 @@ function Piece({code}:{code:string}) {
   return missing?<span aria-hidden="true" className={`piece ${code[0]==='w'?'white-piece':'black-piece'}`}>{symbols[code]}</span>:
     <img className="piece-image" src={`/pieces/neo/${code}.png`} alt="" aria-hidden="true" draggable={false} onError={()=>setMissing(true)}/>
 }
-export default function Board({fen, orientation, interactive:enabled, legalMoves, onMove, lastMove, animateMove=false,reverseMove=false,analysisArrows=[],badge}: {fen:string; orientation:Color; interactive:boolean; legalMoves:string[]; onMove:(uci:string)=>void|Promise<unknown>; lastMove?:string;animateMove?:boolean;reverseMove?:boolean;analysisArrows?:AnalysisArrow[];badge?:{square:string;kind:MoveClass}}) {
+export default function Board({fen, orientation, interactive:enabled, legalMoves, onMove, lastMove, animateMove=false,reverseMove=false,analysisArrows=[],badge,highlights=[]}: {fen:string; orientation:Color; interactive:boolean; legalMoves:string[]; onMove:(uci:string)=>void|Promise<unknown>; lastMove?:string;animateMove?:boolean;reverseMove?:boolean;analysisArrows?:AnalysisArrow[];badge?:{square:string;kind:MoveClass};highlights?:string[]}) {
   const {theme}=useBoardSettings()
   const [selected, setSelected] = useState<string | null>(null)
   const [promotion, setPromotion] = useState<string[]>([])
@@ -240,7 +240,7 @@ export default function Board({fen, orientation, interactive:enabled, legalMoves
         const checked = piece?.type==='k' && piece.color===board.turn() && board.inCheck()
         const lit = shownLastMove?.slice(0,2) === square || shownLastMove?.slice(2,4) === square
         return <button key={square} type="button" data-square={square} aria-label={`${square}${piece ? ` ${names[piece.type]} ${piece.color === 'w' ? 'bianco' : 'nero'}` : ''}`} aria-pressed={selected === square}
-          className={`square ${(ri+fi)%2 ? 'dark-square' : 'light-square'} ${selected === square ? 'selected-square' : ''} ${lit ? 'last-square' : ''} ${checked ? 'check-square' : ''} ${drag?.from===square?'drag-origin':''} ${interactive&&!promotion.length&&legalMoves.some(m=>m.startsWith(square))?'can-drag':''}`}
+          className={`square ${(ri+fi)%2 ? 'dark-square' : 'light-square'} ${selected === square ? 'selected-square' : ''} ${lit ? 'last-square' : ''} ${checked ? 'check-square' : ''} ${highlights.includes(square)?'hint-square':''} ${drag?.from===square?'drag-origin':''} ${interactive&&!promotion.length&&legalMoves.some(m=>m.startsWith(square))?'can-drag':''}`}
           draggable={false} onDragStart={event=>event.preventDefault()}
           onPointerDown={event=>pointerDown(event,square)} onPointerMove={pointerMove} onPointerUp={pointerUp}
           onPointerCancel={event=>{if(gesture.current?.id===event.pointerId)cancelDrag();if(drawing.current?.id===event.pointerId)cancelDrawing()}}

@@ -127,8 +127,8 @@ def pipeline(tmp_path, monkeypatch):
         path = folder/f'lichess_db_standard_rated_{month}.pgn.zst'
         path.write_bytes(zstandard.ZstdCompressor().compress(games(month).encode()))
         md.write_json(folder/f'{month}.manifest.json', dict(name=path.name, sha256=training.fingerprint(path)))
-    def prepare(source, output, month, host_disk):
-        md.prepare_month(source, output, month, host_disk, 10000, 1)
+    def prepare(source, output, month, host_disk, **kwargs):
+        md.prepare_month(source, output, month, host_disk, 10000, 1, **kwargs)
     monkeypatch.setattr(cycle, 'download', download)
     monkeypatch.setattr(cycle, 'prepare_month', prepare)
     monkeypatch.setattr(cycle, 'acceptance', lambda *a, **kw: dict(accepted=True, reasons=[]))
@@ -136,27 +136,29 @@ def pipeline(tmp_path, monkeypatch):
     return tmp_path, args
 
 
-def test_two_months_keep_optimizer_fixed_holdout_and_replay_then_cleanup(pipeline):
+@pytest.mark.parametrize('next_month', ['2026-10', '2026-08'])
+def test_two_months_keep_optimizer_fixed_holdout_and_replay_then_cleanup(pipeline, next_month):
     root, args = pipeline
+    args.allow_earlier_month = next_month < '2026-09'
     cycle.run_month(root, '2026-09', args)
     fixed = training.fingerprint(root/'data/cycles/fixed.sqlite')
     parent = root/'runs/monthly/2026-09/best.pt'
     parent_sha = training.fingerprint(parent)
     first = torch.load(parent, weights_only=True)
-    cycle.run_month(root, '2026-10', args)
+    cycle.run_month(root, next_month, args)
     assert training.fingerprint(root/'data/cycles/fixed.sqlite') == fixed
-    second = torch.load(root/'runs/monthly/2026-10/best.pt', weights_only=True)
+    second = torch.load(root/'runs/monthly'/next_month/'best.pt', weights_only=True)
     assert second['step'] > first['step']
     assert second['parent_sha256'] == parent_sha
     assert second['setup']['replay_positions'] > 0
     assert second['sampling'].endswith('_replay20')
     assert all(float(v['step']) > first['step'] for v in second['optimizer']['state'].values())
     assert not list((root/'data/monthly').glob('*.pgn.zst'))
-    assert json.loads((root/'data/cycles/ledger.json').read_text())['active_month'] == '2026-10'
+    assert json.loads((root/'data/cycles/ledger.json').read_text())['active_month'] == next_month
     assert not md.heldout_keys(root/'data/cycles/fixed.sqlite') & {
         r[0] for r in sqlite3.connect(root/'data/cycles/replay.sqlite').execute('SELECT position_key FROM positions')}
     # Restarting a completed month must not retrain or download it.
-    cycle.run_month(root, '2026-10', args)
+    cycle.run_month(root, next_month, args)
     assert training.fingerprint(root/'runs/monthly/2026-09/best.pt') == parent_sha
 
 
@@ -241,3 +243,26 @@ def test_restart_after_replay_written_before_ledger_commit(pipeline, monkeypatch
     monkeypatch.setattr(cycle, 'write_json', real_write)
     cycle.run_month(root, '2026-09', args)
     assert json.loads((root/'data/cycles/ledger.json').read_text())['active_month'] == '2026-09'
+
+
+@pytest.mark.parametrize('active,requested', [('2026-09', '2026-08'), ('2026-07', '2026-08')])
+def test_historical_month_requires_opt_in_before_download(tmp_path, monkeypatch, active, requested):
+    folder = tmp_path/'data/cycles'
+    folder.mkdir(parents=True)
+    cycle.write_json(folder/'ledger.json', dict(active_month=active, months={
+        '2026-09': {'state': 'complete'}, '2026-07': {'state': 'complete'}}, fixed_sha256=None))
+    monkeypatch.setattr(cycle, 'download', lambda *a: pytest.fail('Unexpected download'))
+    with pytest.raises(ValueError, match='allow-earlier-month'):
+        cycle.run_month(tmp_path, requested, SimpleNamespace(keep_archive=False))
+
+
+def test_retention_uses_training_order_for_historical_months(tmp_path):
+    months = ['2026-09', '2026-08', '2026-07']
+    for month in months:
+        folder = tmp_path/'runs/monthly'/month
+        folder.mkdir(parents=True)
+        (folder/'best.pt').write_bytes(b'fixture')
+    cycle.prune_old_artifacts(tmp_path, {'months': {m: {'state': 'complete'} for m in months}})
+    assert not (tmp_path/'runs/monthly/2026-09/best.pt').exists()
+    assert (tmp_path/'runs/monthly/2026-08/best.pt').exists()
+    assert (tmp_path/'runs/monthly/2026-07/best.pt').exists()

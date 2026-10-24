@@ -26,7 +26,7 @@ download:
 prepare:
 	$(PY) dataset.py prepare --max-games $(GAMES) --output "$(DATA)"
 test:
-	$(PY) -m pytest -q test_policy.py test_benchmark.py test_download_month.py test_monthly_cycle.py
+	$(PY) -m pytest -q test_policy.py test_benchmark.py test_download_month.py test_monthly_cycle.py test_rating_focus.py test_serve.py test_tactical_lab.py test_tactical_matches.py test_tactical_report.py
 train:
 	$(PY) train.py train --data "$(DATA)" --steps $(STEPS) --batch-size $(BATCH) --preset $(PRESET) --run $(RUN)
 resume:
@@ -47,3 +47,10 @@ cycle:
 	$(PY) monthly_cycle.py run --months "$(MONTHS)" --max-steps "$(CYCLE_STEPS)"
 cycle-status:
 	$(PY) monthly_cycle.py status
+
+.PHONY: tactical-pilot tactical-status
+tactical-pilot:
+	$(PY) tactical_lab.py --stockfish "$(abspath ../../vendor/stockfish/stockfish-linux-x86-64-universal)"
+	$(PY) tactical_report.py --directory runs/tactical-pilot-v1
+tactical-status:
+	@$(PY) -c "from pathlib import Path; p=Path('runs/tactical-pilot-v1/RAPPORTO.md'); print(p.read_text() if p.exists() else 'Esperimento non completato: controllare manifest.json, stockfish-labels.json e i log dei bracci in runs/tactical-pilot-v1')"

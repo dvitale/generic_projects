@@ -61,3 +61,14 @@ Il checkpoint del ciclo mensile può rispondere come avversario in Gioca, in alt
 `experiments/human-policy/serve.py` (`make experimental`) e l'opzione
 `SPARRINGMATE_EXPERIMENTAL_ENGINE`. Solo sul PC; Puzzle, Blunder prevention, tutor e stima del profilo
 restano invariati. Dettagli in [`motore-sperimentale.md`](motore-sperimentale.md).
+
+## Pilota tattico isolato — 24 ottobre 2026
+
+Aggiunti audit della codifica sui dati reali, holdout tattico distinto dalle
+posizioni personali note e tre bracci di addestramento controllato. Le etichette
+Stockfish sono usate solo per valutazione; il target resta la mossa umana.
+Procedura, comandi, ripresa e criteri in [TATTICA.md](../experiments/human-policy/TATTICA.md).
+Il servizio di gioco e il registro dei checkpoint accettati non vengono aggiornati.
+
+Esito: [rapporto del primo pilota tattico](../experiments/human-policy/RISULTATI-TATTICA.md).
+Tre bracci completati e quattro partite offline; nessun candidato promosso.

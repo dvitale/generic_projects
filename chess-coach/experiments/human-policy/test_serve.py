@@ -60,3 +60,42 @@ def test_predict_rejects_bad_input_and_handles_finished_games(service):
     assert call(service + "/predict", {"fen": chess.STARTING_FEN, "elo": 2600})[0] == 422
     mate = "7k/6Q1/5K2/8/8/8/8/8 b - - 0 1"
     assert call(service + "/predict", {"fen": mate, "elo": 1500})[1]["moves"] == []
+
+
+
+def test_latest_checkpoint_uses_accepted_training_order_and_verifies_hashes(tmp_path):
+    import hashlib
+    from serve import resolve_checkpoint
+    records = {}
+    for month in ('2026-09', '2026-08'):
+        folder = tmp_path/'runs/monthly'/month
+        folder.mkdir(parents=True)
+        path = folder/'best.pt'
+        path.write_bytes(month.encode())
+        sha = hashlib.sha256(path.read_bytes()).hexdigest()
+        proof = folder/'verification.json'
+        proof.write_text(json.dumps(dict(accepted=True, checkpoint_sha256=sha)))
+        records[month] = dict(state='complete', checkpoint=str(path.relative_to(tmp_path)),
+                              checkpoint_sha256=sha, verification_sha256=hashlib.sha256(proof.read_bytes()).hexdigest())
+    ledger = tmp_path/'data/cycles/ledger.json'
+    ledger.parent.mkdir(parents=True)
+    ledger.write_text(json.dumps(dict(active_month='2026-08', months=records)))
+    expected = tmp_path/'runs/monthly/2026-08/best.pt'
+    assert resolve_checkpoint('latest',tmp_path) == expected
+    assert resolve_checkpoint('runs/monthly/2026-09/best.pt',tmp_path).name == 'best.pt'
+    expected.write_bytes(b'changed')
+    with pytest.raises(ValueError,match='verificato'):
+        resolve_checkpoint('latest',tmp_path)
+
+
+def test_latest_checkpoint_refuses_missing_unaccepted_or_external_records(tmp_path):
+    from serve import resolve_checkpoint
+    with pytest.raises(ValueError,match='verificato'):
+        resolve_checkpoint('latest',tmp_path)
+    ledger = tmp_path/'data/cycles/ledger.json'
+    ledger.parent.mkdir(parents=True)
+    for record in (dict(state='failed',checkpoint='runs/monthly/x/best.pt'),
+                   dict(state='complete',checkpoint='../best.pt')):
+        ledger.write_text(json.dumps(dict(active_month='x',months={'x':record})))
+        with pytest.raises(ValueError,match='verificato'):
+            resolve_checkpoint('latest',tmp_path)

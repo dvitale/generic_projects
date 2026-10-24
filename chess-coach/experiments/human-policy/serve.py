@@ -21,6 +21,33 @@ ENGINE = "sparringmate-human-policy"
 MAX_BODY = 4096
 
 
+def resolve_checkpoint(value="latest", root=None):
+    """Use training order and verified acceptance, never the month name's date order."""
+    root = Path(root) if root is not None else Path(__file__).resolve().parent
+    if value != "latest":
+        path = Path(value)
+        return path if path.is_absolute() else root/path
+    ledger_path = root/"data/cycles/ledger.json"
+    try:
+        ledger = json.loads(ledger_path.read_text())
+        month = ledger["active_month"]
+        record = ledger["months"][month]
+        path = (root/record["checkpoint"]).resolve()
+        if (record["state"] != "complete" or not path.is_relative_to((root/"runs/monthly").resolve())
+            or path.name != "best.pt"):
+            raise ValueError("Checkpoint attivo non valido")
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        proof_path = path.parent/"verification.json"
+        proof = json.loads(proof_path.read_text())
+        if (digest != record["checkpoint_sha256"] or not proof.get("accepted")
+            or proof.get("checkpoint_sha256") != digest
+            or hashlib.sha256(proof_path.read_bytes()).hexdigest() != record["verification_sha256"]):
+            raise ValueError("Verifica del modello attivo non corrispondente")
+        return path
+    except (OSError, KeyError, TypeError, ValueError) as exc:
+        raise ValueError("Nessun modello attivo verificato: controlla il ciclo o indica CHECKPOINT esplicitamente") from exc
+
+
 class Model:
     def __init__(self, checkpoint, device="cpu"):
         path = Path(checkpoint)
@@ -104,11 +131,11 @@ def handler(model):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--checkpoint", default="runs/monthly/2026-09/best.pt")
+    parser.add_argument("--checkpoint", default="latest", help="latest: ultimo ciclo accettato; oppure percorso esplicito")
     parser.add_argument("--port", type=int, default=8044)
     parser.add_argument("--device", default="cpu")
     args = parser.parse_args()
-    model = Model(args.checkpoint, args.device)
+    model = Model(resolve_checkpoint(args.checkpoint), args.device)
     server = ThreadingHTTPServer(("127.0.0.1", args.port), handler(model))
     print(f"{ENGINE} {model.version} su http://127.0.0.1:{args.port}", flush=True)
     try:

@@ -4,3 +4,6 @@ runs/
 baselines/
 __pycache__/
 .pytest_cache/
+
+# Private local game diagnostics, not training data.
+reports/game-audit/

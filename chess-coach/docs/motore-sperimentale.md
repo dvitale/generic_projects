@@ -92,3 +92,26 @@ Playwright avvia lo stesso servizio finto sulla porta 8012. `test_serve.py` cont
 con un checkpoint generato al momento. Il 23 ottobre 2026 una partita completa contro il checkpoint
 `2026-09-step10000-a5408f29595d` ha richiesto circa 0,05 s per mossa su CPU, con promozione e patta in un
 finale.
+
+
+## Correzione di avvio e selezione — 24 ottobre 2026
+
+`make experimental` e `serve.py` usano per default `latest`: il campo
+`active_month` nel registro locale, non il mese cronologicamente maggiore.
+Si verificano stato completato, percorso nel laboratorio, SHA256 dei pesi,
+accettazione e SHA256 del rapporto. Se la verifica fallisce l'avvio si ferma;
+non viene caricato silenziosamente un vecchio modello. `CHECKPOINT=<percorso>`
+resta disponibile per un confronto esplicito. Nessun aggiornamento dei pesi
+durante il funzionamento del servizio.
+
+Gioca mostra il motore della partita corrente accanto alla scacchiera e la
+versione nei dettagli. Il selettore è dichiaratamente quello della prossima
+partita; una differenza genera un messaggio esplicito. La preferenza è salvata
+nel browser e non viene sostituita se il servizio non è disponibile. Una nuova
+versione del servizio con range più stretto aggiorna il livello selezionato
+entro i limiti ammessi. Lo storico e le partite già aperte restano coerenti
+con il motore/versione fissati all'inizio.
+
+Verifica: test del resolver in `test_serve.py`, test backend `test_opponents.py`,
+Playwright `experimental-engine.spec.ts` (chiamata policy-move, persistenza,
+differenza tra motore attuale e prossimo, cambio versione e indisponibilità).

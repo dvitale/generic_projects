@@ -59,7 +59,7 @@ def pgn_blocks(stream):
         yield ''.join(block)
 
 
-def candidate_rows(block, month, modulus=64, positions_per_game=8):
+def candidate_rows(block, month, modulus=64, positions_per_game=8, low=600, high=2600):
     headers = dict(re.findall(r'^\[(\w+) "([^"\n]*)"\]', block, re.M))
     if (not headers.get("Event", "").startswith("Rated ") or
         headers.get("Variant", "Standard") != "Standard" or
@@ -69,7 +69,7 @@ def candidate_rows(block, month, modulus=64, positions_per_game=8):
         return []
     ratings = [int(headers.get(key, '0')) if headers.get(key, '').isdigit() else 0
                for key in ('WhiteElo', 'BlackElo')]
-    if not any(600 <= rating <= 2600 for rating in ratings):
+    if not any(low <= rating <= high for rating in ratings):
         return []
     identity = headers.get('Site', '').rstrip('/').split('/')[-1][:8]
     if not re.fullmatch(r'[A-Za-z0-9]{8}', identity):
@@ -94,7 +94,7 @@ def candidate_rows(block, month, modulus=64, positions_per_game=8):
     rows = []
     for ply, move in enumerate(moves):
         rating = ratings[0 if board.turn else 1]
-        if ply in selected and 600 <= rating <= 2600:
+        if ply in selected and low <= rating <= high:
             pieces, ep, context = encode(board, rating)
             legal = [move_id(m) for m in board.legal_moves]
             material = sum(len(board.pieces(piece, color))*value for piece, value in
@@ -112,11 +112,15 @@ def candidate_rows(block, month, modulus=64, positions_per_game=8):
     return rows
 
 
-def prepare_month(source, output, month, host_disk='/mnt/c', max_positions=1_000_000, modulus=64):
+def prepare_month(source, output, month, host_disk='/mnt/c', max_positions=1_000_000, modulus=64, low=600, high=2600):
+    if not 600 <= low <= high <= 2600:
+        raise ValueError('Intervallo rating non valido: 600 <= minimo <= massimo <= 2600')
     output = Path(output)
     output.parent.mkdir(parents=True, exist_ok=True)
-    settings = dict(schema=2, source_sha256=fingerprint(source), month=month, speed='rapid', low=600,
-                    high=2600, max_positions=max_positions, modulus=modulus, positions_per_game=8)
+    settings = dict(schema=2, source_sha256=fingerprint(source), month=month, speed='rapid', low=low,
+                    high=high, max_positions=max_positions, modulus=modulus, positions_per_game=8)
+    if (low, high) != (600, 2600):
+        settings['restrict_rating_bounds'] = True
     db = database(output)
     old = get_meta(db, 'settings')
     if old is not None and old != settings:
@@ -128,9 +132,10 @@ def prepare_month(source, output, month, host_disk='/mnt/c', max_positions=1_000
     put_meta(db, 'settings', settings)
     cursor = get_meta(db, 'cursor', 0)
     stats = Counter(get_meta(db, 'stats', {}))
-    limits = {split: max(1, int(max_positions*ratio)//930)
+    bucket_count = 31 * 3 * len({min(2400, rating//200*200) for rating in range(low, high+1)})
+    limits = {split: max(1, int(max_positions*ratio)//bucket_count)
               for split, ratio in (('train', .8), ('validation', .1), ('test', .1))}
-    if sum(value*930 for value in limits.values()) > max_positions:
+    if sum(value*bucket_count for value in limits.values()) > max_positions:
         raise ValueError('Limite posizioni troppo piccolo per le fasce previste')
     db.commit()
     counts = dict(db.execute('SELECT bucket,count(*) FROM positions GROUP BY bucket'))
@@ -147,7 +152,7 @@ def prepare_month(source, output, month, host_disk='/mnt/c', max_positions=1_000
                         continue
                     if index % 10000 == 1:
                         check_space(output.parent, host_disk)
-                    rows = candidate_rows(block, month, modulus)
+                    rows = candidate_rows(block, month, modulus, low=low, high=high)
                     stats['scanned_games'] += 1
                     stats['selected_games'] += bool(rows)
                     for row in rows:
@@ -182,7 +187,7 @@ def prepare_month(source, output, month, host_disk='/mnt/c', max_positions=1_000
         db.close()
 
 
-def copy_rows(destination, sources, splits, limit_per_split, settings, exclude_keys=()):
+def copy_rows(destination, sources, splits, limit_per_split, settings, exclude_keys=(), rating_range=None):
     """Stable hash-priority retention, bounded independently for every split."""
     temp = Path(str(destination) + '.tmp')
     if temp.exists():
@@ -194,7 +199,7 @@ def copy_rows(destination, sources, splits, limit_per_split, settings, exclude_k
             with sqlite3.connect(f'file:{Path(path).resolve()}?mode=ro', uri=True) as source:
                 for split in splits:
                     for row in source.execute(f'SELECT {FIELDS} FROM positions WHERE split=? ORDER BY priority', (split,)):
-                        if row[12] not in excluded:
+                        if row[12] not in excluded and (rating_range is None or rating_range[0] <= row[3] <= rating_range[1]):
                             db.execute(f'INSERT OR IGNORE INTO positions({FIELDS}) VALUES({",".join("?"*14)})', row)
                     db.execute('DELETE FROM positions WHERE split=? AND id NOT IN (SELECT id FROM positions WHERE split=? ORDER BY priority LIMIT ?)',
                                (split, split, limit_per_split))

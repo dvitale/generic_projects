@@ -7,6 +7,8 @@ from pydantic import BaseModel, Field
 
 INTERVAL_HOURS = [4, 24, 72, 168, 336, 720, 2160, 4320]
 TABLES = {'puzzle': 'exercises', 'prevention': 'prevention_positions'}
+# Other scheduled items, as functions(con) returning plan rows; they keep their own review rules.
+PROVIDERS = []
 
 
 def init_schema(con):
@@ -78,6 +80,7 @@ def plan(con, timestamp):
             rows.append({'kind':kind,'id':r['id'],'gameId':r['game_id'],'ply':r['ply'],
               'title':r['game_title'],'theme':r['theme'] if kind=='puzzle' else 'Evita il blunder',
               'stage':r['streak'],'dueAt':r['due_at'],'readyAt':ready_at,'new':not r['reviews'] and r['streak']==0})
+    for provider in PROVIDERS:rows.extend(provider(con))
     rows.sort(key=lambda r:(r['new'],r['readyAt'],r['id']))
     ready=[r for r in rows if r['readyAt']<=timestamp]
     # Do not prescribe the same decision twice through puzzle and prevention.
