@@ -69,3 +69,45 @@ test('a serious mistake is explained in plain words and its refutation replays o
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
   await page.screenshot({path:'test-results/mistake-explanation.png',fullPage:true})
 })
+
+test('without a verified motif the Stockfish line is named as the source and plays back in a window',async({page,request})=>{
+  const game=await(await request.post('/api/import',{data:{pgn:'1. e4 e5 2. Qh5 Nc6 3. Qxe5+ Nxe5 *',color:'w'}})).json()
+  const job=await(await request.post(`/api/games/${game.id}/analysis`,{data:{}})).json()
+  await expect.poll(async()=>(await(await request.get('/api/jobs/'+job.jobId)).json()).status,{timeout:30000}).toBe('complete')
+  // Turn the verified motif into the fallback, so the test does not depend on a quiet real mistake.
+  await page.route(`**/api/games/${game.id}`,async route=>{
+    const json=await(await route.fetch()).json()
+    const rewrite=(value:unknown):void=>{
+      if(!value||typeof value!=='object')return
+      const item=value as Record<string,unknown>
+      if(typeof item.motif==='string'&&Array.isArray(item.line))Object.assign(item,{motif:'engine',title:'Deriva dalla linea di Stockfish',text:'Linea di Stockfish: 3. Qxe5+ Nxe5.',bestWins:true})
+      Object.values(item).forEach(rewrite)
+    }
+    rewrite(json);await route.fulfill({json})
+  })
+  await page.goto('/')
+  await page.getByRole('button',{name:'Partite',exact:true}).click()
+  await page.locator('.game-list button').filter({hasText:game.title}).first().click()
+  const summary=page.getByRole('region',{name:'Riepilogo della partita'})
+  await summary.getByRole('button',{name:/^Vai a 3\. Qxe5\+/}).click()
+  const why=summary.getByLabel('Perché è un errore')
+  await expect(why).toContainText('Deriva dalla linea di Stockfish')
+  await expect(why).toContainText('Linea di Stockfish: 3. Qxe5+ Nxe5.')
+  await why.getByRole('button',{name:'Mostra',exact:true}).click()
+  const panel=page.getByRole('dialog',{name:'Linea di Stockfish'})
+  // When the better move wins material, the window opens on that line.
+  await expect(panel.getByRole('button',{name:/^Mossa migliore \(\S+\)$/})).toHaveAttribute('aria-pressed','true')
+  await panel.getByRole('button',{name:'Dopo la tua mossa (Qxe5+)'}).click()
+  // Playback starts before the move and advances on its own.
+  await expect(panel.getByRole('status')).toContainText(/^1\/\d+ · Qxe5\+$/)
+  await expect(panel.getByRole('status')).toContainText('Nxe5')
+  await panel.getByRole('button',{name:'Metti in pausa la variante'}).click()
+  await panel.getByRole('button',{name:'Mossa precedente della variante'}).click()
+  await expect(panel.getByRole('status')).toContainText('Qxe5+')
+  await panel.getByRole('button',{name:'Mossa successiva della variante'}).click()
+  await expect(panel.getByRole('status')).toContainText('Nxe5')
+  await expect(panel.locator('[data-square="e5"] img')).toHaveAttribute('src',/bn\.png$/)
+  await page.screenshot({path:'test-results/engine-line-replay.png'})
+  await panel.getByRole('button',{name:'Chiudi spiegazione'}).click()
+  await expect(panel).toHaveCount(0)
+})

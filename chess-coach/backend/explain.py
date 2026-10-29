@@ -2,7 +2,7 @@
 
 Each motif is claimed only when a board check confirms it (static exchange, attacks, legal
 escapes) and the engine line agrees on the material outcome. Otherwise the text states what
-the line shows and says the cause is not immediate."""
+the line shows; with no verified motif it only names Stockfish's line as the source."""
 import chess
 
 from .insights import VALUES, features, material
@@ -17,7 +17,7 @@ TITLES = {'mate': 'Matto contro', 'missed_mate': 'Matto non visto', 'hanging': '
           'skewer': 'Infilata', 'fork': 'Attacco doppio', 'trapped': 'Pezzo intrappolato',
           'discovered': 'Attacco di scoperta', 'pin': 'Inchiodatura', 'promotion': 'Promozione avversaria',
           'material': 'Perdita di materiale', 'king': 'Re esposto', 'positional': 'Svantaggio di posizione',
-          'unclear': 'Causa non immediata'}
+          'engine': 'Deriva dalla linea di Stockfish'}
 MIN_LOSS = 80
 
 
@@ -133,7 +133,40 @@ def settled(positions, pv, me, taken):
     return balance + gain if end.turn == me else balance - gain
 
 
-def sans(positions, pv, start, count=6):
+def recapture(positions, pv):
+    """The cheapest legal recapture on the last move's square when it wins material, or None."""
+    end = positions[-1]
+    if len(positions) < 2:
+        return None
+    square = chess.Move.from_uci(pv[len(positions) - 2]).to_square
+    if not see(end, square, end.turn):
+        return None
+    moves = [m for m in end.legal_moves if m.to_square == square]
+    return min(moves, key=lambda m: value(end.piece_at(m.from_square)), default=None)
+
+
+def extend(positions, pv):
+    """The line with its pending recapture played, so text and replay show what the balance counts."""
+    pv = pv[:len(positions) - 1]
+    if move := recapture(positions, pv):
+        following = positions[-1].copy(stack=False)
+        following.push(move)
+        return positions + [following], pv + [move.uci()]
+    return positions, pv
+
+
+def balance(gained, given):
+    """Pieces of the same kind on both lists cancel out: a traded queen is neither won nor lost."""
+    gained, given = list(gained), list(given)
+    for piece in list(gained):
+        if match := next((p for p in given if p.piece_type == piece.piece_type), None):
+            gained.remove(piece)
+            given.remove(match)
+    return gained, given
+
+
+def sans(positions, pv, start, count=8):
+    # The default covers the whole stored line, so the text shows every capture the balance counts.
     return ' '.join(label(positions[i], chess.Move.from_uci(pv[i])) if i == start or positions[i].turn else positions[i].san(chess.Move.from_uci(pv[i]))
                     for i in range(start, min(len(positions) - 1, start + count)))
 
@@ -276,7 +309,9 @@ def explain(fen, played, best, actual):
     # A line cut in the middle of an exchange would otherwise look like a loss of material.
     net = settled(positions, pv, me, taken) - material(board, me)
     best_net = settled(best_positions, best_pv, me, best_taken) - material(board, me)
-    line_text, best_text = sans(positions, pv, 1), sans(best_positions, best_pv, 0)
+    shown, shown_pv = extend(positions, pv)
+    best_shown, best_shown_pv = extend(best_positions, best_pv)
+    line_text, best_text = sans(shown, shown_pv, 1, 9), sans(best_shown, best_shown_pv, 0, 9)
     focus, motif, text = [], None, None
     if mated:
         motif, text = 'mate', f"Dopo {san} {opponent} ha un matto in {abs(actual['mate'])}: {line_text}."
@@ -295,8 +330,9 @@ def explain(fen, played, best, actual):
         if any(chess.Move.from_uci(pv[i]).promotion for i in range(1, len(positions) - 1) if positions[i].turn != me):
             motif, text = 'promotion', f"Dopo {san} il pedone {articled('del', opponent)} arriva a promozione: {line_text}."
         else:
-            won = f", in cambio di {pieces_text(taken[me])}" if taken[me] else ''
-            motif, text = 'material', f"Dopo {san} la risposta più forte {articled('del', opponent)} ({line_text}) ti costa {pieces_text(taken[not me])}{won}."
+            lost, won = balance(taken[not me], taken[me])
+            won = f", in cambio di {pieces_text(won)}" if won else ''
+            motif, text = 'material', f"Dopo {san} la risposta più forte {articled('del', opponent)} ({line_text}) ti costa {pieces_text(lost or taken[not me])}{won}."
     else:
         # Checks that trade or win pieces are an exchange, not an attack on the king.
         checks = [i for i in range(1, len(positions) - 1) if positions[i].turn != me and positions[i + 1].is_check()
@@ -306,13 +342,15 @@ def explain(fen, played, best, actual):
         elif reasons := positional(board, played, best_pv[0], opponent):
             motif, text = 'positional', f"Non perdi materiale subito, ma rispetto a {best_san} la tua mossa {' e '.join(reasons)}: è uno svantaggio che pesa più avanti."
         else:
-            motif, text = 'unclear', (f"Nelle prossime mosse non perdi materiale e non c’è una tattica evidente: la differenza con {best_san} "
-                                      f"riguarda la posizione o sta oltre la variante mostrata. Confronta le due varianti.")
-    better = None
+            # No verified motif: name the source and let the replayed line show the trend.
+            motif, text = 'engine', f"Linea di Stockfish: {sans(shown, shown_pv, 0, 9)}."
+    gained, given = balance(best_taken[me], best_taken[not me])
+    better, best_wins = None, best_net >= 2 and bool(gained)
     if motif != 'missed_mate':
-        if best_net >= 2 and best_taken[me]:
-            better = f"Con {best_san} vincevi {pieces_text(best_taken[me])}: {best_text}."
+        if best_wins:
+            traded = f", in cambio di {pieces_text(given)}" if given else ''
+            better = f"Con {best_san} vincevi {pieces_text(gained)}{traded}: {best_text}."
         else:
             better = f"Stockfish preferisce {best_san}: {best_text}."
     return {'motif': motif, 'title': TITLES[motif], 'text': text, 'better': better, 'focus': focus,
-            'fen': fen, 'line': pv[:len(positions) - 1], 'bestLine': best_pv[:len(best_positions) - 1]}
+            'fen': fen, 'line': shown_pv, 'bestLine': best_shown_pv, 'bestWins': best_wins}

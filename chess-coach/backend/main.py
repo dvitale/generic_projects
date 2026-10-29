@@ -107,6 +107,14 @@ def init_db():
                                   'resign_offer': 'INTEGER', 'resign_declined': 'INTEGER'}.items():
             if name not in columns:
                 con.execute(f'ALTER TABLE games ADD COLUMN {name} {declaration}')
+        # A stable game number to name a game in conversation: creation order, never reused (games are not deleted).
+        if 'number' not in columns:
+            con.execute('ALTER TABLE games ADD COLUMN number INTEGER')
+            con.execute('''UPDATE games SET number=(SELECT COUNT(*) FROM games g WHERE g.created_at<games.created_at
+                           OR g.created_at=games.created_at AND g.rowid<=games.rowid)''')
+        con.execute('CREATE UNIQUE INDEX IF NOT EXISTS games_number ON games(number)')
+        con.execute('''CREATE TRIGGER IF NOT EXISTS games_assign_number AFTER INSERT ON games WHEN NEW.number IS NULL BEGIN
+                       UPDATE games SET number=(SELECT COALESCE(MAX(number),0)+1 FROM games) WHERE rowid=NEW.rowid; END''')
         if 'last_shown_at' not in {r[1] for r in con.execute('PRAGMA table_info(exercises)')}:
             con.execute('ALTER TABLE exercises ADD COLUMN last_shown_at TEXT')
         columns = {r[1] for r in con.execute("PRAGMA table_info(attempts)")}
@@ -332,7 +340,7 @@ def game_view(row):
         drill = {"name": session["template_name"], "goal": session["goal"], "theme": session["theme"],
                  "target": session["target"], "decisions": count, "startPly": session["start_ply"],
                  "complete": count >= session["target"] or outcome is not None}
-    return {"id": row["id"], "fen": board.fen(), "initialFen": row["initial_fen"],
+    return {"id": row["id"], "number": row["number"], "fen": board.fen(), "initialFen": row["initial_fen"],
             "moves": moves, "version": len(moves), "revision": row['revision'], "playerColor": row["player_color"],
             "canUndo": not row['termination'] and row['source'] in PLAYABLE and undo_ply(row, session) is not None,
             "termination": row['termination'], "resignOffer": resign_pending(row, moves),
@@ -414,7 +422,7 @@ def games():
         board = reconstruct(r["initial_fen"], moves)
         outcome = game_result(r, board)
         analyzed = bool(r["analysis"]) and r["analysis_version"] == len(moves)
-        result.append({"id": r["id"], "title": r["title"], "createdAt": r["created_at"],
+        result.append({"id": r["id"], "number": r["number"], "title": r["title"], "createdAt": r["created_at"],
                        "plies": len(moves), "source": r["source"], "playerColor": r["player_color"], "elo": r["elo"],
                        "engine": r["engine"], "engineLabel": opponents.label(r) if r["source"] == 'maia' else None, "engineVersion": r["engine_version"],
                        "result": None if outcome == '*' else outcome, "fen": board.fen(),

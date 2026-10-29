@@ -1,7 +1,7 @@
 """Observable chess facts, separate from engine scores and causal hypotheses."""
 import chess
 
-VERSION = 4
+VERSION = 6
 VALUES = {chess.PAWN: 1, chess.KNIGHT: 3, chess.BISHOP: 3, chess.ROOK: 5, chess.QUEEN: 9, chess.KING: 0}
 LABELS = {'tactical': 'Evidenza tattica', 'positional': 'Indizi posizionali',
           'mixed': 'Tattica e posizione', 'unclear': 'Causa da approfondire', 'neutral': 'Confronto didattico'}

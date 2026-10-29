@@ -46,12 +46,13 @@ def test_mates_for_and_against_the_player():
     assert missed['better'] is None
 
 
-def test_no_material_loss_is_described_as_a_positional_or_unclear_cause():
+def test_no_material_loss_is_described_as_positional_or_left_to_the_engine_line():
     b = chess.Board(); b.push_san('e4'); b.push_san('e5')
     result = why(b.fen(), ['g1f3', 'b8c6'], ['e1e2', 'g8f6'], best_cp=50, actual_cp=-100)
     assert result['motif'] == 'positional' and 'pedoni davanti al tuo re' in result['text']
-    quiet = why('7k/8/8/8/8/8/8/K7 w - - 0 1', ['a1a2'], ['a1b1'], best_cp=50, actual_cp=-300)
-    assert quiet['motif'] == 'unclear'
+    quiet = why('7k/8/8/8/8/8/8/K7 w - - 0 1', ['a1a2', 'h8g7'], ['a1b1', 'h8g8', 'b1c2'], best_cp=50, actual_cp=-300)
+    assert quiet['motif'] == 'engine' and quiet['title'] == 'Deriva dalla linea di Stockfish'
+    assert quiet['text'] == 'Linea di Stockfish: 1. Kb1 Kg8 2. Kc2.' and quiet['line'] == ['a1b1', 'h8g8', 'b1c2']
 
 
 def test_small_losses_and_best_moves_have_no_explanation():
@@ -63,7 +64,7 @@ def test_small_losses_and_best_moves_have_no_explanation():
 def test_insights_carry_the_explanation():
     b = chess.Board('4r1k1/5ppp/8/4B3/8/8/5PPP/6K1 w - - 0 1')
     result = insights.public(insights.compare(b.fen(), 'h2h3', value(b, ['e5c3', 'e8e2'], 0), value(b, ['h2h3', 'e8e5'], -400)))
-    assert insights.VERSION == 4 and result['explanation']['motif'] == 'ignored_threat'
+    assert insights.VERSION == 6 and result['explanation']['motif'] == 'ignored_threat'
 
 
 def test_a_line_cut_in_the_middle_of_an_exchange_does_not_hide_a_lost_piece():
@@ -73,10 +74,25 @@ def test_a_line_cut_in_the_middle_of_an_exchange_does_not_hide_a_lost_piece():
                  ['b3a4', 'c6a4', 'c3a4', 'f6f4', 'g2g3', 'f4a4', 'b2b3', 'a4c6'], best_cp=21, actual_cp=-570)
     assert result['motif'] == 'material'
     assert result['text'].startswith('Dopo Ba4 la risposta più forte del Nero (18… Bxa4 19. Nxa4 Qf4')
-    assert 'ti costa un cavallo e un alfiere, in cambio di un alfiere' in result['text']
+    assert result['text'].endswith('ti costa un cavallo.')
 
 
 def test_a_loss_found_only_in_the_pending_recapture_still_names_the_piece():
     # The line ends with the queen landing on h5, where the knight takes it: nothing is captured inside the line.
     result = why('6k1/8/5n2/8/8/8/7P/3Q2K1 w - - 0 1', ['d1d2', 'g8h8'], ['h2h3', 'g8h8', 'd1h5'], best_cp=900, actual_cp=0)
     assert result is not None and 'donna' in result['text']
+
+
+def test_the_better_line_shows_every_capture_it_counts():
+    # The queen falls on the seventh half-move: a text cut at six named a gain the line never showed.
+    result = why(chess.STARTING_FEN, ['e2e4', 'e7e5', 'g1f3', 'b8c6', 'f1c4', 'd8g5', 'f3g5'], ['a2a3', 'e7e5'], best_cp=900, actual_cp=0)
+    assert result['bestWins']
+    assert result['better'] == 'Con e4 vincevi una donna: 1. e4 e5 2. Nf3 Nc6 3. Bc4 Qg5 4. Nxg5.'
+
+
+def test_traded_pieces_cancel_and_the_pending_recapture_is_shown():
+    # 4. d5 in a real game: the queens come off on d1, so dxe5 wins three pawns, not a queen and three pawns.
+    fen = 'rn1qkbnr/ppp2ppp/3pb3/4p3/3PP3/5N2/PPP2PPP/RNBQKB1R w KQkq - 1 4'
+    result = why(fen, ['d4e5', 'a7a6', 'c1f4', 'g8e7', 'e5d6', 'e7g6', 'd6c7', 'd8d1'], ['d4d5', 'e6d7'], best_cp=175, actual_cp=65)
+    assert result['better'] == 'Con dxe5 vincevi tre pedoni: 4. dxe5 a6 5. Bf4 Ne7 6. exd6 Ng6 7. dxc7 Qxd1+ 8. Kxd1.'
+    assert result['bestLine'][-1] == 'e1d1' and result['bestWins']
