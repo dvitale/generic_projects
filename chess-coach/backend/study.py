@@ -17,7 +17,7 @@ from fastapi import HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from . import learning, mistakes, tutor
+from . import learning, mistakes, training_schedule, tutor
 from .engine import evaluator
 
 # Ratings of a self-assessed flashcard, SM-2 style: transparent and predictable intervals.
@@ -699,7 +699,7 @@ def install(app, database, find_game, now, lock):
         with database() as con:
             row, start = analysed(con, game_id)
             exercises = {r['ply']: r['id'] for r in con.execute('SELECT id,ply FROM exercises WHERE game_id=?', (game_id,))}
-            positions = {r['ply']: r['id'] for r in con.execute('SELECT id,ply FROM prevention_positions WHERE game_id=? AND enabled=1', (game_id,))}
+            positions = {r['ply']: r['id'] for r in con.execute('SELECT id,ply FROM prevention_positions WHERE game_id=? AND '+training_schedule.PREVENTION_LISTED.format(''), (game_id,))}
             cards = {}
             for r in con.execute('SELECT ply FROM study_cards WHERE game_id=? AND archived=0', (game_id,)):
                 cards[r['ply']] = cards.get(r['ply'], 0) + 1

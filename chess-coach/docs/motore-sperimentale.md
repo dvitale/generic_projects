@@ -5,11 +5,15 @@ Data: 23 ottobre 2026. Descrive come SparringMate usa, in **Gioca**, il modello 
 
 ## Perimetro
 
-- Solo **Gioca**, solo sul PC. Puzzle, Blunder prevention, tutor, stima del profilo e analisi restano
+- Solo **Gioca**, sul PC e sull'istanza pubblica. Puzzle, Blunder prevention, tutor, stima del profilo e analisi restano
   invariati: Stockfish valuta la partita come sempre e le previsioni Maia nell'analisi restano
   etichettate «Maia».
 - «Gioca da qui» (Rivedi, Puzzle, Blunder prevention) avvia sempre una partita contro Maia.
-- In produzione l'opzione non è impostata e `experiments/` non viene pubblicata: il selettore non compare.
+- In produzione `make deploy` copia solo ciò che serve al servizio: il codice, i `best.pt` accettati in `runs/monthly/`
+  con la loro `verification.json` e `data/cycles/ledger.json` (circa 20 MB; niente dati di addestramento né
+  `.venv`). Sul server crea un ambiente solo CPU da `requirements-serve.txt`, avvia
+  `sparringmate-experimental.service` (checkpoint `latest`, porta 8044) e, se manca, aggiunge
+  `SPARRINGMATE_EXPERIMENTAL_ENGINE=http://127.0.0.1:8044` al `.env`. Togliendo la riga il selettore scompare.
 
 ## Componenti
 
@@ -46,12 +50,15 @@ e il pulsante per iniziare resta disattivato solo per lo Sperimentale.
    nella partita `engine`, `engine_version` e `move_selection`. Per Maia il browser dichiara il modello
    che carica (`maia3_simplified.onnx@official-browser-2026-09-23`).
 2. **Risposta.** Dopo la stessa pausa di presentazione usata per Maia (1,2–3,2 s, prima della richiesta:
-   un turno annullato non registra nulla), il browser chiama `policy-move`. Il server chiede la
+   un turno annullato non registra nulla), il browser chiama `policy-move`. Se la partita è palesemente
+   persa per il motore (vedi «Abbandonare una partita» nel README), il server registra una proposta di
+   abbandono, che il giocatore accetta o rifiuta, senza interrogare il servizio. Altrimenti chiede la
    distribuzione al servizio (10 s al massimo) e la scarta se la versione non è quella fissata all'avvio,
    se le mosse non coincidono esattamente con quelle legali o se le probabilità non sono finite, non
    negative e con somma 1 (±0,001).
 3. **Scelta della mossa.** Estrazione casuale secondo le probabilità del modello, sull'intera
-   distribuzione (`sample-full-distribution`, la stessa regola usata per Maia). Il server genera un seme
+   distribuzione (`sample-full-distribution`, la modalità predefinita di Maia; le altre modalità di Maia, vedi
+   [verifica-maia.md](verifica-maia.md), non si applicano allo Sperimentale). Il server genera un seme
    a 63 bit; le mosse sono ordinate per UCI prima dell'estrazione, quindi seme e distribuzione bastano a
    ripetere la scelta.
 4. **Registrazione.** `move_choices` ha una voce per semimossa: per le risposte sperimentali motore,

@@ -106,3 +106,34 @@ def test_promotion_and_game_end_are_handled_by_the_experimental_engine(client, p
     mate = client.post(f"/api/games/{mate['id']}/moves", json={'move': 'g6g7', 'version': 0, 'actor': 'human'}).json()
     assert mate['result'] == '1-0'
     assert reply(client, mate).status_code == 409
+
+
+def test_maia_game_fixes_its_move_selection_and_records_it_per_move(client):
+    assert client.post('/api/games', json={'move_selection': 'temperature-9'}).status_code == 422
+    g = client.post('/api/games', json={'elo': 600, 'engine_version': 'maia3-test', 'move_selection': 'temperature-0.4-top-p-0.8'}).json()
+    assert g['moveSelection'] == 'temperature-0.4-top-p-0.8'
+    g = client.post(f"/api/games/{g['id']}/moves", json={'move': 'e2e4', 'version': 0, 'actor': 'human'}).json()
+    g = client.post(f"/api/games/{g['id']}/moves", json={'move': 'e7e5', 'version': 1, 'actor': 'maia'}).json()
+    assert '[MoveSelection "temperature-0.4-top-p-0.8"]' in g['pgn']
+    with main.database() as con:
+        choices = json.loads(main.find_game(con, g['id'])['move_choices'])
+    assert choices == [None, {'engine': 'maia', 'version': 'maia3-test', 'selection': 'temperature-0.4-top-p-0.8'}]
+
+
+def test_experimental_game_ignores_the_maia_selection(client, policy):
+    g = client.post('/api/games', json={'engine': 'experimental', 'elo': 1300, 'move_selection': 'top-move'}).json()
+    assert g['moveSelection'] == opponents.SELECTION
+
+
+def test_experimental_engine_offers_to_resign_a_lost_game_instead_of_asking_the_service(client, policy, monkeypatch):
+    monkeypatch.setattr(main, 'RESIGN_MIN_PLY', 0)
+    g = client.post('/api/games', json={'engine': 'experimental', 'elo': 1300, 'fen': '7k/8/8/8/8/8/8/2QRK3 w - - 0 1'}).json()
+    for human in ['e1e2', 'e2e3', 'e3e4']:
+        g = client.post(f"/api/games/{g['id']}/moves", json={'move': human, 'version': g['version'], 'revision': g['revision'], 'actor': 'human'}).json()
+        asked = len(policy['requests'])
+        g = reply(client, g).json()
+    assert g['resignOffer'] and g['termination'] is None and g['result'] is None and len(g['moves']) == 5
+    # The third reply was an offer to resign: the service was not asked for it, nor while the offer waits.
+    assert len(policy['requests']) == asked and reply(client, g).json()['resignOffer'] and len(policy['requests']) == asked
+    g = client.post(f"/api/games/{g['id']}/resign-offer", json={'version': g['version'], 'revision': g['revision'], 'accept': True}).json()
+    assert g['termination'] == 'engine_resign' and g['result'] == '1-0' and not g['resignOffer']

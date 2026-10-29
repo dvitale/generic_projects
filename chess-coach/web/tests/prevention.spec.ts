@@ -61,7 +61,7 @@ test('Blunder prevention accepts alternatives, rejects the original blunder and 
 })
 
 test('empty catalog explains how personal positions are obtained',async({page})=>{
-  await page.route('**/api/prevention',route=>route.fulfill({json:{positions:[],stats:{firstAttempts:0,firstSuccesses:0},analyzedGames:0,rule:{description:'Soglia −1,00 dal tuo punto di vista.'}}}))
+  await page.route('**/api/prevention',route=>route.fulfill({json:{positions:[],stats:{firstAttempts:0,firstSuccesses:0},analyzedGames:0,reach:{lapse:0,typical:0,complex:0,pending:0,available:true,description:'Solo abbagli.'},rule:{description:'Soglia −1,00 dal tuo punto di vista.'}}}))
   await page.goto('/')
   await page.getByRole('button',{name:'Blunder prevention',exact:false}).click()
   await expect(page.getByText('Nessun blunder evitabile disponibile.',{exact:false})).toBeVisible()
@@ -117,4 +117,17 @@ test('a closed position can be retried from the start without recording the move
   await page.locator('[data-square="g6"]').click();await page.locator('[data-square="g7"]').click()
   await expect(page.getByRole('heading',{name:'✓ Qg7#: mossa sicura'})).toBeVisible({timeout:30000})
   expect((await(await request.get('/api/prevention')).json()).stats).toEqual(stats)
+})
+
+test('Blunder prevention explains which errors count as lapses and how many were left to Puzzle',async({page})=>{
+  await page.route('**/api/prevention',async route=>{
+    const catalog=await(await route.fetch()).json()
+    await route.fulfill({json:{...catalog,reach:{...catalog.reach,typical:3,complex:1,pending:2,available:true}}})
+  })
+  await page.goto('/')
+  await page.getByRole('button',{name:'Blunder prevention',exact:false}).click()
+  await page.getByText('Solo abbagli, non lacune').click()
+  await expect(page.getByText('meno del 25% delle volte',{exact:false})).toBeVisible()
+  await expect(page.getByText('Escluse: 3 errori tipici del livello e 1 confutazione da calcolare',{exact:false})).toBeVisible()
+  await expect(page.getByText('2 ancora da valutare, per ora incluse.',{exact:false})).toBeVisible()
 })

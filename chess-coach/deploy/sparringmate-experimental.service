@@ -1,0 +1,20 @@
+[Unit]
+Description=SparringMate experimental engine (human policy, CPU) on 127.0.0.1:8044
+After=network.target
+
+[Service]
+User=sparringmate
+Group=sparringmate
+WorkingDirectory=/opt/sparringmate/experiments/human-policy
+# Few threads: one move at a time is enough, and the machine hosts other sites.
+Environment=OMP_NUM_THREADS=2
+ExecStart=/opt/sparringmate/experiments/human-policy/.venv/bin/python serve.py --checkpoint latest --port 8044
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

@@ -173,6 +173,7 @@ test('a closed puzzle can be retried from the start without recording the moves'
   const attempts=(await(await request.get('/api/profile')).json()).attempts
   await reset.click()
   await expect(feedback.getByRole('heading',{name:'↺ Pratica dalla posizione iniziale'})).toBeVisible()
+  await expect(feedback.getByRole('button',{name:/^Gioca da qui col /})).toBeVisible()
   await expect(page.locator('[data-square="g6"] img')).toBeVisible()
   await page.locator('[data-square="g6"]').click();await page.locator('[data-square="g8"]').click()
   await expect(feedback.getByRole('heading',{name:'↻ Qg8+: c’è di meglio'})).toBeVisible({timeout:30000})

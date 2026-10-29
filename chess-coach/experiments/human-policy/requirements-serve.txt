@@ -1,0 +1,5 @@
+# Inference only (serve.py) on the public server: CPU build of torch, no CUDA, no training tools.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.7.1+cpu
+chess==1.11.2
+numpy==2.2.6

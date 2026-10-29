@@ -5,6 +5,7 @@ import MistakeExplanation from './MistakeExplanation'
 import {classifyMove,MoveClassIcon,moveClassInfo,type MoveClass} from './moveClass'
 import {evaluationSeries,type EvaluationPoint} from './evaluationSeries'
 import {gameAccuracy} from './accuracy'
+import {calibrationInfo,performanceFromAccuracy} from './performance'
 
 const kinds:MoveClass[]=['best','good','inaccuracy','error','blunder']
 
@@ -75,6 +76,8 @@ export default function ReviewSummary({game,cursor,onPosition}:{game:Game;cursor
   const lines=current?(current.stockfishCandidates??[current.best]).filter(e=>e.san.length):[]
   const mover:Color=current?.fen.split(' ')[1]==='b'?'b':'w'
   const percent=(v:number|null)=>v===null?'—':`${Math.round(v)}%`
+  const performance=sides.map(side=>performanceFromAccuracy(accuracy[side.color],side.total))
+  const rating=(i:number)=>{const p=performance[i];return p?<><b>≈ {p.rating}</b><small>{p.low}–{p.high}</small></>:<b>—</b>}
   useEffect(()=>{
     const box=list.current,active=box?.querySelector<HTMLElement>('[aria-current="step"]')
     if(!box||!active)return
@@ -87,6 +90,7 @@ export default function ReviewSummary({game,cursor,onPosition}:{game:Game;cursor
       <thead><tr><th scope="col"><span className="side-dot side-dot-w" aria-hidden="true"/>{sides[0].name}</th><td/><th scope="col"><span className="side-dot side-dot-b" aria-hidden="true"/>{sides[1].name}</th></tr></thead>
       <tbody>
         <tr className="review-score"><td><b className="score-chip score-chip-w">{percent(accuracy.w)}</b></td><th scope="row" title="Formula di Lichess: deriva dalla probabilità di vittoria stimata persa a ogni mossa, con più peso ai momenti tesi. Non è un Elo.">Precisione</th><td><b className="score-chip score-chip-b">{percent(accuracy.b)}</b></td></tr>
+        <tr className="review-score review-performance"><td>{rating(0)}</td><th scope="row" title={`Livello Lichess rapid e classical, fra 600 e 2600, che spiega meglio questa precisione, partendo con tutti i livelli ugualmente possibili: mediana e intervallo che nelle verifiche contiene il livello vero almeno 8 volte su 10. Calibrato su ${calibrationInfo.games.toLocaleString('it-IT')} partite analizzate (${calibrationInfo.source}). Una sola partita dice poco, per questo l’intervallo è largo: la stima sulle ultime partite è in Progressi. Servono almeno ${calibrationInfo.minMoves} mosse non obbligate.`}>Prestazione stimata</th><td>{rating(1)}</td></tr>
         <tr className="review-score"><td><b>{percent(sides[0].sound)}</b></td><th scope="row">Senza perdite rilevanti</th><td><b>{percent(sides[1].sound)}</b></td></tr>
         {kinds.map(k=><tr key={k} className={`review-count count-${k}`}><td>{sides[0].count[k]}</td><th scope="row"><MoveClassIcon kind={k}/>{moveClassInfo[k].label}</th><td>{sides[1].count[k]}</td></tr>)}
       </tbody>

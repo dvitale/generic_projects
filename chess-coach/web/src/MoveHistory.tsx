@@ -30,7 +30,7 @@ export default function MoveHistory({game,ply,onPosition,onReview,reviewDisabled
     const target=event.key==='ArrowLeft'?Math.max(0,ply-1):event.key==='ArrowRight'?Math.min(last,ply+1):event.key==='Home'?0:event.key==='End'?last:null
     if(target!==null){event.preventDefault();onPosition(target)}
   }}>
-    <h2>Mosse della partita</h2>
+    <div className="section-head move-history-head"><h2>Mosse della partita</h2>{last>0&&<a className="button-link" href={`/api/games/${encodeURIComponent(game.id)}/pgn`} download title="Salva il PGN della partita, tempi inclusi">↓ Salva PGN</a>}</div>
     <p className="muted">Seleziona una mossa per tornare a quella posizione.</p>
     <div className="move-history-list" ref={list}>
       {rows.length?rows.map(row=><div className="move-history-row" key={row.number}><span>{row.number}.</span>{(['w','b'] as const).map(color=>{

@@ -2,7 +2,7 @@ import type {Decision} from './types'
 
 export type MoveClass='best'|'good'|'inaccuracy'|'error'|'blunder'|'forced'
 
-/** Backend thresholds for inaccuracies and errors (80 and 180 centipawns); 300 or more, mates included, is a blunder. */
+/** Backend thresholds for inaccuracies and errors (80 and 180 centipawns); 300 or more is a blunder; the backend counts only mates in 1–2 at full weight (review_loss). */
 export function classifyMove(d:Pick<Decision,'loss'|'played'|'best'|'forced'>):MoveClass{
   if(d.forced)return 'forced'
   if(d.loss>=300)return 'blunder'

@@ -109,3 +109,37 @@ def test_puzzle_practice_opens_only_after_closing_and_records_nothing(client):
     bad = client.post(url, json={'session_id': s['id'], 'move': 'g6g8'}).json()
     assert (good['success'], good['san'], bad['success']) == (True, 'Qg7#', False)
     assert client.get('/api/profile').json()['attempts'] == attempts
+
+
+def describe(fen):
+    import chess
+    from backend import diagnosis
+    from backend.engine import evaluator
+    board = chess.Board(fen)
+    best = evaluator.evaluate(board, nodes=diagnosis.NODES)
+    passed = diagnosis.threat_board(board)
+    threat = diagnosis.player_view(evaluator.evaluate(passed, nodes=diagnosis.NODES))
+    return diagnosis.solution(board, best, {'move': threat['pv'][0], 'san': threat['san'][0], 'evaluation': threat})
+
+
+def test_solution_kind_tells_forcing_moves_from_quiet_ones(client):
+    mate = describe('6k1/5ppp/8/8/8/8/5PPP/3R2K1 w - - 0 1')
+    assert (mate['kind'], mate['san'], mate['forcing']) == ('forcing', 'Rd8#', ['check'])
+    # Qd4 neither checks nor captures, but threatens Qxg7#.
+    quiet = describe('r4rk1/5pp1/8/8/8/2B5/5PPP/3QR1K1 w - - 0 1')
+    assert quiet['kind'] == 'quiet_threat' and quiet['san'] == 'Qd4' and quiet['threat']['san'] == 'Qxg7#'
+    # With a free tempo Black would mate with ...Ra1+: the luft takes that resource away.
+    luft = describe('r5k1/5ppp/8/8/8/1Q6/5PPP/6K1 w - - 0 1')
+    assert luft['kind'] == 'prophylaxis' and luft['stopped']['san'] == 'Ra1+'
+    # A quiet opening position: no forcing move, no threat to make or stop.
+    calm = describe('r1b1k2r/ppppqppp/2n2n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQK2R w KQkq - 0 1')
+    assert calm['kind'] == 'improvement' and calm['facts']['piece'] in 'KQRBNP'
+
+
+def test_obstacle_is_stored_and_missed_solutions_are_counted_by_kind(stocked):
+    problem = start(stocked, band=0)
+    pid, sid = problem['puzzle']['id'], problem['sessionId']
+    saved = diagnose(stocked, 'problem', pid, sid, assessment='much_better', obstacle='inconclusive', candidate='a7a6', candidate_reason='inconclusive').json()
+    assert saved['answer']['obstacle'] == 'inconclusive' and saved['ruleVersion'] == 2
+    assert saved['search'] == 'missed_solution' and saved['evidence']['solution']['kind'] == 'forcing'
+    assert stocked.get('/api/diagnoses/summary').json()['recent']['solutions']['forcing'] == 1

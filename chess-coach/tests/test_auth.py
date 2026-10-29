@@ -20,6 +20,7 @@ def test_login_protects_the_api_until_valid_credentials(client, monkeypatch, tmp
     assert client.get('/api/auth/session').json() == {'required': False, 'authenticated': True, 'user': None}
     env = enable(monkeypatch, tmp_path)
     assert client.get('/api/health').status_code == 200
+    assert client.get('/api/health').json()['maiaServer'] in ('disponibile', 'assente')
     assert client.get('/api/games').status_code == 401
     assert client.get('/api/auth/session').json() == {'required': True, 'authenticated': False, 'user': None}
     assert client.post('/api/auth/login', json={'username': 'dante', 'password': 'sbagliata'}).status_code == 401

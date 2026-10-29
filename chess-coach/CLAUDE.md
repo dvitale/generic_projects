@@ -16,7 +16,8 @@ make experimental                             # servizio del motore sperimentale
 
 - Le prove Playwright avviano da sole un server sulla porta 8011, con dati temporanei e `CHESS_COACH_DISABLE_AUTH=1` e `CHESS_COACH_DISABLE_LLM=1`, e usano `/usr/bin/chromium`. Prima va fatto `npm run build`: il server di prova serve `web/dist`.
 - `tests/test_static_cache.py` viene saltato se l'interfaccia non è compilata.
-- Variabili d'ambiente: `CHESS_COACH_DATA` (cartella dei dati), `STOCKFISH_PATH`, `SPARRINGMATE_USER`/`SPARRINGMATE_PASSWORD` (login, anche da `.env`), `DEEPSEEK_API_KEY`/`DEEPSEEK_MODEL` (tutor), `SPARRINGMATE_EXPERIMENTAL_ENGINE` (URL del motore sperimentale, anche da `.env`; senza, il selettore in Gioca non compare), `SPARRINGMATE_ALTERNATIVE_THRESHOLDS` (JSON con le soglie di «Trova un’alternativa», vedi `docs/trova-alternativa.md`).
+- Variabili d'ambiente: `CHESS_COACH_DATA` (cartella dei dati), `STOCKFISH_PATH`, `SPARRINGMATE_USER`/`SPARRINGMATE_PASSWORD` (login, anche da `.env`), `DEEPSEEK_API_KEY`/`DEEPSEEK_MODEL` (tutor), `SPARRINGMATE_EXPERIMENTAL_ENGINE` (URL del motore sperimentale, anche da `.env`; senza, il selettore in Gioca non compare), `SPARRINGMATE_ALTERNATIVE_THRESHOLDS` (JSON con le soglie di «Trova un’alternativa», vedi `docs/trova-alternativa.md`), `MAIA_MODEL_PATH`/`MAIA_THREADS` (Maia sul server, vedi `docs/maia-server.md`).
+- `scripts/calibrate_accuracy_rating.py` rigenera `web/src/data/accuracy-rating.json` (tabella della Prestazione stimata) da un archivio mensile Lichess, in streaming: circa 12 minuti per le 150.000 partite predefinite, poi `make build`. Vedi `docs/elo-partita.md`.
 - La suite Playwright avvia anche `tests/fixtures/fake_policy_service.py` sulla porta 8012, al posto del motore sperimentale.
 
 ## Produzione
@@ -29,10 +30,11 @@ make experimental                             # servizio del motore sperimentale
 
 ## Trappole note
 
-- Nella suite Playwright completa, `evaluation-chart.spec.ts`, `refutation.spec.ts`, `puzzle-flow.spec.ts`, `training-plan.spec.ts` e `undo-rating.spec.ts` a volte falliscono, ma passano se eseguiti da soli.
-- `experiments/` (ricerca locale: in git solo il codice; dati, pesi e `.venv`, diversi GB, sono esclusi dal suo `.gitignore`) è esclusa dal deploy, quindi in produzione il motore sperimentale non esiste: se `make deploy` resta fermo su «Sincronizzo», cerca nuove cartelle pesanti non escluse in `scripts/deploy.sh`.
+- Nella suite Playwright completa, `evaluation-chart.spec.ts`, `refutation.spec.ts`, `puzzle-flow.spec.ts`, `training-plan.spec.ts`, `undo-rating.spec.ts` e `pgn-export.spec.ts` a volte falliscono, ma passano se eseguiti da soli.
+- `experiments/` (ricerca locale: in git solo il codice; dati, pesi e `.venv`, diversi GB, sono esclusi dal suo `.gitignore`) è esclusa dalla sincronizzazione principale: `make deploy` ne copia a parte, con un filtro a inclusione, solo codice, `best.pt` accettati e ledger, e sul server gira come `sparringmate-experimental.service` con un `.venv` solo CPU. Se `make deploy` resta fermo su «Sincronizzo», cerca nuove cartelle pesanti non escluse in `scripts/deploy.sh`.
 - `docs/training-guide.html` si genera da `docs/training-guide.md` con `pwsh -File scripts/build_training_guide.ps1`. Se pwsh non è installato, l'HTML va aggiornato a mano con lo stesso contenuto.
 - Nelle prove, `exercises` e `prevention_positions` hanno `UNIQUE(game_id, ply)`: per creare più esercizi della stessa partita servono ply diversi.
+- Maia sul server (`backend/maia.py`): onnxruntime 1.23+ va in crash su questo modello con `ORT_ENABLE_ALL`. Resta `ORT_ENABLE_EXTENDED` e `onnxruntime==1.22.1` in `requirements.lock`; prima di aggiornarlo esegui `tests/test_maia.py`.
 - I problemi Lichess importati sono un campione ordinato per ID: gli ID iniziano tutti per "0".
 - Le valutazioni e le classificazioni didattiche (diagnosi, Blunder prevention, Puzzle) le decide Stockfish con regole fisse; il tutor DeepSeek interpreta soltanto.
 

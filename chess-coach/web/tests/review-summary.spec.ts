@@ -2,6 +2,7 @@ import {test,expect} from '@playwright/test'
 import {gameAccuracy,moveAccuracy,winPercent} from '../src/accuracy'
 import type {Game} from '../src/types'
 import {classifyMove} from '../src/moveClass'
+import {performanceFromAccuracy} from '../src/performance'
 
 test('accuracy follows the Lichess win-percentage formula',()=>{
   expect(winPercent({cp:0,mate:null})).toBe(50)
@@ -24,6 +25,15 @@ test('accuracy follows the Lichess win-percentage formula',()=>{
   expect(gameAccuracy(game,[point(0,20),point(2,20),point(3,20)],new Set()).w).toBeNull()
 })
 
+test('estimated performance reads the Lichess calibration and needs enough moves',()=>{
+  expect(performanceFromAccuracy(null,30)).toBeNull()
+  expect(performanceFromAccuracy(90,9)).toBeNull()
+  const weak=performanceFromAccuracy(55,20)!,strong=performanceFromAccuracy(92,20)!
+  for(const p of [weak,strong]){expect(p.low).toBeLessThanOrEqual(p.rating);expect(p.rating).toBeLessThanOrEqual(p.high);expect(p.rating%50).toBe(0)}
+  expect(strong.rating).toBeGreaterThan(weak.rating)
+  expect(performanceFromAccuracy(150,20)).toEqual(performanceFromAccuracy(100,20))
+})
+
 test('move classes separate errors from blunders that lose three points or allow mate',()=>{
   const move=(loss:number)=>classifyMove({loss,played:'e2e4',best:{pv:['d2d4']} as never,forced:false})
   expect([79,80,179,180,299,300,99395].map(move)).toEqual(['good','inaccuracy','inaccuracy','error','error','blunder','blunder'])
@@ -41,6 +51,8 @@ test('review summary compares both sides, marks mistakes on the graph and lists 
   await expect(table.getByRole('rowheader',{name:'Precisione',exact:true})).toBeVisible()
   await expect(table.locator('.score-chip-w')).toHaveText(/^\d+%$/)
   await expect(table.locator('.score-chip-b')).toHaveText(/^\d+%$/)
+  // Four moves are too few for an estimate.
+  await expect(table.locator('.review-performance td')).toHaveText(['—','—'])
   const mark=summary.getByRole('button',{name:'Grafico: 3… Nf6 · Errore grave'})
   await expect(mark).toBeVisible()
   await mark.click()

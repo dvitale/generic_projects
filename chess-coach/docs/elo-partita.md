@@ -51,3 +51,31 @@ La versione `maia3-drill-match-v2` sostituisce quel metodo. Un risultato v1 non 
 I punteggi per livello, il numero di mosse, i parametri e il metodo restano nel database. Nuove mosse o annullamenti invalidano il risultato. I controlli di versione impediscono di associare una risposta al ramo sbagliato. Le copie delle partite già analizzate conservano esercizi e tentativi precedenti.
 
 Per ridurre realmente l’incertezza servono più partite o decisioni informative, calibrazione su giocatori con rating noto e verifica su partite separate. Il punteggio delle mosse e la qualità Stockfish sono segnali diversi: non si converte arbitrariamente la perdita in centipawn in Elo e non si chiede a un LLM di inventare il numero.
+
+## Prestazione stimata dalla precisione
+
+Da ottobre 2026 Rivedi mostra, sotto la **Precisione**, una **Prestazione stimata** per ciascun lato, e **Progressi** la stessa stima sulle ultime 10 partite analizzate contro Maia. È un metodo diverso dalla somiglianza con Maia: usa la qualità delle mosse secondo Stockfish, non quanto sono tipiche di un livello.
+
+**Calibrazione.** `scripts/calibrate_accuracy_rating.py` legge in streaming l’archivio Lichess `lichess_db_standard_rated_2025-09.pgn.zst` (CC0, non viene salvato) e tiene le partite rated rapid e classical (durata stimata base + 40 × incremento ≥ 480 s), dalla posizione iniziale, terminate normalmente o per tempo, con l’analisi di Lichess su ogni mossa e almeno 10 mosse per lato: 150.000 partite, 299.553 giocatori. La precisione usa la stessa formula di `web/src/accuracy.ts`, con +0,15 per la posizione iniziale come Lichess. Il risultato è `web/src/data/accuracy-rating.json`: per ogni livello da 600 a 2600, a passi di 100 (i rating fuori vanno al primo o all’ultimo), la probabilità di ciascuna precisione, smussata di 3 punti di precisione e di un livello.
+
+**Stima.** Tutti i livelli partono ugualmente possibili. Ogni partita moltiplica le probabilità dei livelli secondo la sua precisione; il risultato è la mediana, con l’intervallo fra il 10° e il 90° percentile, arrotondati a 50. Non si parte dalla distribuzione dei giocatori Lichess, concentrata intorno a 1500: quella tirerebbe ogni stima verso il centro e assegnerebbe a un principiante con una partita al 55% circa 1300.
+
+La relazione è debole: la precisione mediana va dal 67% dei 600 all’88% dei 2400, mentre fra le partite di uno stesso giocatore ne varia facilmente 10–15 punti.
+
+**Verifica.** Un giocatore su cinque, scelto in base al nome, resta fuori dalla calibrazione e serve a controllare gli intervalli. Le partite dello stesso giocatore non sono indipendenti (lo stile pesa), quindi le probabilità combinate vengono attenuate con l’esponente che porta al 80% la copertura su 10 partite: oggi 0,7.
+
+| Partite | Giocatori di verifica | Rating vero nell’intervallo | Larghezza mediana |
+|---|---|---|---|
+| 1 | 26.033 | 97% | ~1590 punti |
+| 5 | 2.773 | 90% | ~1230 punti |
+| 10 | 533 | 81% | ~990 punti |
+
+Con una sola partita l’intervallo è largo e prudente; anche con 10 resta circa ±500 punti. Il numero serve a seguire la tendenza, non a certificare un livello.
+
+**Limiti.**
+- Scala Lichess rapid e classical, non FIDE né chess.com.
+- La nostra analisi usa Stockfish a 12.000 nodi per posizione, quella di Lichess è più profonda: le precisioni non sono perfettamente confrontabili.
+- Le partite contro Maia sono senza orologio, quelle di calibrazione a tempo.
+- In Progressi contano solo le partite contro Maia dalla posizione iniziale, analizzate per intero, con almeno 10 mosse proprie; sono esclusi Drill, PGN importati (possono essere partite di altri) e le mosse giocate dopo un suggerimento. In Rivedi servono almeno 10 mosse non obbligate.
+
+Per rifare la calibrazione su un altro mese: `.venv/bin/python scripts/calibrate_accuracy_rating.py --month AAAA-MM [--games 150000]` (circa 8 minuti ogni 100.000 partite), poi `make build`.

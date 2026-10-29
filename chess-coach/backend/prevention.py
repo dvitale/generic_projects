@@ -8,7 +8,8 @@ import chess
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
-from .engine import evaluator
+from .engine import SHORT_MATE, evaluator
+from .maia import maia
 from . import mistakes
 from . import insights
 from . import training_schedule
@@ -16,11 +17,85 @@ from . import diagnosis
 
 SAFE_CP = -100
 BLUNDER_CP = -200
+# Below SAFE_CP a move is still accepted when it gives up less than this against the best one:
+# starting from -0.80, a move to -1.20 is not a blunder.
+TOLERANCE_CP = 100
 RULE_VERSION = 1
+RULE = 'È accettata ogni mossa valutata almeno −1,00 dalla tua parte, oppure che perde meno di 1,00 rispetto alla migliore, senza matto forzato contro di te. Non è richiesta la migliore.'
+
+
+# «Alla portata»: a blunder is a lapse (abbaglio), not a skill gap, when humans of the game's level rarely play it
+# and the refutation is elementary or easy for the opponent to find. Maia gives the human side, Stockfish the line.
+REACH_VERSION = 1
+TYPICAL_PROBABILITY = 0.25  # Maia plays the blunder at least this often: an error typical of the level.
+OBVIOUS_REPLY = 0.20  # Maia, for the opponent at the same level, finds the refutation at least this often.
+ELEMENTARY_PLIES = 4  # Plies after the blunder in which the loss must become concrete.
+ELEMENTARY_MATERIAL = 2  # Net material, in pawns, lost within those plies.
+VALUES = {chess.PAWN: 1, chess.KNIGHT: 3, chess.BISHOP: 3, chess.ROOK: 5, chess.QUEEN: 9}
+REACH_RULE = ('Sono un abbaglio i blunder che Maia, al livello della partita, gioca meno del 25% delle volte e la cui '
+              'confutazione è elementare (matto in 1–2 o almeno 2 pedoni di materiale persi entro 4 semimosse) '
+              'oppure viene trovata da Maia per l’avversario almeno il 20% delle volte.')
+
+
+def balance(board, color):
+    return sum(VALUES.get(p.piece_type, 0) * (1 if p.color == color else -1) for p in board.piece_map().values())
+
+
+def elementary(board, actual):
+    """The refutation needs no deep calculation: a short mate, or material gone within a few plies of the line."""
+    if actual['mate'] is not None and actual['mate'] < 0 and -actual['mate'] <= SHORT_MATE:
+        return True
+    line, after, color = actual.get('pv') or [], board.copy(stack=False), board.turn
+    start = balance(after, color)
+    for uci in line[:1 + ELEMENTARY_PLIES]:
+        move = chess.Move.from_uci(uci)
+        if move not in after.legal_moves:
+            break
+        after.push(move)
+    return after.is_checkmate() or balance(after, color) <= start - ELEMENTARY_MATERIAL
+
+
+def assess_reach(items):
+    """items: (board before the blunder, blunder uci, Stockfish line after it, level). One verdict per item, None without evidence."""
+    if not maia.available():
+        return [None] * len(items)
+    requests, plan = [], []
+    for board, move, actual, level in items:
+        line = actual.get('pv') or []
+        if len(line) < 2 or line[0] != move:
+            plan.append(None)
+            continue
+        after = board.copy(stack=False)
+        after.push_uci(move)
+        plan.append(len(requests))
+        requests += [(board.fen(), level, level), (after.fen(), level, level)]
+    predictions = maia.predict_many(requests)
+    verdicts = []
+    for (board, move, actual, level), index in zip(items, plan):
+        if index is None:
+            verdicts.append(None)
+            continue
+        probability = lambda prediction, uci: next((m['probability'] for m in prediction['moves'] if m['uci'] == uci), 0.0)
+        typical = probability(predictions[index], move)
+        reply = actual['pv'][1]
+        found = probability(predictions[index + 1], reply)
+        simple = elementary(board, actual)
+        status = 'typical' if typical >= TYPICAL_PROBABILITY else 'lapse' if simple or found >= OBVIOUS_REPLY else 'complex'
+        verdicts.append({'version': REACH_VERSION, 'status': status, 'level': level, 'blunderProbability': round(typical, 4),
+                         'reply': reply, 'replyProbability': round(found, 4), 'elementary': simple})
+    return verdicts
 
 
 def safe(value):
     return value['mate'] > 0 if value['mate'] is not None else value['cp'] >= SAFE_CP
+
+
+def accepted(best, actual):
+    if safe(actual):
+        return True
+    if actual['mate'] is not None or best['mate'] is not None:
+        return False
+    return best['cp'] - actual['cp'] < TOLERANCE_CP
 
 
 def eligible(best, actual):
@@ -47,14 +122,18 @@ def init_schema(con):
       move TEXT NOT NULL, success INTEGER NOT NULL, assisted INTEGER NOT NULL,
       is_first INTEGER NOT NULL, created_at TEXT NOT NULL);
     ''')
-    if 'last_shown_at' not in {r[1] for r in con.execute('PRAGMA table_info(prevention_positions)')}:
-        con.execute('ALTER TABLE prevention_positions ADD COLUMN last_shown_at TEXT')
+    columns = {r[1] for r in con.execute('PRAGMA table_info(prevention_positions)')}
+    for name in ('last_shown_at', 'reach', 'reach_status'):
+        if name not in columns:
+            con.execute(f'ALTER TABLE prevention_positions ADD COLUMN {name} TEXT')
 
 
-def seed_game(con, row, analysis, timestamp):
+def seed_game(con, row, analysis, timestamp, reach=True):
+    """Index the player's blunders; with reach, also judge new or outdated ones (see assess_reach)."""
     moves = json.loads(row['moves'])
     board = chess.Board(row['initial_fen'])
     decisions = {d['ply']: d for d in analysis.get('decisions', [])}
+    pending = []
     for ply, uci in enumerate(moves):
         d = decisions.get(ply)
         # Derive ownership and position from the saved line, not from stale analysis flags.
@@ -67,7 +146,25 @@ def seed_game(con, row, analysis, timestamp):
             con.execute('''INSERT OR IGNORE INTO prevention_positions
               (id,game_id,ply,initial_fen,history,original_move,due_at) VALUES(?,?,?,?,?,?,?)''',
                         (position_id, row['id'], ply, row['initial_fen'], history, uci, timestamp))
+            stored = con.execute('SELECT reach FROM prevention_positions WHERE id=?', (position_id,)).fetchone()[0]
+            if reach and (stored is None or json.loads(stored).get('version') != REACH_VERSION):
+                pending.append((position_id, (board.copy(stack=False), uci, d['actual'], row['elo'] or 1500)))
         board.push_uci(uci)
+    for (position_id, _), verdict in zip(pending, assess_reach([item for _, item in pending])):
+        if verdict:
+            con.execute('UPDATE prevention_positions SET reach=?,reach_status=? WHERE id=?', (json.dumps(verdict), verdict['status'], position_id))
+
+
+def backfill_reach(database, load_analysis):
+    """Judge positions indexed before the reach rule (or by an older version), one game at a time."""
+    with database() as con:
+        ids = [r[0] for r in con.execute('''SELECT DISTINCT g.id FROM prevention_positions p JOIN games g ON g.id=p.game_id
+            WHERE g.analysis IS NOT NULL AND (p.reach IS NULL OR json_extract(p.reach,'$.version')!=?)''', (REACH_VERSION,))]
+    for game_id in ids:
+        with database() as con:
+            row = con.execute('SELECT * FROM games WHERE id=?', (game_id,)).fetchone()
+            if row and row['analysis'] and row['analysis_version'] == len(json.loads(row['moves'])):
+                seed_game(con, row, load_analysis(row['analysis']), row['created_at'])
 
 
 class SessionBody(BaseModel):
@@ -106,7 +203,8 @@ def install(app, database, reconstruct, now):
 
     def check(board, move):
         best, actual, _ = evaluator.compare(board, move, nodes=300000)
-        if any(v['mate'] is None and abs(v['cp'] - SAFE_CP) <= 50 for v in (best, actual)):
+        near_loss = best['mate'] is None and actual['mate'] is None and abs(best['cp'] - actual['cp'] - TOLERANCE_CP) <= 50
+        if near_loss or any(v['mate'] is None and abs(v['cp'] - SAFE_CP) <= 50 for v in (best, actual)):
             best, actual, _ = evaluator.compare(board, move, nodes=1200000)
         return best, actual
 
@@ -119,7 +217,7 @@ def install(app, database, reconstruct, now):
         row = find(con, position_id)
         active(con, position_id, session_id)
         tried = [r[0] for r in con.execute('SELECT move FROM prevention_attempts WHERE session_id=? AND success=0 AND assisted=0 ORDER BY id', (session_id,))]
-        return {'board': board_for(row), 'accepts': lambda board, move, evaluation, best: safe(evaluation), 'tried': tried}
+        return {'board': board_for(row), 'accepts': lambda board, move, evaluation, best: accepted(best, evaluation), 'tried': tried}
 
     diagnosis.register('prevention', diagnosis_position)
 
@@ -127,7 +225,7 @@ def install(app, database, reconstruct, now):
     def catalog():
         with database() as con:
             rows = con.execute('''SELECT p.*,g.title,g.created_at AS game_created_at FROM prevention_positions p JOIN games g ON g.id=p.game_id
-                WHERE p.enabled=1
+                WHERE '''+training_schedule.PREVENTION_LISTED.format('p.')+'''
                 ORDER BY p.due_at<=? DESC, p.last_shown_at IS NOT NULL, p.last_shown_at, p.due_at, p.id''', (now(),)).fetchall()
             items = []
             for row in rows:
@@ -140,8 +238,11 @@ def install(app, database, reconstruct, now):
                 FROM prevention_attempts a JOIN prevention_sessions s ON s.id=a.session_id
                 WHERE a.is_first=1 AND a.assisted=0 AND s.exposure IN ('new','review')''').fetchone()
             analyzed = con.execute('SELECT count(*) FROM games WHERE analysis IS NOT NULL').fetchone()[0]
+            counts = dict(con.execute("SELECT coalesce(reach_status,'pending'),count(*) FROM prevention_positions WHERE enabled=1 GROUP BY 1").fetchall())
         return {'positions': items, 'stats': dict(stats), 'analyzedGames': analyzed,
-                'rule': {'safeCp': SAFE_CP, 'description': 'È accettata ogni mossa valutata almeno −1,00 dalla tua parte, senza matto forzato contro di te. Non è richiesta la migliore.'}}
+                'reach': {'lapse': counts.get('lapse', 0), 'typical': counts.get('typical', 0), 'complex': counts.get('complex', 0),
+                          'pending': counts.get('pending', 0), 'available': maia.available(), 'description': REACH_RULE},
+                'rule': {'safeCp': SAFE_CP, 'toleranceCp': TOLERANCE_CP, 'description': RULE}}
 
     @app.post('/api/prevention/{position_id}/sessions')
     def session(position_id: str):
@@ -194,8 +295,8 @@ def install(app, database, reconstruct, now):
         move = chess.Move.from_uci(body.move)
         if move not in board.legal_moves:
             raise HTTPException(422, 'Mossa non legale')
-        _, actual = check(board, move)
-        return {'success': safe(actual), 'san': board.san(move), 'actual': actual}
+        best, actual = check(board, move)
+        return {'success': accepted(best, actual), 'san': board.san(move), 'actual': actual}
 
     @app.post('/api/prevention/{position_id}/attempts')
     def attempt(position_id: str, body: AttemptBody):
@@ -207,7 +308,7 @@ def install(app, database, reconstruct, now):
         if move not in board.legal_moves:
             raise HTTPException(422, 'Mossa non legale')
         best, actual = check(board, move)
-        success = safe(actual)
+        success = accepted(best, actual)
         with database() as con:
             con.execute('BEGIN IMMEDIATE')
             current = find(con, position_id)
@@ -218,7 +319,7 @@ def install(app, database, reconstruct, now):
                 'insight': insights.public(insights.compare(board.fen(),body.move,best,actual)),
                 'example': best if success else None,
                 'original': explanation(row, json.loads(row['verification'])) if success else None,
-                'message': 'Blunder evitato: questa mossa mantiene la posizione difendibile.' if success else 'Questa mossa scende sotto la soglia di sicurezza secondo Stockfish. Riprova: non serve trovare la migliore.'}
+                'message': 'Blunder evitato: questa mossa mantiene la posizione difendibile.' if success else 'Secondo Stockfish questa mossa scende sotto −1,00 e perde almeno 1,00 rispetto alla migliore. Riprova: non serve trovare la migliore.'}
 
     @app.post('/api/prevention/{position_id}/reveal')
     def reveal(position_id: str, body: SessionBody):

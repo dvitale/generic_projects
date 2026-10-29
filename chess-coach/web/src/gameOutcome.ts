@@ -4,12 +4,13 @@ import type {Game} from './types'
 export type Outcome={tone:'win'|'loss'|'draw';title:string;detail:string}
 
 /** How a finished game ended, from the player's side: the reason is read from the final position. */
-export function gameOutcome(game:Pick<Game,'initialFen'|'moves'|'result'|'termination'|'playerColor'>):Outcome|null{
+export function gameOutcome(game:Pick<Game,'initialFen'|'moves'|'result'|'termination'|'playerColor'>&{engineLabel?:string|null}):Outcome|null{
   if(!game.result)return null
   const winner=game.result==='1-0'?'w':game.result==='0-1'?'b':null
   const tone=!winner?'draw':winner===game.playerColor?'win':'loss'
   const verdict=tone==='win'?'Hai vinto':tone==='loss'?'Hai perso':'Patta'
   if(game.termination==='resign')return {tone,title:'Hai abbandonato la partita',detail:`${verdict} · ${game.result}`}
+  if(game.termination==='engine_resign')return {tone,title:`${game.engineLabel??'Maia'} abbandona · ${verdict}`,detail:`${game.result} · secondo Stockfish la sua posizione era persa da tre mosse.`}
   const board=new Chess(game.initialFen)
   try{for(const move of game.moves)board.move({from:move.slice(0,2),to:move.slice(2,4),promotion:move[4]})}
   catch{return {tone,title:verdict,detail:game.result}}

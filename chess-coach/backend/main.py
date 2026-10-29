@@ -20,7 +20,7 @@ from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, FiniteFloat
 
-from .engine import ROOT, evaluator
+from .engine import ROOT, SHORT_MATE, evaluator, load_analysis
 from .drills import CATALOG, materialize, decisions_played
 from . import tutor, final_review
 from . import prevention
@@ -31,6 +31,7 @@ from . import study
 from . import problems
 from . import diagnosis
 from . import auth
+from .maia import maia as maia_server
 from . import opponents
 from . import alternatives
 from .rating import rating_plan, summarize_rating, RATING_LEVELS, RATING_METHOD
@@ -102,7 +103,8 @@ def init_db():
         columns = {r[1] for r in con.execute('PRAGMA table_info(games)')}
         # engine/engine_version/move_selection are fixed when a bot game starts; move_choices has one entry per ply.
         for name, declaration in {'move_times': "TEXT NOT NULL DEFAULT '[]'", 'pgn_headers': "TEXT NOT NULL DEFAULT '{}'", 'termination': 'TEXT', 'assisted_plies': "TEXT NOT NULL DEFAULT '[]'",
-                                  'engine': 'TEXT', 'engine_version': 'TEXT', 'move_selection': 'TEXT', 'move_choices': "TEXT NOT NULL DEFAULT '[]'"}.items():
+                                  'engine': 'TEXT', 'engine_version': 'TEXT', 'move_selection': 'TEXT', 'move_choices': "TEXT NOT NULL DEFAULT '[]'",
+                                  'resign_offer': 'INTEGER', 'resign_declined': 'INTEGER'}.items():
             if name not in columns:
                 con.execute(f'ALTER TABLE games ADD COLUMN {name} {declaration}')
         if 'last_shown_at' not in {r[1] for r in con.execute('PRAGMA table_info(exercises)')}:
@@ -122,7 +124,8 @@ def init_db():
         alternatives.init_schema(con)
         for row in con.execute('SELECT * FROM games WHERE analysis IS NOT NULL').fetchall():
             if row['analysis_version'] == len(json.loads(row['moves'])):
-                prevention.seed_game(con, row, json.loads(row['analysis']), now())
+                # Startup stays fast: Maia judges unassessed positions afterwards, on the analysis worker.
+                prevention.seed_game(con, row, json.loads(row['analysis']), now(), reach=False)
 
 
 @asynccontextmanager
@@ -130,6 +133,7 @@ async def lifespan(app):
     global executor
     executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="analysis")
     init_db()
+    executor.submit(prevention.backfill_reach, database, load_analysis)
     evaluator.start()
     try:
         yield
@@ -179,6 +183,8 @@ class NewGame(BaseModel):
     # The human-like model answering a "maia" game; the browser declares the Maia model it loads.
     engine: Literal["maia", "experimental"] = "maia"
     engine_version: str | None = Field(default=None, max_length=80)
+    # How the browser picks Maia's move from its distribution; ignored for the experimental engine.
+    move_selection: str = opponents.SELECTION
 
 
 class MoveInput(BaseModel):
@@ -260,6 +266,8 @@ def game_result(row, board, stored_headers=None):
     """PGN result: board outcome, then resignation, then the imported header."""
     if row['termination'] == 'resign':
         return '0-1' if row['player_color'] == 'w' else '1-0'
+    if row['termination'] == ENGINE_RESIGN:
+        return '1-0' if row['player_color'] == 'w' else '0-1'
     outcome = board.outcome(claim_draw=True)
     if outcome:
         return outcome.result()
@@ -290,9 +298,10 @@ def game_pgn(row, include_times=True):
         pgn.headers['OpponentElo'] = str(row['elo'])
         pgn.headers['MoveSelection'] = row['move_selection'] or opponents.SELECTION
     pgn.headers['Result'] = game_result(row, board, stored_headers)
-    if row['termination'] == 'resign':
+    if row['termination'] in ('resign', ENGINE_RESIGN):
         pgn.headers['Termination'] = 'normal'
-        pgn.headers['Resignation'] = 'White' if row['player_color'] == 'w' else 'Black'
+        # The side that gave up: the player, or the bot on the other side.
+        pgn.headers['Resignation'] = 'White' if (row['player_color'] == 'w') == (row['termination'] == 'resign') else 'Black'
     if include_times:
         for node, timing in zip(pgn.mainline(), json.loads(row['move_times'])):
             if timing:
@@ -326,7 +335,7 @@ def game_view(row):
     return {"id": row["id"], "fen": board.fen(), "initialFen": row["initial_fen"],
             "moves": moves, "version": len(moves), "revision": row['revision'], "playerColor": row["player_color"],
             "canUndo": not row['termination'] and row['source'] in PLAYABLE and undo_ply(row, session) is not None,
-            "termination": row['termination'],
+            "termination": row['termination'], "resignOffer": resign_pending(row, moves),
             "rating": json.loads(rating['response']) if rating else None, "analysisJobId": analysis_job,
             "elo": row["elo"], "title": row["title"], "pgn": str(pgn),
             "timedMoves": sum(bool(t) for t in json.loads(row['move_times'])),
@@ -336,13 +345,13 @@ def game_view(row):
             "result": pgn.headers['Result'] if pgn.headers['Result'] != '*' else None, "source": row["source"], "drill": drill,
             "engine": row['engine'], "engineLabel": opponents.label(row) if row['source'] == 'maia' else None,
             "engineVersion": row['engine_version'], "moveSelection": row['move_selection'],
-            "analysis": insights.enrich(json.loads(row["analysis"])) if row["analysis"] and row["analysis_version"] == len(moves) else None}
+            "analysis": insights.enrich(load_analysis(row["analysis"])) if row["analysis"] and row["analysis_version"] == len(moves) else None}
 
 
 @app.get("/api/health")
 def health():
     return {"status": "ok", "stockfish": evaluator.name, "storage": "SQLite locale",
-            "maia": "maia3_simplified.onnx · browser"}
+            "maia": "maia3_simplified.onnx · browser", "maiaServer": "disponibile" if maia_server.available() else "assente"}
 
 
 @app.post("/api/games")
@@ -365,6 +374,10 @@ def new_game(body: NewGame):
     engine = version = selection = None
     if body.opponent == 'maia':
         engine, version, selection = body.engine, body.engine_version, opponents.SELECTION
+        if engine == opponents.MAIA:
+            if body.move_selection not in opponents.MAIA_SELECTIONS:
+                raise HTTPException(422, 'Modalità di scelta delle mosse non prevista')
+            selection = body.move_selection
         if engine == opponents.EXPERIMENTAL:
             state = opponents.status(ENV_PATH)
             if not state['enabled']:
@@ -429,6 +442,14 @@ def get_game(game_id: str):
 
 @app.post("/api/games/{game_id}/moves")
 def make_move(game_id: str, body: MoveInput):
+    if body.actor == 'maia':
+        # Stockfish runs outside the transaction; the resignation is recorded only on the same position.
+        with database() as con:
+            row = find_game(con, game_id)
+        moves = json.loads(row['moves'])
+        if row['engine'] != opponents.EXPERIMENTAL and len(moves) == body.version and row['revision'] == body.revision \
+                and (resign_pending(row, moves) or bot_resigns(row, moves) and offer_resignation(game_id, body.version, body.revision)):
+            return get_game(game_id)
     with database() as con:
         con.execute("BEGIN IMMEDIATE")
         row = find_game(con, game_id)
@@ -457,7 +478,7 @@ def make_move(game_id: str, body: MoveInput):
         times = json.loads(row['move_times'])
         times = (times + [None] * body.version)[:body.version]
         times.append({'emt': round(body.elapsed_seconds, 3)} if body.elapsed_seconds is not None else None)
-        choice = {'engine': row['engine'] or opponents.MAIA, 'version': row['engine_version'], 'selection': opponents.SELECTION} if body.actor == 'maia' else None
+        choice = {'engine': row['engine'] or opponents.MAIA, 'version': row['engine_version'], 'selection': row['move_selection'] or opponents.SELECTION} if body.actor == 'maia' else None
         con.execute("UPDATE games SET moves=?,move_times=?,move_choices=? WHERE id=?", (json.dumps(moves), json.dumps(times), json.dumps(aligned(row['move_choices'], body.version) + [choice]), game_id))
         snapshot = dict(find_game(con, game_id))
     # Commit the final move before the worker reads it; analysis survives closing the browser.
@@ -500,6 +521,78 @@ def engine_move(game_id: str, body: UndoInput):
     return get_game(game_id)
 
 
+# The bot offers to resign a clearly lost game, as a human would: Stockfish gives it RESIGN_CP or worse (or a
+# mate against) at RESIGN_TURNS consecutive turns of its own, and the game is past the opening. The game ends
+# only if the player accepts; a declined offer is not repeated for RESIGN_RETRY_PLIES.
+ENGINE_RESIGN = 'engine_resign'
+RESIGN_CP = -700
+RESIGN_TURNS = 3
+RESIGN_MIN_PLY = 20
+RESIGN_RETRY_PLIES = 20
+RESIGN_NODES = 30000
+
+
+def resign_pending(row, moves):
+    """Whether the bot's offer to resign waits for an answer in this very position (an undo cancels it)."""
+    return not row['termination'] and row['resign_offer'] == len(moves)
+
+
+def bot_resigns(row, moves):
+    """Whether the bot, about to move after `moves`, should offer to resign instead (Maia and experimental games)."""
+    if row['source'] != 'maia' or row['termination'] or len(moves) < RESIGN_MIN_PLY:
+        return False
+    declined = row['resign_declined']
+    if declined is not None and declined <= len(moves) < declined + RESIGN_RETRY_PLIES:
+        return False
+    for back in range(RESIGN_TURNS):
+        if len(moves) - 2 * back < 0:
+            return False
+        board = reconstruct(row['initial_fen'], moves[:len(moves) - 2 * back])
+        if board.turn == (row['player_color'] == 'w') or board.is_game_over(claim_draw=True):
+            return False
+        e = evaluator.evaluate(board, nodes=RESIGN_NODES)
+        # Checked from the latest position back: a single position that is not lost keeps the game going.
+        if not (e['mate'] is not None and e['mate'] < 0 or e['mate'] is None and e['cp'] <= RESIGN_CP):
+            return False
+    return True
+
+
+def offer_resignation(game_id, version, revision):
+    """Record the bot's offer to resign if the position is unchanged; returns whether it was recorded."""
+    with database() as con:
+        con.execute('BEGIN IMMEDIATE')
+        row = find_game(con, game_id)
+        if row['termination'] or len(json.loads(row['moves'])) != version or row['revision'] != revision:
+            return False
+        con.execute('UPDATE games SET resign_offer=? WHERE id=?', (version, game_id))
+    return True
+
+
+class ResignAnswer(BaseModel):
+    version: int
+    revision: int
+    accept: bool
+
+
+@app.post('/api/games/{game_id}/resign-offer')
+def answer_resign_offer(game_id: str, body: ResignAnswer):
+    """Accept the bot's resignation (the player wins) or decline it (the bot plays on)."""
+    with database() as con:
+        con.execute('BEGIN IMMEDIATE')
+        row = find_game(con, game_id)
+        moves = json.loads(row['moves'])
+        if len(moves) != body.version or row['revision'] != body.revision or not resign_pending(row, moves):
+            raise HTTPException(409, 'La proposta di abbandono non è più valida: ricarica la partita')
+        if body.accept:
+            con.execute('UPDATE games SET termination=?,resign_offer=NULL,revision=revision+1 WHERE id=?', (ENGINE_RESIGN, game_id))
+        else:
+            con.execute('UPDATE games SET resign_offer=NULL,resign_declined=? WHERE id=?', (len(moves), game_id))
+        snapshot = dict(find_game(con, game_id))
+    if body.accept:
+        queue_analysis(snapshot, automatic=True)
+    return get_game(game_id)
+
+
 def aligned(choices, plies):
     """Per-ply entries padded or cut to the moves already played."""
     return (json.loads(choices) + [None] * plies)[:plies]
@@ -523,6 +616,8 @@ def policy_move(game_id: str, body: UndoInput):
         return row, moves, board
     with database() as con:
         row, moves, board = opponent_position(con)
+    if resign_pending(row, moves) or bot_resigns(row, moves) and offer_resignation(game_id, body.version, body.revision):
+        return get_game(game_id)
     # The service is called outside the transaction; the position is checked again before committing.
     try:
         distribution = opponents.predict(ENV_PATH, board, row['elo'], row['engine_version'],
@@ -669,7 +764,7 @@ def undo_move(game_id: str, body: UndoInput):
         if row['revision'] != body.revision or len(moves) not in {body.version, body.version + 1} or ply is None or ply >= body.version:
             raise HTTPException(409, 'Nessuna mossa da annullare in questa posizione: ricarica la partita')
         preserve_review(con, row, session)
-        con.execute('UPDATE games SET moves=?,move_times=?,move_choices=?,assisted_plies=?,revision=revision+1,analysis=NULL,analysis_version=NULL WHERE id=?',
+        con.execute('UPDATE games SET moves=?,move_times=?,move_choices=?,assisted_plies=?,resign_offer=NULL,revision=revision+1,analysis=NULL,analysis_version=NULL WHERE id=?',
                     (json.dumps(moves[:ply]), json.dumps(json.loads(row['move_times'])[:ply]), json.dumps(json.loads(row['move_choices'])[:ply]),
                      json.dumps([p for p in json.loads(row['assisted_plies']) if p < ply]), game_id))
         con.execute('DELETE FROM game_ratings WHERE game_id=?', (game_id,))
@@ -800,9 +895,9 @@ def analyze_game(job_id, snapshot):
                 if loss >= 80:
                     best, actual, loss, choices = evaluator.compare_candidates(board, move, nodes=60000)
                 theme = "Calcolo e mosse candidate"
-                if best["mate"] is not None and best["mate"] > 0 and (actual["mate"] is None or actual["mate"] < 0):
+                if best["mate"] is not None and 0 < best["mate"] <= SHORT_MATE and (actual["mate"] is None or actual["mate"] < 0):
                     theme = "Riconoscere il matto"
-                elif actual["mate"] is not None and actual["mate"] < 0 and (best["mate"] is None or best["mate"] > 0):
+                elif actual["mate"] is not None and -SHORT_MATE <= actual["mate"] < 0 and (best["mate"] is None or best["mate"] > 0):
                     theme = "Difesa dalle minacce di matto"
                 item = {"ply": ply, "fen": board.fen(), "played": uci, "playedSan": board.san(move),
                                   "best": best, "actual": actual, "loss": loss, "theme": theme,
@@ -1083,7 +1178,7 @@ def profile():
         domains = {key:0 for key in ('tactical','positional','mixed','unclear')}
         seen = set()
         for row in con.execute("SELECT analysis FROM games WHERE analysis IS NOT NULL AND source NOT IN ('snapshot','stockfish')"):
-            for d in json.loads(row['analysis']).get('decisions',[]):
+            for d in load_analysis(row['analysis']).get('decisions',[]):
                 identity=(d['fen'],d['played'])
                 if d['loss']<80 or identity in seen:continue
                 seen.add(identity)
@@ -1129,7 +1224,7 @@ def request_tutor(game_id: str, body: TutorInput):
             row = dict(find_game(con, game_id))
             if body.version != len(json.loads(row['moves'])) or row['analysis_version'] != body.version or not row['analysis']:
                 raise HTTPException(409, 'Completa l’analisi Stockfish della versione attuale prima di chiedere al tutor.')
-            analysis = json.loads(row['analysis'])
+            analysis = load_analysis(row['analysis'])
             decisions = sorted(analysis['decisions'], key=lambda d: -d['loss'])[:3]
             for d in decisions:
                 d['insight'] = insights.compare(d['fen'],d['played'],d['best'],d['actual'])

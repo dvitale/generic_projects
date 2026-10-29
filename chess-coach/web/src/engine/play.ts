@@ -1,4 +1,4 @@
-import {maia,sample} from './maia'
+import {maia,sample,FULL_SELECTION,type Selection} from './maia'
 
 function pause(milliseconds:number,signal:AbortSignal):Promise<void> {
   if(signal.aborted)return Promise.reject(new DOMException('Turn cancelled','AbortError'))
@@ -17,11 +17,12 @@ export async function paceServerReply<T>(reply:()=>Promise<T>,signal:AbortSignal
 }
 
 /** Presentation pacing only: preserve Maia's move distribution and count inference time. */
-export async function chooseMaiaMove(fen:string,elo:number,signal:AbortSignal) {
+export async function chooseMaiaMove(fen:string,elo:number,signal:AbortSignal,selection:Selection=FULL_SELECTION) {
   const started=performance.now()
   const thinkingTime=1200+(Math.random()+Math.random())*1000
   const policy=await maia.predict(fen,elo,elo,signal)
   await pause(thinkingTime-(performance.now()-started),signal)
   if(signal.aborted)throw new DOMException('Turn cancelled','AbortError')
-  return sample(policy)
+  // The FEN's full-move number tells the opening apart; positions set up mid-game use their own number.
+  return sample(policy,selection,Number(fen.split(' ')[5])||Infinity)
 }

@@ -159,8 +159,33 @@ class MaiaEngine {
 export const maia = new MaiaEngine()
 /** Recorded with each new Maia game: the model the browser loads for Play. */
 export const MAIA_MODEL_VERSION = `maia3_simplified.onnx@${MAIA_WEIGHTS}`
-export function sample(prediction: Prediction) {
-  let draw = Math.random()
-  for (const move of prediction.moves) { draw -= move.probability; if (draw <= 0) return move.uci }
-  return prediction.moves.at(-1)?.uci
+// A low temperature replays the same opening every game: up to this move number, sharpened modes draw
+// with OPENING (temperature 1, rare moves still cut) so games diverge before their own rule applies.
+const OPENING_MOVES = 8
+const OPENING = { temperature: 1, topP: 0.9 }
+/** Move selection modes for Play, fixed per game; keys match MAIA_SELECTIONS in backend/opponents.py. */
+export const SELECTIONS = {
+  'sample-full-distribution': { label: 'Completa', temperature: 1, topP: 1 },
+  'temperature-0.7-top-p-0.95': { label: 'Bilanciata', temperature: 0.7, topP: 0.95, openingMoves: OPENING_MOVES },
+  'temperature-0.4-top-p-0.8': { label: 'Solida', temperature: 0.4, topP: 0.8, openingMoves: OPENING_MOVES },
+  'top-move': { label: 'Prima scelta', temperature: 0, topP: 1 },
+} as const
+export type Selection = keyof typeof SELECTIONS
+export const FULL_SELECTION: Selection = 'sample-full-distribution'
+/** Sharpen the distribution with the temperature, keep the smallest set reaching top-p, then draw. */
+export function sample(prediction: Prediction, selection: Selection = FULL_SELECTION, moveNumber = Infinity) {
+  const mode: { temperature: number; topP: number; openingMoves?: number } = SELECTIONS[selection] ?? SELECTIONS[FULL_SELECTION]
+  const { temperature, topP } = mode.openingMoves && moveNumber <= mode.openingMoves ? OPENING : mode
+  const moves = prediction.moves
+  if (!moves.length) return undefined
+  if (temperature === 0) return moves[0].uci
+  const top = moves[0].probability
+  let weights = moves.map(move => top > 0 ? (move.probability / top) ** (1 / temperature) : 1)
+  const total = weights.reduce((a, b) => a + b, 0)
+  let cumulative = 0, kept = 0
+  while (kept < moves.length && (kept === 0 || cumulative < topP * total - 1e-12)) cumulative += weights[kept++]
+  weights = weights.slice(0, kept)
+  let draw = Math.random() * cumulative
+  for (let i = 0; i < kept; i++) { draw -= weights[i]; if (draw < 0) return moves[i].uci }
+  return moves[kept - 1].uci
 }

@@ -19,8 +19,21 @@ test('resignation requires confirmation, persists defeat and starts review autom
   await expect.poll(async()=>(await(await request.get('/api/games/'+g.id)).json()).analysis?.version).toBe(2)
   await page.reload()
   await expect(page.getByRole('button',{name:'Continua partita',exact:true})).toHaveCount(0)
+  // A finished game is not reopened in Play: a fresh board is ready, and Review still holds the game.
   await page.getByRole('button',{name:'Gioca',exact:true}).click()
-  await expect(page.getByText('Partita conclusa · Hai abbandonato la partita')).toBeVisible()
+  await expect(page.getByRole('button',{name:'Inizia partita →'})).toBeVisible()
+  await expect(page.getByText('Partita conclusa · Hai abbandonato la partita')).toHaveCount(0)
+  await expect(page.locator('.board-actions')).toHaveCount(0)
+  await expect(page.locator('.piece-image,.piece')).toHaveCount(32)
+  await page.getByRole('button',{name:'Rivedi',exact:true}).click()
+  await expect(page.getByRole('button',{name:'Ricalcola analisi',exact:true})).toBeVisible()
+  expect(await page.evaluate(()=>localStorage.getItem('chess-coach-game'))).toBe(g.id)
+  await page.getByRole('button',{name:'Gioca',exact:true}).click()
+  const created=page.waitForResponse(r=>r.url().endsWith('/api/games')&&r.request().method()==='POST')
+  await page.getByRole('button',{name:'Inizia partita →'}).click();await created
+  await expect(page.getByText('Tocca a te · trascina un pezzo o usa due clic')).toBeVisible()
+  await expect(page.getByRole('button',{name:'Nuova partita',exact:true})).toBeVisible()
+  expect(await page.evaluate(()=>localStorage.getItem('chess-coach-game'))).not.toBe(g.id)
 })
 
 test('resign while Maia is thinking cancels its move',async({page,request})=>{
@@ -43,4 +56,22 @@ test('resign while Maia is thinking cancels its move',async({page,request})=>{
   const ended=await(await request.get('/api/games/'+g.id)).json()
   expect(ended.moves).toEqual(['e2e4'])
   await expect(page.getByText('Maia sta pensando…',{exact:true})).toHaveCount(0)
+})
+
+test('after a finished game the first move on the fresh Play board starts a new game',async({page,request})=>{
+  const s=await(await request.post('/api/games',{data:{color:'w',fen:'7k/8/5K2/6Q1/8/8/8/8 w - - 0 1'}})).json()
+  await request.post(`/api/games/${s.id}/moves`,{data:{move:'g5g6',actor:'human',version:0,revision:0}})
+  await page.addInitScript(id=>localStorage.setItem('chess-coach-game',id),s.id)
+  await page.goto('/')
+  await page.getByRole('button',{name:'Gioca',exact:true}).click()
+  // The automatic analysis of the finished game holds the board until it completes.
+  await expect.poll(async()=>(await(await request.get('/api/games/'+s.id)).json()).analysis?.version,{timeout:30000}).toBe(1)
+  await expect(page.getByText('Muovi un pezzo per iniziare col Bianco')).toBeVisible({timeout:10000})
+  const created=page.waitForResponse(r=>r.url().endsWith('/api/games')&&r.request().method()==='POST')
+  await page.locator('[data-square="e2"]').click();await page.locator('[data-square="e4"]').click()
+  const game=await(await created).json()
+  expect(game.playerColor).toBe('w')
+  await expect.poll(async()=>(await(await request.get('/api/games/'+game.id)).json()).moves[0]).toBe('e2e4')
+  await expect(page.getByRole('button',{name:'Abbandona partita',exact:true})).toBeVisible()
+  expect(await page.evaluate(()=>localStorage.getItem('chess-coach-game'))).toBe(game.id)
 })

@@ -17,8 +17,11 @@ from .auth import read_env
 MAIA = 'maia'
 EXPERIMENTAL = 'experimental'
 ENGINES = {MAIA: 'Maia', EXPERIMENTAL: 'Sperimentale'}
-# Both engines draw the move at random from the model's whole distribution: no top-k truncation.
+# Default: draw from the model's whole distribution, no truncation. The experimental engine always uses it.
 SELECTION = 'sample-full-distribution'
+# Maia move selection, fixed when the game starts and applied by the browser (web/src/engine/maia.ts).
+MAIA_SELECTIONS = {SELECTION: 'Completa', 'temperature-0.7-top-p-0.95': 'Bilanciata',
+                   'temperature-0.4-top-p-0.8': 'Solida', 'top-move': 'Prima scelta'}
 HEALTH_TIMEOUT = 2
 PREDICT_TIMEOUT = 10
 # The service rounds through float32: the distribution must still add up to one.

@@ -43,6 +43,48 @@ test('Full-policy sampling can select a low-probability move and does not mean t
   }
 })
 
+test('Temperature and top-p selections drop rare moves; top-move always plays the first choice',async({page})=>{
+  await load(page)
+  const policy={whiteExpectedScore:.5,moves:[
+    {uci:'e2e4',san:'e4',probability:.5},
+    {uci:'d2d4',san:'d4',probability:.3},
+    {uci:'c2c4',san:'c4',probability:.15},
+    {uci:'g2g4',san:'g4',probability:.05},
+  ]}
+  const draw=(selection:string,value:number)=>page.evaluate(({policy,selection,value})=>{
+    const original=Math.random
+    try{Math.random=()=>value;return (window as any).MaiaCheck.sample(policy,selection)}finally{Math.random=original}
+  },{policy,selection,value})
+  // Even the last draw never reaches the 5% move once the tail is cut.
+  for(const selection of ['temperature-0.7-top-p-0.95','temperature-0.4-top-p-0.8'])expect(await draw(selection,.9999)).not.toBe('g2g4')
+  expect(await draw('sample-full-distribution',.9999)).toBe('g2g4')
+  // At temperature 0.4 e4 and d4 weigh 1 and 0.28: c4 (0.05) is outside top-p 0.8.
+  expect(await draw('temperature-0.4-top-p-0.8',.9999)).toBe('d2d4')
+  expect(await draw('temperature-0.4-top-p-0.8',.5)).toBe('e2e4')
+  for(const value of [0,.5,.9999])expect(await draw('top-move',value)).toBe('e2e4')
+})
+
+test('Sharpened selections keep variety in the opening, then apply their own rule',async({page})=>{
+  await load(page)
+  const policy={whiteExpectedScore:.5,moves:[
+    {uci:'e2e4',san:'e4',probability:.5},
+    {uci:'d2d4',san:'d4',probability:.3},
+    {uci:'c2c4',san:'c4',probability:.15},
+    {uci:'g2g4',san:'g4',probability:.05},
+  ]}
+  const draw=(selection:string,value:number,moveNumber:number)=>page.evaluate(({policy,selection,value,moveNumber})=>{
+    const original=Math.random
+    try{Math.random=()=>value;return (window as any).MaiaCheck.sample(policy,selection,moveNumber)}finally{Math.random=original}
+  },{policy,selection,value,moveNumber})
+  // Up to move 8: temperature 1 and top-p 0.9, so c4 is possible but g4 (the last 5%) is not.
+  for(const selection of ['temperature-0.4-top-p-0.8','temperature-0.7-top-p-0.95']){
+    expect(await draw(selection,.9999,8)).toBe('c2c4')
+    expect(await draw(selection,.6,1)).toBe('d2d4')
+  }
+  expect(await draw('temperature-0.4-top-p-0.8',.9999,9)).toBe('d2d4')
+  expect(await draw('top-move',.9999,1)).toBe('e2e4')
+})
+
 test('Real browser Maia reproduces reference predictions at 600, 1500 and 2600',async({page})=>{
   await page.addInitScript(()=>{
     const NativeWorker=window.Worker

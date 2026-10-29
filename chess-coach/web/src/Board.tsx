@@ -47,6 +47,18 @@ function BoardAnnotation({from,to,orientation,brush=brushes.annotation,extra=0,s
   return <line {...attributes} x1={x1} y1={y1} x2={x2-Math.cos(angle)*margin} y2={y2-Math.sin(angle)*margin}
     {...stroke}/>
 }
+// Stacking order as on maiachess.com: Maia, Stockfish, then the played move on top. Arrows of the same
+// move from different sources hide each other, so `turn` rotates which one is in the foreground.
+const arrowOrder={maia:0,stockfish:1,played:2}
+const arrowKey=(a:AnalysisArrow)=>a.move.slice(0,4)
+const overlapping=(arrows:AnalysisArrow[])=>arrows.some((a,i)=>arrows.some((b,j)=>j>i&&arrowKey(a)===arrowKey(b)&&a.source!==b.source))
+function stackArrows(arrows:AnalysisArrow[],turn:number){
+  const sorted=[...arrows].sort((a,b)=>b.rank-a.rank||arrowOrder[a.source]-arrowOrder[b.source])
+  const groups=new Map<string,AnalysisArrow[]>()
+  sorted.forEach(a=>groups.set(arrowKey(a),[...groups.get(arrowKey(a))??[],a]))
+  const next=new Map([...groups].map(([key,group])=>[key,group.map((_,i)=>group[(i+turn)%group.length])]))
+  return sorted.map(a=>next.get(arrowKey(a))!.shift()!)
+}
 function Piece({code}:{code:string}) {
   const [missing,setMissing]=useState(false)
   return missing?<span aria-hidden="true" className={`piece ${code[0]==='w'?'white-piece':'black-piece'}`}>{symbols[code]}</span>:
@@ -58,6 +70,15 @@ export default function Board({fen, orientation, interactive:enabled, legalMoves
   const [promotion, setPromotion] = useState<string[]>([])
   const [drag, setDrag] = useState<{from:string;code:string;x:number;y:number;size:number}|null>(null)
   const [annotations,setAnnotations]=useState<Annotation[]>([])
+  const [arrowTurn,setArrowTurn]=useState(0)
+  const rotating=overlapping(analysisArrows)
+  useEffect(()=>{
+    setArrowTurn(0)
+    if(!rotating)return
+    let id=0
+    const schedule=()=>{id=window.setTimeout(()=>{setArrowTurn(t=>t+1);schedule()},2000+Math.random()*2000)}
+    schedule();return()=>clearTimeout(id)
+  },[rotating,analysisArrows.map(a=>a.source+a.move).join()])
   const [preview,setPreview]=useState<Annotation|null>(null)
   const drawing=useRef<Drawing|null>(null)
   const boardElement=useRef<HTMLDivElement>(null)
@@ -256,9 +277,7 @@ export default function Board({fen, orientation, interactive:enabled, legalMoves
       <svg className="board-annotations" viewBox="0 0 800 800" aria-hidden="true">
         <ArrowMarkers/>
         {(()=>{
-          // Stacking order as on maiachess.com: Maia, Stockfish, then the played move on top.
-          const order={maia:0,stockfish:1,played:2}
-          const sorted=optimistic?[]:[...analysisArrows].sort((a,b)=>b.rank-a.rank||order[a.source]-order[b.source])
+          const sorted=stackArrows(optimistic?[]:analysisArrows,arrowTurn)
           const all=[...sorted.map(a=>({from:a.move.slice(0,2),to:a.move.slice(2,4)})),...annotations]
           return sorted.map(arrow=>{
             const from=arrow.move.slice(0,2),to=arrow.move.slice(2,4)

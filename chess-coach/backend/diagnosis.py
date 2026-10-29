@@ -2,8 +2,10 @@
 
 The player states an assessment, the opponent threat they fear (played on the board) and the candidate they
 rejected. Stockfish, never the LLM, classifies the failure on two axes: search (solution missed or seen and
-rejected) and reading (pessimistic, optimistic, ignored threat, phantom threat or accurate). Raw answers are
-stored with the rule version, so the history can be reclassified when the rules change.
+rejected) and reading (pessimistic, optimistic, ignored threat, phantom threat or accurate). A third fact
+describes the solution itself (forcing, quiet move with a threat, prophylaxis or positional improvement), for the
+positions where every candidate looks inconclusive. Raw answers are stored with the rule version, so the history
+can be reclassified when the rules change.
 """
 import json
 import uuid
@@ -14,9 +16,10 @@ from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
 from .engine import evaluator
+from . import insights
 from .learning import category, value
 
-RULE_VERSION = 1
+RULE_VERSION = 2
 NODES = 150000
 BANDS = ['much_worse', 'worse', 'equal', 'better', 'much_better']
 # Ignoring the threat costs at least 2 pawns and leaves no real advantage.
@@ -24,6 +27,12 @@ THREAT_DROP_CP = 200
 THREAT_CEILING_CP = 100
 # A stated threat is concrete when it would cost at least 1.5 pawns if ignored.
 CONCRETE_DROP_CP = 150
+# A quiet solution threatens something when moving again would gain at least this much,
+# and is prophylactic when it takes at least this much off the opponent's best threat.
+QUIET_THREAT_CP = 150
+PROPHYLAXIS_CP = 150
+SOLUTIONS = ('forcing', 'quiet_threat', 'prophylaxis', 'improvement')
+OBSTACLES = ('inconclusive', 'no_plan', 'calculation', 'danger')
 WINDOW = 30
 UCI = r'^[a-h][1-8][a-h][1-8][qrbn]?$'
 
@@ -57,7 +66,9 @@ class DiagnosisBody(ContextBody):
     feared_lost: bool = False
     threat: str | None = Field(default=None, pattern=UCI)
     candidate: str | None = Field(default=None, pattern=UCI)
-    candidate_reason: Literal['material', 'mate', 'calculation', 'other'] | None = None
+    candidate_reason: Literal['material', 'mate', 'calculation', 'inconclusive', 'other'] | None = None
+    # What stopped the search, in the player's words: needed when no candidate was forcing.
+    obstacle: Literal['inconclusive', 'no_plan', 'calculation', 'danger'] | None = None
     note: str = Field(default='', max_length=1000)
 
 
@@ -85,6 +96,52 @@ def player_view(evaluation):
     """Turn an evaluation made with the opponent to move into the player's perspective."""
     mate = evaluation['mate']
     return {**evaluation, 'cp': -evaluation['cp'], 'mate': -mate if mate is not None else None}
+
+
+def gain(path):
+    """First capture, check or promotion of the solver in the engine line: when the gain becomes concrete."""
+    for index, step in enumerate(path['steps']):
+        if index % 2 == 0 and (step['captured'] or step['check'] or step['promotion']):
+            return {'ply': index + 1, 'san': [s['san'] for s in path['steps'][:index + 1]]}
+    return None
+
+
+def solution(board, best, threat):
+    """What kind of move the engine's solution is, with the concrete evidence for it."""
+    if not best['pv']:
+        return None
+    move = chess.Move.from_uci(best['pv'][0])
+    path = insights.line(board, best)
+    found = {'move': move.uci(), 'san': board.san(move), 'line': [s['san'] for s in path['steps'][:8]], 'gain': gain(path)}
+    forcing = [name for name, hit in (('check', board.gives_check(move)), ('capture', board.is_capture(move)),
+                                       ('promotion', bool(move.promotion))) if hit]
+    if forcing:
+        return {**found, 'kind': 'forcing', 'forcing': forcing}
+    after = board.copy(stack=False)
+    after.push(move)
+    # Moving again after the solution shows what it threatens; the opponent must answer it.
+    again = threat_board(after)
+    if again is not None:
+        follow = evaluator.evaluate(again, nodes=NODES)
+        # A free tempo is worth something in any position: the threat must be a nameable forcing move.
+        hit = chess.Move.from_uci(follow['pv'][0]) if follow['pv'] else None
+        forcing_hit = hit is not None and (again.gives_check(hit) or again.is_capture(hit) or bool(hit.promotion))
+        sooner = follow['mate'] is not None and best['mate'] is not None and 0 < follow['mate'] < best['mate']
+        if forcing_hit and (sooner or value(follow) - value(best) >= QUIET_THREAT_CP):
+            return {**found, 'kind': 'quiet_threat', 'threat': {'san': follow['san'][0], 'evaluation': follow}}
+    # The opponent's best move with a free tempo, played after the solution: does it still work?
+    if threat and threat['move'] and value(best) - value(threat['evaluation']) >= PROPHYLAXIS_CP:
+        stopped = chess.Move.from_uci(threat['move'])
+        if stopped in after.legal_moves:
+            line = player_view(evaluator.evaluate(after, stopped, nodes=NODES))
+            if value(line) - value(threat['evaluation']) >= PROPHYLAXIS_CP:
+                return {**found, 'kind': 'prophylaxis', 'stopped': {'san': threat['san'], 'before': threat['evaluation'], 'after': line}}
+    moved = board.piece_at(move.from_square)
+    before, later = insights.features(board, board.turn), insights.features(after, board.turn)
+    facts = {'piece': moved.symbol().upper(), 'reach': [before['pieceReach'], later['pieceReach']],
+             'openRooks': later['openRooks'] if later['openRooks'] != before['openRooks'] else None,
+             'center': later['center'] if len(later['center']) > len(before['center']) else None}
+    return {**found, 'kind': 'improvement', 'facts': facts}
 
 
 def classify(board, accepts, answer):
@@ -123,6 +180,7 @@ def classify(board, accepts, answer):
             reading.append('ignored_threat')
     else:
         evidence['threat'] = None
+    evidence['solution'] = solution(board, best, evidence['threat'])
 
     search = 'missed_solution'
     if answer['candidate']:
@@ -149,11 +207,16 @@ def summary(con):
     def window(batch):
         counts = {'missed_solution': 0, 'rejected_solution': 0, 'pessimistic': 0, 'optimistic': 0,
                   'ignored_threat': 0, 'phantom_threat': 0, 'accurate': 0}
+        # Solution kinds among missed solutions only: what the search keeps leaving out.
+        solutions = dict.fromkeys(SOLUTIONS, 0)
         for r in batch:
             counts[r['search']] += 1
             for label in json.loads(r['reading']):
                 counts[label] += 1
-        return {'total': len(batch), 'counts': counts}
+            found = json.loads(r['evidence']).get('solution')
+            if found and r['search'] == 'missed_solution':
+                solutions[found['kind']] += 1
+        return {'total': len(batch), 'counts': counts, 'solutions': solutions}
 
     calibration = {level: {'total': 0, 'matched': 0} for level in ('uncertain', 'moderate', 'confident')}
     themes = {}
@@ -208,7 +271,7 @@ def install(app, database, now):
         board = position['board']
         answer = {'assessment': body.assessment, 'confidence': body.confidence, 'fearedLost': body.feared_lost,
                   'threat': body.threat, 'candidate': body.candidate, 'candidateReason': body.candidate_reason,
-                  'note': body.note.strip()}
+                  'obstacle': body.obstacle, 'note': body.note.strip()}
         search, reading, evidence = classify(board, position['accepts'], answer)
         # Played and rejected by the mode itself: they never turn a miss into a rejected solution.
         evidence['tried'] = [m['san'] for m in tried_moves(board, position.get('tried', []))]

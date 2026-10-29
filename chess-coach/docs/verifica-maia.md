@@ -23,11 +23,20 @@ Restano quindi non verificati: pesi effettivamente usati dal server, uso della s
 
 ## Come sceglie SparringMate
 
-`chooseMaiaMove` chiama il modello locale sulla posizione corrente; `sample` sorteggia sull’intera distribuzione legale, senza taglio delle mosse poco probabili. È equivalente a temperatura 1 e nessun filtro top-p. Il ritardo di 1,2–3,2 secondi regola solo la presentazione: non aumenta la profondità di ricerca.
+`chooseMaiaMove` chiama il modello locale sulla posizione corrente; `sample` applica la modalità di scelta fissata all’avvio della partita (campo `move_selection`, scelto in Gioca sotto **Scelta delle mosse di Maia**):
+
+| Modalità | `move_selection` | Regola |
+|---|---|---|
+| Completa (predefinita) | `sample-full-distribution` | sorteggio sull’intera distribuzione legale: temperatura 1, nessun top-p |
+| Bilanciata | `temperature-0.7-top-p-0.95` | probabilità elevate a 1/0,7, poi il più piccolo insieme di mosse che copre il 95% |
+| Solida | `temperature-0.4-top-p-0.8` | probabilità elevate a 1/0,4, poi top-p 0,8 |
+| Prima scelta | `top-move` | sempre la mossa più probabile (temperatura 0) |
+
+Bilanciata e Solida, fino alla mossa 8 compresa (numero di mossa del FEN), usano temperatura 1 e top-p 0,9: a temperatura bassa Maia ripeteva la stessa apertura in quasi ogni partita, trappole comprese (3 Italiane identiche su 4 in Solida, 27 ottobre 2026). Dalla mossa 9 vale la regola della modalità. Prima scelta resta deterministica anche in apertura. Le probabilità mostrate in analisi restano quelle originali del modello. La modalità compare nell’intestazione PGN `MoveSelection` e in `move_choices` per ogni risposta di Maia; le partite precedenti restano `sample-full-distribution`. I Drill usano sempre la modalità completa. Il ritardo di 1,2–3,2 secondi regola solo la presentazione: non aumenta la profondità di ricerca.
 
 Questo campionamento è una modalità valida per Maia, ma non certifica una forza equivalente a quella di Play sul sito. Il [motore UCI ufficiale Maia3](https://github.com/CSSLab/maia3/blob/1e13597c42d4858b7cfd7cfdae01e297263364b2/maia3/uci.py) espone temperatura e top-p; temperatura zero sceglie la mossa più probabile. La configurazione di quel programma non è prova della configurazione del server web.
 
-Probabilità umana e qualità tattica sono grandezze diverse. Anche una seconda scelta frequente può lasciare un pezzo in presa; la prima scelta a livello 600 può essere sbagliata. Limitarsi alle mosse sopra una piccola soglia non garantisce l’eliminazione di questi errori.
+Probabilità umana e qualità tattica sono grandezze diverse. Anche una seconda scelta frequente può lasciare un pezzo in presa; la prima scelta a livello 600 può essere sbagliata. Limitarsi alle mosse sopra una piccola soglia non garantisce l’eliminazione di questi errori: le modalità Bilanciata e Solida tolgono le sviste rare della coda, non quelle che a quel livello sono la scelta più comune. Nessuna modalità è calibrata in Elo; la Prima scelta gioca, per costruzione, sopra il livello indicato.
 
 ## Verifiche ripetibili
 
@@ -43,6 +52,6 @@ L’audit delle partite locali è conservato separatamente sul PC. La valutazion
 
 ## Intervento consigliato
 
-Per isolare l’effetto del sorteggio, aggiungere una modalità dichiarata **Prima scelta Maia**, affiancata alla modalità attuale. Il livello deve restare quello selezionato e le probabilità di analisi devono rimanere quelle originali. Confrontare poi partite nuove a parità di condizioni prima di scegliere una modalità predefinita.
+Per isolare l’effetto del sorteggio, aggiungere una modalità dichiarata **Prima scelta Maia**, affiancata alla modalità attuale. Fatto il 27 ottobre 2026, insieme alle modalità intermedie Bilanciata e Solida (vedi sopra). Il livello deve restare quello selezionato e le probabilità di analisi devono rimanere quelle originali. Confrontare poi partite nuove a parità di condizioni prima di scegliere una modalità predefinita.
 
 Un filtro Stockfish contro le sviste sarebbe un motore ibrido con forza diversa: andrebbe reso esplicito e calibrato. Cambiare di nascosto Elo, pesi o probabilità non è una dimostrazione di equivalenza con maiachess.com. Questa verifica non modifica la selezione delle mosse dell’app.

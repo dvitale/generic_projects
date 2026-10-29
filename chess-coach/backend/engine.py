@@ -1,4 +1,5 @@
 """Stockfish boundary: keep every comparison in the decision maker's perspective."""
+import json
 import os
 import threading
 from pathlib import Path
@@ -95,7 +96,7 @@ class Evaluator:
                 choices = self.candidates(board, nodes=nodes * 2)
                 actual = next((c for c in choices if c["pv"] and c["pv"][0] == played.uci()), actual)
             best = choices[0]
-            return best, actual, max(0, best["cp"] - actual["cp"]), choices
+            return best, actual, review_loss(best, actual), choices
 
     def compare(self, board, played, nodes=24000):
         # One lock prevents interleaved jobs from changing the engine's state mid-comparison.
@@ -105,6 +106,35 @@ class Evaluator:
             if actual["cp"] > best["cp"] + 30:
                 best = self.evaluate(board, nodes=nodes * 2)
             return best, actual, max(0, best["cp"] - actual["cp"])
+
+
+# Review severity: a missed or allowed mate longer than SHORT_MATE moves is not something to demand at
+# club level, so it counts as a decisive edge (DECISIVE_CP) instead of the 100000 mate sentinel.
+SHORT_MATE = 2
+DECISIVE_CP = 500
+
+
+def review_loss(best, actual):
+    """Centipawn loss used to classify a reviewed move; short mates keep their full weight."""
+    if best['mate'] is not None and actual['mate'] is not None:
+        return max(0, best['cp'] - actual['cp'])
+    def value(e):
+        mate = e['mate']
+        if mate is None or abs(mate) <= SHORT_MATE:
+            return e['cp']
+        return DECISIVE_CP if mate > 0 else -DECISIVE_CP
+    return max(0, value(best) - value(actual))
+
+
+def load_analysis(text):
+    """Stored game analysis with losses rescored by review_loss, so older analyses follow the current rule."""
+    analysis = json.loads(text)
+    for key in ('moves', 'decisions', 'critical'):
+        for d in analysis.get(key, []):
+            d['loss'] = review_loss(d['best'], d['actual'])
+    if 'critical' in analysis:
+        analysis['critical'] = sorted([d for d in analysis.get('decisions', []) if d['loss'] >= 80], key=lambda d: -d['loss'])[:3]
+    return analysis
 
 
 evaluator = Evaluator()

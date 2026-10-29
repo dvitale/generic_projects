@@ -36,7 +36,7 @@ def record(con, kind, target_id, attempt_id, board, move, best, actual, timestam
     evidence = {'fen': board.fen(), 'turn': 'w' if board.turn else 'b',
                 'move': move.uci(), 'san': board.san(move), 'best': best, 'actual': actual,
                 'lossCp': loss, 'engine': evaluator.name,
-                'criterion': 'Mantieni almeno −1,00, senza matto contro di te.' if kind == 'prevention'
+                'criterion': 'Mantieni almeno −1,00 o perdi meno di 1,00 rispetto alla migliore, senza matto contro di te.' if kind == 'prevention'
                 else 'Perdi meno di 0,70 rispetto alla migliore mossa di Stockfish.'}
     con.execute('''INSERT INTO training_mistakes(kind,target_id,attempt_id,created_at,evidence)
                    VALUES(?,?,?,?,?)''', (kind, target_id, attempt_id, timestamp, json.dumps(evidence)))

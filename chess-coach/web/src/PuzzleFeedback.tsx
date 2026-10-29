@@ -11,6 +11,7 @@ export default function PuzzleFeedback({attempt,busy,ready,hasNext,onNext,onRest
     <div role="status" aria-live="polite" aria-atomic="true"><h3>{busy&&!motionMessage?'Verifica della mossa…':practice?.success?`✓ ${practice.san}: mossa corretta`:practice?`↻ ${practice.san}: c’è di meglio`:'↺ Pratica dalla posizione iniziale'}</h3>
       <p>{motionMessage||(practice?.success?'Puoi ricominciare quante volte vuoi.':'Muovi un pezzo: Stockfish verifica la mossa. La pratica non conta per i ripassi.')}</p></div>
     <div className="puzzle-next"><button disabled={busy} onClick={onPractice}>↺ Riprova da capo</button>{hasNext&&<button className="primary" disabled={busy} onClick={onNext}>Prossimo puzzle →</button>}</div>
+    {onPlayFrom&&<button className="play-from" disabled={busy} title="Nuova partita contro Maia dalla posizione iniziale del puzzle" onClick={onPlayFrom.play}>{onPlayFrom.label}</button>}
   </section>
   const title=checking?(ready?'Verifica della mossa…':'Preparazione del puzzle…'):attempt?.success?'✓ Mossa corretta!':attempt?.closed?'Soluzione mostrata':attempt?'↻ Mossa da migliorare':'Trova una buona mossa'
   return <section ref={feedback} className={`puzzle-feedback ${attempt?.success?'solved':attempt&&!attempt.closed?'retry':''}`} aria-label="Esito del puzzle">

@@ -12,9 +12,24 @@ Una candidata deve avere una scelta con valutazione almeno −100 centesimi di p
 
 Prima della prima sessione si ricontrollano la migliore e la mossa originale a 300.000 nodi per ricerca. Entro 50 centesimi dalla soglia di accettazione si ripete a 1.200.000 nodi. Un candidato non confermato viene escluso. La posizione e la sua storia sono conservate come evidenza; se la partita viene annullata dopo un’analisi, il collegamento passa alla copia della linea originale.
 
+## Abbagli e lacune
+
+Dal 29 ottobre 2026 (`REACH_VERSION` 1) un blunder entra nel catalogo solo se è un **abbaglio**: un errore grave che il giocatore, di norma, saprebbe evitare, e che riconosce subito appena gli si indica il punto. Quando l'errore nasce invece da una lacuna di competenza o di calcolo, appartiene ai Puzzle. La condizione di Stockfish descritta sopra resta necessaria, ma non basta più. Per ogni candidato, `assess_reach` in `backend/prevention.py` usa Maia sul server ([docs/maia-server.md](maia-server.md)) e la variante salvata dall'analisi:
+
+| Esito (`reach_status`) | Regola | Nel catalogo |
+|---|---|---|
+| `typical`: errore tipico del livello | Maia, al livello della partita (entrambi i lati), gioca la mossa sbagliata almeno il 25% delle volte (`TYPICAL_PROBABILITY`) | no |
+| `lapse`: abbaglio | Altrimenti, se la confutazione è elementare (matto in 1–2, oppure almeno 2 pedoni netti persi entro 4 semimosse dopo l'errore, cambi compresi) o se Maia, per l'avversario allo stesso livello, trova la prima mossa della confutazione almeno il 20% delle volte (`OBVIOUS_REPLY`) | sì |
+| `complex`: confutazione da calcolare | Nessuno dei casi precedenti | no |
+| nessun esito | La variante dopo l'errore manca, oppure Maia sul server non è disponibile | sì, come prima |
+
+Il livello è l'Elo della partita: il livello di Maia scelto in Gioca, oppure quello di riferimento delle partite importate (1500 se manca). È un'approssimazione: indica contro chi stavi giocando, non la tua forza misurata. Le soglie sono convenzioni di allenamento, da rivedere con i dati.
+
+Le nuove analisi valutano subito le posizioni. Quelle già indicizzate, o valutate con una versione precedente della regola, sono valutate dopo l'avvio sul thread delle analisi (`backfill_reach`): l'avvio resta rapido. Esito e indizi (`blunderProbability`, `reply`, `replyProbability`, `elementary`, `level`) sono salvati nella colonna `reach`. Le posizioni escluse non vengono cancellate e i loro tentativi restano. `GET /api/prevention` restituisce in `reach` il numero di posizioni per esito, che il riquadro **Solo abbagli, non lacune** mostra. Le posizioni ancora da valutare restano incluse.
+
 ## Valutazione della risposta
 
-Ogni mossa legale proposta viene valutata, anche se non compare nelle prime tre. È accettata se mantiene almeno −1,00 dalla parte del giocatore e non permette un matto forzato contro di lui. Non si impone una perdita massima rispetto alla migliore: una mossa da +6 a 0 viene accettata, così come una vittoria che rinuncia al matto più corto. Questa è la differenza rispetto ai Puzzle, che richiedono una perdita massima di 50 centesimi dalla migliore.
+Ogni mossa legale proposta viene valutata, anche se non compare nelle prime tre. È accettata se mantiene almeno −1,00 dalla parte del giocatore, oppure se perde meno di 1,00 rispetto alla migliore (`TOLERANCE_CP`, dal 27 ottobre 2026: da −0,80 una mossa a −1,20 non è un blunder), e non permette un matto forzato contro di lui. Quando la migliore è un matto a favore vale solo la soglia di −1,00. Entro 50 centesimi da una delle due soglie la verifica si ripete a 1.200.000 nodi. Sopra −1,00 non si impone una perdita massima rispetto alla migliore: una mossa da +6 a 0 viene accettata, così come una vittoria che rinuncia al matto più corto. Questa è la differenza rispetto ai Puzzle, che richiedono una perdita massima di 50 centesimi dalla migliore.
 
 La soglia è una convenzione pratica di allenamento, non una dimostrazione matematica di patta o vittoria. Stockfish lavora con un budget limitato; il criterio e i punteggi sono espliciti nell’interfaccia. Le valutazioni di matto vengono trattate come esiti, non sottratte come enormi perdite numeriche.
 

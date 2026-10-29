@@ -7,6 +7,8 @@ from pydantic import BaseModel, Field
 
 INTERVAL_HOURS = [4, 24, 72, 168, 336, 720, 2160, 4320]
 TABLES = {'puzzle': 'exercises', 'prevention': 'prevention_positions'}
+# Prevention positions offered anywhere: confirmed by Stockfish and, once Maia judged them, lapses only.
+PREVENTION_LISTED = "{0}enabled=1 AND ({0}reach_status IS NULL OR {0}reach_status='lapse')"
 # Other scheduled items, as functions(con) returning plan rows; they keep their own review rules.
 PROVIDERS = []
 
@@ -71,7 +73,7 @@ def plan(con, timestamp):
     seen_today = {(r['kind'],r['target_id']) for r in independent}
     rows=[]
     for kind,table in TABLES.items():
-        where='WHERE e.enabled=1' if kind=='prevention' else ''
+        where='WHERE '+PREVENTION_LISTED.format('e.') if kind=='prevention' else ''
         for r in con.execute(f'''SELECT e.*,g.title AS game_title,g.pgn_headers AS headers,
           m.review_after,(SELECT count(*) FROM training_reviews v WHERE v.kind=? AND v.target_id=e.id AND v.independent=1) AS reviews
           FROM {table} e JOIN games g ON g.id=e.game_id

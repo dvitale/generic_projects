@@ -8,6 +8,7 @@ from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from . import insights, learning, tutor
+from .engine import load_analysis
 
 VERSION = 'final-review-1'
 
@@ -33,7 +34,7 @@ def normalized(evaluation, player, mover):
 
 
 def build_context(con, row, result):
-    analysis = json.loads(row['analysis'])
+    analysis = load_analysis(row['analysis'])
     drill = con.execute('SELECT start_ply FROM drill_sessions WHERE game_id=?', (row['id'],)).fetchone()
     start = drill['start_ply'] if drill else 0
     moves = json.loads(row['moves'])
@@ -100,7 +101,8 @@ trajectory contiene tutte le mosse ANALIZZATE di entrambi i colori in ordine:
 before/after/best/actual sono già dalla prospettiva del giocatore, anche quando
 muove l'avversario. Non invertire nuovamente i segni. lossCp è la perdita del lato
 che ha mosso. cp è in centesimi di pedone, non materiale perso né Elo. mate è
-separato, non convertirlo in pedoni. Non chiamare matto un abbandono. result='*'
+separato, non convertirlo in pedoni. Non chiamare matto un abbandono: termination='resign'
+significa che ha abbandonato il giocatore, 'engine_resign' che ha abbandonato il bot. result='*'
 significa risultato non noto/partita non conclusa: il bilancio è provvisorio.
 scope=drill riguarda una sessione, non una partita completa. startPly esclude la
 preparazione del drill. Se completeCoverage=false segnala le lacune: non inventare

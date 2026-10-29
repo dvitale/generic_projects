@@ -154,3 +154,87 @@ def test_practice_after_closing_checks_moves_without_recording(client):
     assert client.get('/api/prevention').json()['stats']==before
     with main.database() as con:
         assert con.execute('SELECT count(*) FROM prevention_attempts WHERE session_id=?',(s['id'],)).fetchone()[0]==1
+
+
+def test_a_small_loss_below_the_safety_line_is_not_a_blunder():
+    from backend.prevention import accepted
+    e = lambda cp=None, mate=None: {'cp': cp if mate is None else (100000 - mate if mate > 0 else -100000 - mate), 'mate': mate}
+    # From -0.80, losing 0.40 is accepted even below -1.00; losing 1.50 is not.
+    assert accepted(e(-80), e(-120))
+    assert not accepted(e(-80), e(-230))
+    assert accepted(e(300), e(-90))
+    # A mate against is never accepted; missing a mate is judged by the safety line only.
+    assert not accepted(e(-50), e(mate=-5))
+    assert not accepted(e(mate=3), e(-150))
+    assert accepted(e(mate=3), e(-20))
+
+
+def line(*moves):
+    return {'cp': -900, 'mate': None, 'pv': list(moves)}
+
+
+def test_elementary_refutations_lose_material_or_mate_within_four_plies():
+    hanging = chess.Board(FEN)
+    assert prevention.elementary(hanging, line('g6g8', 'a8g8'))
+    assert prevention.elementary(hanging, {'cp': -100000, 'mate': -1, 'pv': []})
+    # An even exchange is not a loss: the recapture inside the window restores the balance.
+    trade = chess.Board('4k3/8/4p3/3q4/8/8/3Q4/4K3 w - - 0 1')
+    assert not prevention.elementary(trade, line('d2d5', 'e6d5'))
+    # The loss must be concrete inside the window: a queen lost on the sixth ply is calculation, not a glance.
+    slow = chess.Board('4k3/8/8/8/8/8/1q6/Q3K3 w - - 0 1')
+    assert not prevention.elementary(slow, line('e1f1', 'e8e7', 'f1g1', 'e7e6', 'g1h1', 'b2a1'))
+
+
+def test_reach_separates_lapses_from_typical_and_complex_errors(monkeypatch):
+    board = chess.Board(FEN)
+    def fake(blunder, reply):
+        return lambda requests: [{'moves': [{'uci': 'g6g8', 'probability': blunder}]}, {'moves': [{'uci': 'a8g8', 'probability': reply}]}]
+    cases = [((0.30, 0.9), line('g6g8', 'a8g8'), 'typical'), ((0.01, 0.9), line('g6g8', 'a8g8'), 'lapse'),
+             ((0.01, 0.05), line('g6g8', 'a8g8'), 'lapse')]
+    for (blunder, reply), actual, status in cases:
+        monkeypatch.setattr(prevention.maia, 'predict_many', fake(blunder, reply))
+        assert prevention.assess_reach([(board, 'g6g8', actual, 1500)])[0]['status'] == status
+    # A refutation that is neither short nor likely for the opponent asks for calculation: it belongs to Puzzle.
+    monkeypatch.setattr(prevention, 'elementary', lambda *a: False)
+    monkeypatch.setattr(prevention.maia, 'predict_many', fake(0.01, 0.05))
+    verdict = prevention.assess_reach([(board, 'g6g8', line('g6g8', 'a8g8'), 1500)])[0]
+    assert verdict['status'] == 'complex' and verdict['reply'] == 'a8g8' and verdict['level'] == 1500
+    monkeypatch.setattr(prevention.maia, 'predict_many', fake(0.01, 0.20))
+    assert prevention.assess_reach([(board, 'g6g8', line('g6g8', 'a8g8'), 1500)])[0]['status'] == 'lapse'
+    # Without the engine line there is no evidence, and without Maia no verdict: the position stays as before.
+    assert prevention.assess_reach([(board, 'g6g8', {'cp': -900, 'mate': None, 'pv': []}, 1500)]) == [None]
+    monkeypatch.setattr(prevention.maia, 'available', lambda: False)
+    assert prevention.assess_reach([(board, 'g6g8', line('g6g8', 'a8g8'), 1500)]) == [None]
+
+
+@pytest.mark.skipif(not prevention.maia.available(), reason='modello Maia o onnxruntime assenti')
+def test_real_maia_marks_the_hanging_queen_as_a_lapse_and_the_catalog_hides_other_verdicts(client):
+    _, p = seed(client)
+    with main.database() as con:
+        reach = json.loads(con.execute('SELECT reach FROM prevention_positions WHERE id=?', (p['id'],)).fetchone()[0])
+    assert reach['status'] == 'lapse' and reach['elementary'] and reach['blunderProbability'] < 0.25 and reach['level'] == 1500
+    catalog = client.get('/api/prevention').json()
+    assert catalog['reach'] | {'description': ''} == {'lapse': 1, 'typical': 0, 'complex': 0, 'pending': 0, 'available': True, 'description': ''}
+    with main.database() as con:
+        con.execute("UPDATE prevention_positions SET reach_status='typical' WHERE id=?", (p['id'],))
+    catalog = client.get('/api/prevention').json()
+    assert catalog['positions'] == [] and catalog['reach']['typical'] == 1
+    # Positions indexed before the rule (or by an older version) are judged again by the backfill.
+    with main.database() as con:
+        con.execute('UPDATE prevention_positions SET reach=NULL,reach_status=NULL WHERE id=?', (p['id'],))
+    assert client.get('/api/prevention').json()['reach']['pending'] == 1
+    prevention.backfill_reach(main.database, main.load_analysis)
+    assert [x['id'] for x in client.get('/api/prevention').json()['positions']] == [p['id']]
+
+
+def test_positions_left_to_puzzle_leave_the_training_plan_and_the_game_pack(client):
+    game, p = seed(client)
+    plan = lambda: json.dumps(client.get('/api/training-plan').json())
+    assert p['id'] in plan()
+    with main.database() as con:
+        con.execute("UPDATE prevention_positions SET reach_status='complex' WHERE id=?", (p['id'],))
+        listed = con.execute('SELECT count(*) FROM prevention_positions WHERE ' + prevention.training_schedule.PREVENTION_LISTED.format(''))
+        assert listed.fetchone()[0] == 0
+    assert p['id'] not in plan()
+    pack = client.get(f"/api/study/games/{game['id']}/pack")
+    assert pack.status_code != 200 or p['id'] not in pack.text

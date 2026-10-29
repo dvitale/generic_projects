@@ -20,3 +20,18 @@ test('Move suggestion shows the first Stockfish and Maia choices and marks the t
   await expect(box).toHaveCount(0)
   await expect(page.locator('.analysis-arrow[data-source="stockfish"]')).toHaveCount(0)
 })
+
+test('arrows of the same move from different engines take turns in the foreground',async({page,request})=>{
+  const game=await(await request.post('/api/games',{data:{fen:'r6k/8/5KQ1/8/8/8/8/8 w - - 0 1',color:'w',elo:1500}})).json()
+  await page.addInitScript(id=>localStorage.setItem('chess-coach-game',id),game.id)
+  await page.goto('/')
+  await page.getByRole('button',{name:'Continua partita',exact:true}).click()
+  await page.getByRole('button',{name:'Suggerisci mossa',exact:true}).click()
+  await expect(page.getByRole('status',{name:'Suggerimento'})).toContainText('Maia 1500:',{timeout:90000})
+  const arrows=page.locator('.analysis-arrow[data-move="g6g7"]')
+  await expect(arrows).toHaveCount(2)
+  const top=()=>arrows.last().getAttribute('data-source')
+  const first=await top()
+  await expect.poll(top,{timeout:4500,intervals:[200]}).not.toBe(first)
+  await expect.poll(top,{timeout:4500,intervals:[200]}).toBe(first)
+})

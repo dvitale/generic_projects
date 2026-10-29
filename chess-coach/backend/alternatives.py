@@ -1204,6 +1204,8 @@ def local_results(con):
         outcome = board.outcome(claim_draw=True)
         if row['termination'] == 'resign':
             score = 'loss'
+        elif row['termination'] == 'engine_resign':
+            score = 'win'
         elif outcome is None:
             continue
         else:

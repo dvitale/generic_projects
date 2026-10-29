@@ -58,7 +58,7 @@ async function maiaEstimate(fen:string,moves:string[]){
   return out
 }
 
-export default function Problems(){
+export default function Problems({onPlayFrom}:{onPlayFrom?:(fen:string,color:Color,title:string)=>void}={}){
   const [overview,setOverview]=useState<Overview|null>(null)
   const [band,setBand]=useState<number|null>(null)
   const [theme,setTheme]=useState('')
@@ -148,6 +148,13 @@ export default function Problems(){
   }
 
   const solution=problem&&result?[problem.puzzle.opponentMove,...result.solution]:[]
+  // The solver's starting position: after the opponent's move that sets the problem.
+  function playFrom(){
+    if(!problem||!onPlayFrom)return
+    const b=new Chess(problem.puzzle.fen);const m=problem.puzzle.opponentMove
+    b.move({from:m.slice(0,2),to:m.slice(2,4),promotion:m[4]})
+    onPlayFrom(b.fen(),problem.puzzle.turn,`Problema ${problem.puzzle.id} · ${b.moveNumber()}${problem.puzzle.turn==='w'?'.':'…'}`)
+  }
   function restart(){practiceTicket.current++;setCursor(null);setPractice({line:solution.slice(0,1),state:'solving'})}
   async function practiceMove(uci:string){
     if(!problem||practice?.state!=='solving')return
@@ -218,7 +225,7 @@ export default function Problems(){
           </div>}
           <div className="row">
             {phase!=='done'?<><button disabled={busy||phase!=='solving'||diagnosing===problem.sessionId} onClick={()=>setDiagnosing(problem.sessionId)}>Mostra soluzione</button><button disabled={busy} onClick={()=>void start()}>{failed||problem.step>1?'Prossimo problema':'Salta'}</button></>
-            :<><button className="primary" disabled={busy} onClick={()=>void start()}>Prossimo problema →</button><button title="Riporta la scacchiera alla posizione iniziale per riprovare: non cambia il rating" onClick={restart}>↺ Riprova da capo</button></>}
+            :<><button className="primary" disabled={busy} onClick={()=>void start()}>Prossimo problema →</button><button title="Riporta la scacchiera alla posizione iniziale per riprovare: non cambia il rating" onClick={restart}>↺ Riprova da capo</button>{onPlayFrom&&<button className="play-from" title="Nuova partita contro Maia dalla posizione in cui tocca a te" onClick={playFrom}>Gioca da qui col {problem.puzzle.turn==='w'?'Bianco':'Nero'}</button>}</>}
             <button className="quiet" disabled={busy&&phase!=='done'} onClick={()=>{token.current++;setProblem(null);setBusy(false)}}>Cambia fascia</button>
           </div>
           {problem.repeated&&phase!=='done'&&<p className="footnote">Hai già visto tutti i problemi di questa selezione: questo è una ripetizione.</p>}

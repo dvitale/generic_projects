@@ -23,11 +23,13 @@ Il server ospita anche altri siti, con i propri virtual host in `/etc/nginx/site
 | Dati | `/opt/sparringmate/data` (utente `sparringmate`, permessi 750): `coach.sqlite3` e `session.key` |
 | Credenziali di accesso | `/opt/sparringmate/.env` (`SPARRINGMATE_USER`, `SPARRINGMATE_PASSWORD`; utente `sparringmate`, permessi 600) |
 | Python | `/opt/sparringmate/.venv`, Python 3.12.14, dipendenze da `requirements.lock` |
+| Maia sul server | `backend/maia.py` legge `web/public/maia3/maia3_simplified.onnx`, copiato dal deploy; onnxruntime da `requirements.lock`. Caricato alla prima richiesta: circa 150–200 MB di RAM in più per `sparringmate.service` (misure in `docs/maia-server.md`) |
 | Stockfish | `/opt/sparringmate/engine/stockfish`, Stockfish 19 compilato sul server (vedi sotto) |
 | Servizio | `sparringmate.service`, utente `sparringmate`, Uvicorn su `127.0.0.1:8033` con `--proxy-headers` (copia in `sparringmate.service`) |
 | nginx | `/etc/nginx/sites-enabled/sparringmate.conf` (copia in `sparringmate.conf`) |
 | Log nginx | `/var/log/nginx/sparringmate-access.log`, `/var/log/nginx/sparringmate-error.log` |
-| Log applicazione | `journalctl -u sparringmate` |
+| Motore sperimentale | `experiments/human-policy` (solo codice, `best.pt` accettati e ledger), `.venv` solo CPU da `requirements-serve.txt`; `sparringmate-experimental.service` su `127.0.0.1:8044` (copia in `sparringmate-experimental.service`), circa 250 MB di RAM; attivato da `SPARRINGMATE_EXPERIMENTAL_ENGINE` nel `.env` |
+| Log applicazione | `journalctl -u sparringmate` (motore sperimentale: `journalctl -u sparringmate-experimental`) |
 | TLS | `/etc/ssl/certs/u-s.it.cer` e `/etc/ssl/private/u-s.it.key`, certificato `*.u-s.it` (scadenza 5 novembre 2026), condiviso con gli altri siti |
 
 Il servizio usa `ProtectSystem=strict`: l'unica cartella in cui può scrivere è `data/`. La chiave DeepSeek è installata dal 18 ottobre 2026 in `.secrets/deepseek.json` (utente `sparringmate`, cartella 700, file 600, modello `deepseek-flash`): il tutor e **Spiega motivo** usano DeepSeek, con addebito sulla chiave. `make deploy` non tocca `.secrets/`. Per sostituirla: `.venv/bin/python scripts/configure_deepseek.py` sul server, poi `chown -R sparringmate:sparringmate .secrets`.
@@ -41,12 +43,13 @@ SSHPASS='…' make deploy    # in alternativa, la password tramite sshpass
 
 `scripts/deploy.sh` esegue questi passi:
 
-1. compila l'interfaccia (`SKIP_BUILD=1` per saltare il passo);
+1. controlla che `web/public/maia3/maia3_simplified.onnx` esista e abbia l'hash del manifest: senza, `--delete` lo toglierebbe anche dal server; poi compila l'interfaccia (`SKIP_BUILD=1` per saltare la compilazione);
 2. sincronizza la cartella con `rsync --delete --no-owner --no-group --chmod=Dgo-w,Fgo-w`: il codice resta di `root` e non è scrivibile da gruppo e altri, qualunque siano i permessi della copia locale; non tocca `.env`, `.secrets/`, `data/`, `.venv/` né `engine/`;
    se esiste in locale, copia anche `data/lichess_puzzles.sqlite3` (i problemi di `make puzzles`, sola lettura); gli altri file di `data/` restano solo sul server;
-3. aggiorna le dipendenze con `uv pip install`;
+   copia a parte il motore sperimentale (codice, `best.pt` accettati con `verification.json`, `data/cycles/ledger.json`); il suo `.venv` sul server non viene toccato;
+3. aggiorna le dipendenze con `uv pip install` ed esegue un'inferenza di prova di Maia sul server (un onnxruntime che va in crash ferma il deploy prima del riavvio); per il motore sperimentale crea il `.venv` solo CPU se manca, installa la unit, la riavvia, aggiunge `SPARRINGMATE_EXPERIMENTAL_ENGINE` al `.env` se assente e controlla `/health` sulla porta 8044;
 4. installa unit e virtual host se sono cambiati: crea prima una copia in `/root/sparringmate.conf.bak-…`, esegue `nginx -t` e ripristina la copia se il test fallisce;
-5. riavvia il servizio e verifica `/api/health`, poi che `/api/games` senza login risponda 401.
+5. riavvia il servizio e verifica `/api/health`, anche `maiaServer: disponibile`, poi che `/api/games` senza login risponda 401.
 
 Variabili disponibili: `DEPLOY_HOST` (predefinito `root@sparringmate.u-s.it`), `DEPLOY_DIR`, `DEPLOY_URL`.
 

@@ -29,6 +29,12 @@ export function useMoveTime(game:Game|null,active:boolean) {
     persist();const seconds=t.milliseconds/1000;resume()
     return Math.min(604800,Math.max(0,seconds))
   }
+  /** Seconds spent so far on this turn, read without pausing the timer: drives the visible clock. */
+  function live(snapshot:Game):number|null{
+    const t=timer.current
+    if(!t||t.key!==key(snapshot))return null
+    return (t.milliseconds+(t.started===null?0:performance.now()-t.started))/1000
+  }
   useEffect(()=>{
     persist()
     if(!game){timer.current=null;return}
@@ -45,5 +51,5 @@ export function useMoveTime(game:Game|null,active:boolean) {
     window.addEventListener('pagehide',hide)
     return()=>{persist();document.removeEventListener('visibilitychange',visibility);window.removeEventListener('pagehide',hide)}
   },[game?.id,game?.version,game?.revision,active])
-  return {begin,elapsed}
+  return {begin,elapsed,live}
 }
