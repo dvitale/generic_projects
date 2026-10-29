@@ -29,7 +29,6 @@ test('puzzle and prevention identify the originating game and open the exact dec
   await page.goto('/')
   for(const mode of ['Puzzle','Blunder prevention']){
     await page.getByRole('button',{name:mode==='Puzzle'?/^Puzzle/:mode,exact:mode!=='Puzzle'}).click()
-    if(mode!=='Puzzle')await page.getByRole('button',{name:'Inizia Blunder prevention'}).click()
     const source=page.getByRole('region',{name:'Partita di origine'})
     await expect(source).toContainText(game.title)
     await expect(source).toContainText('Mossa 17. · Bianco')

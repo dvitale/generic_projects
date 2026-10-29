@@ -12,7 +12,7 @@ import ChessInsights,{ThinkingGuide,type Insight} from './ChessInsights'
 import {api} from './api'
 import type {Color,Evaluation,Practice} from './types'
 
-interface Position {id:string;gameId:string;title:string;gameCreatedAt?:string;ply:number;fen:string;turn:Color;moveNumber:number;legalMoves:string[];dueAt:string;streak:number}
+interface Position {id:string;gameId:string;title:string;gameNumber?:number|null;gameCreatedAt?:string;ply:number;fen:string;turn:Color;moveNumber:number;legalMoves:string[];dueAt:string;streak:number}
 interface Reach {lapse:number;typical:number;complex:number;pending:number;available:boolean;description:string}
 interface Catalog {positions:Position[];stats:{firstAttempts:number;firstSuccesses:number};analyzedGames:number;reach:Reach;rule:{description:string}}
 interface Session {id:string;version:number;exposure:string;excluded?:boolean;message?:string}
@@ -40,6 +40,9 @@ export default function BlunderPrevention({onArchive,onReview,onPlayMistake,onPl
   async function refresh(){const next=await api<Catalog>('/prevention');setCatalog(next);return next}
   useEffect(()=>{let stale=false;api<Catalog>('/prevention').then(c=>{if(!stale)setCatalog(c)}).catch(e=>{if(!stale)setError(e.message)});return()=>{stale=true;operation.current++}},[])
   useEffect(()=>{if(startPositionId&&catalog&&!busy){const p=catalog.positions.find(p=>p.id===startPositionId);onStarted?.();if(p)void open(p);else setError('Posizione non disponibile: aggiorna il piano.')}},[startPositionId,catalog])
+  // From the menu the first position opens at once; the overview page is left for empty or finished sessions.
+  const started=useRef(false)
+  useEffect(()=>{if(!catalog||started.current||startPositionId)return;started.current=true;if(catalog.positions[0]&&!position)void open(catalog.positions[0])},[catalog,startPositionId])
   const remaining=catalog?.positions.filter(p=>!done.includes(p.id)&&p.id!==position?.id)||[]
   async function open(p:Position){
     const token=++operation.current
@@ -89,16 +92,17 @@ export default function BlunderPrevention({onArchive,onReview,onPlayMistake,onPl
   const displayedMove=showOriginal?result?.original?.move:motion.move??undefined
   const board=position?new Chess(position.fen):null
   if(board&&displayedMove)board.move({from:displayedMove.slice(0,2),to:displayedMove.slice(2,4),promotion:displayedMove[4]})
+  const reachNote=catalog?.reach&&<InfoNote summary="Solo abbagli, non lacune"><p>{catalog.reach.description}</p>
+        {catalog.reach.available?<p>Escluse: <strong>{catalog.reach.typical}</strong> {catalog.reach.typical===1?'errore tipico':'errori tipici'} del livello e <strong>{catalog.reach.complex}</strong> {catalog.reach.complex===1?'confutazione':'confutazioni'} da calcolare: si allenano meglio nei Puzzle.{catalog.reach.pending>0&&` ${catalog.reach.pending} ancora da valutare, per ora incluse.`}</p>
+        :<p>Maia sul server non è disponibile: tutte le posizioni restano incluse.</p>}</InfoNote>
   return <div className="prevention">
     {error&&<div className="alert" role="alert">{error}<button disabled={busy} onClick={()=>position?void open(position):void refresh().catch(e=>setError(e.message))}>Riprova</button></div>}
     {notice&&<div className="notice" role="status">{notice}</div>}
     <div className="prevention-summary"><span><strong>{catalog?.positions.length??'—'}</strong> tue posizioni</span><span><strong>{catalog?.stats.firstSuccesses??0} / {catalog?.stats.firstAttempts??0}</strong> primi tentativi riusciti senza aiuti</span><span>{done.length} completate o escluse in questa sessione</span></div>
-    {!position?<section className="panel prevention-intro"><span className="eyebrow">COME FUNZIONA</span><h2>Evita di nuovo lo stesso blunder</h2><p>Ti riproponiamo la posizione prima del tuo errore. Va bene qualsiasi mossa che mantenga la partita difendibile, non serve trovare la prima scelta del motore.</p>
+    {!position?<section className="panel prevention-intro"><span className="eyebrow">COME FUNZIONA</span><h2>Evita di nuovo lo stesso blunder</h2><p>Ti riproponiamo la posizione prima del tuo errore. Basta non ripetere l’abbaglio: va bene qualsiasi mossa che eviti il blunder della partita senza commetterne un altro, anche se Stockfish ne preferisce una migliore.</p>
       {!catalog?<p role="status">Caricamento delle tue posizioni…</p>:remaining.length?<button className="primary" disabled={busy} onClick={next}>Inizia Blunder prevention →</button>:<><p>{catalog.positions.length?'Hai completato tutte le posizioni disponibili in questa sessione.':'Nessun blunder evitabile disponibile. Gioca o importa una partita, seleziona il tuo colore e avvia Analizza partita: le posizioni adatte appariranno qui.'}</p>{catalog.positions.length>0&&<button onClick={()=>{setDone([]);void open(catalog.positions[0])}}>Ripeti come pratica</button>}<button onClick={onArchive}>Apri le tue partite</button></>}
       <InfoNote summary="Quali mosse sono accettate"><p>{catalog?.rule.description} Le posizioni già perse prima dell’errore vengono escluse. Il primo accesso include una verifica Stockfish approfondita.</p></InfoNote>
-      {catalog?.reach&&<InfoNote summary="Solo abbagli, non lacune"><p>{catalog.reach.description}</p>
-        {catalog.reach.available?<p>Escluse: <strong>{catalog.reach.typical}</strong> {catalog.reach.typical===1?'errore tipico':'errori tipici'} del livello e <strong>{catalog.reach.complex}</strong> {catalog.reach.complex===1?'confutazione':'confutazioni'} da calcolare: si allenano meglio nei Puzzle.{catalog.reach.pending>0&&` ${catalog.reach.pending} ancora da valutare, per ora incluse.`}</p>
-        :<p>Maia sul server non è disponibile: tutte le posizioni restano incluse.</p>}</InfoNote>}</section>:<div className="training-layout layout-prevention">
+      {reachNote}</section>:<div className="training-layout layout-prevention">
       <section className="board-column">
         <div className="player-row"><span className="avatar">◇</span><div><strong>{position.turn==='w'?'Muove il Bianco':'Muove il Nero'}</strong><small>Mossa {position.moveNumber} · {position.title}</small></div></div>
         <Board fen={board!.fen()} orientation={boardOrientation} legalMoves={position.legalMoves} interactive={!busy&&!!session&&(!result?.closed||practicing&&!showOriginal&&!practice?.result?.success)&&diagnosing!==session.id} onMove={move=>void (practicing?practiceMove(move):submit(move))} lastMove={showOriginal?displayedMove:motion.lastMove} animateMove reverseMove={!showOriginal&&motion.reverse}/>
@@ -107,17 +111,18 @@ export default function BlunderPrevention({onArchive,onReview,onPlayMistake,onPl
       </section>
       <aside className="coach-column">
         <section className={`puzzle-feedback ${result?.success?'solved':result&&!result.closed?'retry':''}`} aria-label="Esito Blunder prevention">
-          <div role="status" aria-live="polite"><h3>{practicing?(busy&&!motion.message?'Verifica della mossa…':practice?.result?.success?`✓ ${practice.result.san}: mossa sicura`:practice?.result?`↻ ${practice.result.san}: non basta`:'↺ Pratica dalla posizione iniziale'):motion.message?'↻ Mossa da migliorare':busy?session?'Verifica della mossa…':'Verifica della posizione…':result?.success?'✓ Blunder evitato!':result?.closed?'Una mossa sicura':result?'↻ Riprova una mossa diversa':'Evita il blunder'}</h3><p>{motion.message||(practicing?(practice?.result?.success?'Puoi ricominciare quante volte vuoi.':'Cerca una mossa sicura: Stockfish la verifica, ma la pratica non conta per i ripassi.'):busy?'Stockfish sta controllando la posizione.':result?.message||'Cerca una mossa sicura. Più alternative possono essere corrette.')}</p></div>
+          <div role="status" aria-live="polite"><h3>{practicing?(busy&&!motion.message?'Verifica della mossa…':practice?.result?.success?`✓ ${practice.result.san}: mossa sicura`:practice?.result?`↻ ${practice.result.san}: non basta`:'↺ Pratica dalla posizione iniziale'):motion.message?'↻ Mossa da migliorare':busy?session?'Verifica della mossa…':'Verifica della posizione…':result?.success?'✓ Blunder evitato!':result?.closed?'Una mossa sicura':result?'↻ Riprova una mossa diversa':'Evita il blunder'}</h3><p>{motion.message||(practicing?(practice?.result?.success?'Puoi ricominciare quante volte vuoi.':'Evita il blunder: Stockfish lo verifica, ma la pratica non conta per i ripassi.'):busy?'Stockfish sta controllando la posizione.':result?.message||'Trova una mossa che eviti il blunder della partita. Non serve la migliore.')}</p></div>
           {result?.closed&&<button disabled={busy} title="Riporta la scacchiera alla posizione iniziale per riprovare: non conta per i ripassi" onClick={restart}>↺ Riprova da capo</button>}
           {result?.closed&&onPlayFrom&&<button className="play-from" disabled={busy} title="Nuova partita contro Maia dalla posizione prima del tuo errore"
             onClick={()=>onPlayFrom(position.fen,position.turn,`Blunder prevention · ${position.title} · ${position.moveNumber}${position.turn==='w'?'.':'…'}`)}>Gioca da qui col {position.turn==='w'?'Bianco':'Nero'}</button>}
           {result?.closed&&<div className="puzzle-next">{remaining.length?<button className="primary" disabled={busy} onClick={next}>Prossima posizione →</button>:<><p>Hai completato tutte le posizioni disponibili.</p><button onClick={()=>{setPosition(null);setSession(null);setResult(null)}}>Riepilogo della sessione</button></>}</div>}
         </section>
-        <ExerciseSource title={position.title} createdAt={position.gameCreatedAt} fen={position.fen} disabled={busy} onReview={()=>onReview(position.gameId,position.ply)}/>
+        <ExerciseSource title={position.title} number={position.gameNumber} createdAt={position.gameCreatedAt} fen={position.fen} disabled={busy} onReview={()=>onReview(position.gameId,position.ply)}/>
         <section className="panel"><ThinkingGuide/><p className="footnote">La mossa può perdere per una tattica o compromettere una posizione difendibile. Stockfish decide l’esito; la spiegazione distingue fatti e ipotesi.</p></section>
-        <section className="panel"><span className="eyebrow">PRIMA DI MUOVERE</span><h2>Tre controlli</h2><ol><li>Il re è al sicuro?</li><li>Quali pezzi sono attaccati o indifesi?</li><li>Quali scacchi e catture avrà l’avversario?</li></ol><p className="muted">Una mossa semplice che evita la perdita è sufficiente.</p>
+        <section className="panel"><span className="eyebrow">PRIMA DI MUOVERE</span><h2>Tre controlli</h2><ol><li>Il re è al sicuro?</li><li>Quali pezzi sono attaccati o indifesi?</li><li>Quali scacchi e catture avrà l’avversario?</li></ol><p className="muted">Una mossa semplice che evita l’abbaglio è sufficiente.</p>
           {!result?.closed&&<div className="row"><button disabled={busy||!session||diagnosing===session.id} onClick={()=>setDiagnosing(session!.id)}>Mostra una mossa sicura</button><button disabled={busy||!remaining.length} onClick={()=>{setDone(d=>[...d,position.id]);next()}}>Salta posizione</button></div>}
-          <p className="footnote">{catalog?.rule.description} I valori sono dal tuo punto di vista e sono stime del motore.</p>
+          <InfoNote summary="Quali mosse sono accettate"><p>{catalog?.rule.description} I valori sono dal tuo punto di vista e sono stime del motore.</p></InfoNote>
+          {reachNote}
           {session?.exposure==='practice'&&<p className="footnote">Ripetizione anticipata: utile per esercitarti, non aumenta i successi indipendenti.</p>}
         </section>
         {session&&diagnosing===session.id&&<FailureDiagnosis kind="prevention" targetId={position.id} sessionId={session.id} onReveal={()=>void submit()} onCancel={()=>setDiagnosing(null)}/>}

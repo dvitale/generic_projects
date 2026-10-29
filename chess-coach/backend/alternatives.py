@@ -23,7 +23,7 @@ import chess
 from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from . import diagnosis, explain, learning, pgn_import, tutor
+from . import diagnosis, explain, learning, pgn_import, training_schedule, tutor
 from .engine import evaluator
 from .insights import material
 
@@ -654,7 +654,7 @@ def install(app, database, now, find_game, playable, make_move, puzzles_path):
         board, closed = board_of(row), row['status'] in ('reflecting', 'complete')
         evidence, reasoning = stored(row, 'evidence'), stored(row, 'reasoning')
         hints = stored(row, 'hints', {})
-        game = con.execute('SELECT id,title,moves,source,pgn_headers FROM games WHERE id=?', (row['game_id'],)).fetchone() if row['game_id'] else None
+        game = con.execute('SELECT id,number,title,moves,source,pgn_headers FROM games WHERE id=?', (row['game_id'],)).fetchone() if row['game_id'] else None
         source = stored(row, 'source_ref', {})
         played = None
         if game and row['ply'] is not None and len(json.loads(game['moves'])) > row['ply']:
@@ -669,7 +669,7 @@ def install(app, database, now, find_game, playable, make_move, puzzles_path):
                 'parentId': row['parent_id'], 'origin': row['origin'], 'reasoningOrigin': row['reasoning_origin'], 'exposure': row['exposure'],
                 'status': row['status'], 'createdAt': row['created_at'], 'fen': row['fen'], 'color': row['color'],
                 'moveNumber': board.fullmove_number, 'ply': row['ply'], 'gameId': row['game_id'],
-                'gameTitle': game['title'] if game else source.get('title'), 'gameSource': game['source'] if game else source.get('kind'),
+                'gameTitle': game['title'] if game else source.get('title'), 'gameNumber': game['number'] if game else None, 'gameSource': game['source'] if game else source.get('kind'),
                 'onlineMaia': bool(game) and pgn_import.origin(json.loads(game['pgn_headers'])) == 'Maia online',
                 'legalMoves': [m.uci() for m in board.legal_moves], 'playedMove': played if closed or row['origin'] != 'live' else None,
                 'reasoning': reasoning, 'analysisReady': bool(evidence), 'helpLevel': row['help_level'], 'hints': shown,
@@ -1219,9 +1219,9 @@ def local_results(con):
 def plan_rows(con):
     """Scheduled exposures for the daily plan, beside puzzles and Blunder prevention."""
     rows = []
-    for r in con.execute('''SELECT e.*,g.title AS game_title FROM stuck_episodes e LEFT JOIN games g ON g.id=e.game_id
+    for r in con.execute('''SELECT e.*,g.title AS game_title,g.number AS game_number FROM stuck_episodes e LEFT JOIN games g ON g.id=e.game_id
         WHERE e.due_at IS NOT NULL AND e.status!='complete' ''').fetchall():
         rows.append({'kind': 'alternative', 'id': r['id'], 'gameId': r['game_id'] or 'ref:' + r['id'], 'ply': r['ply'] or 0,
-                     'title': r['game_title'] or stored(r, 'source_ref', {}).get('title') or 'Posizione', 'theme': 'Trova un’alternativa · ' + ROLES[r['role']].lower(),
+                     'title': training_schedule.numbered(r['game_title'], r['game_number']) or stored(r, 'source_ref', {}).get('title') or 'Posizione', 'theme': 'Trova un’alternativa · ' + ROLES[r['role']].lower(),
                      'stage': r['stage'], 'dueAt': r['due_at'], 'readyAt': r['due_at'], 'new': r['exposure'] == 'new'})
     return rows

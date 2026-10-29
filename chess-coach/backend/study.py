@@ -483,7 +483,7 @@ def notebook_entries(con, timestamp):
             lessons = [c['lesson'] for c in cards if c['fen'] == d['fen']]
             themes.setdefault(d['theme'], {'theme': d['theme'], 'decisions': [], 'lessons': []})
             themes[d['theme']]['decisions'].append({
-                'gameId': row['id'], 'gameTitle': row['title'], 'createdAt': row['created_at'], 'ply': d['ply'],
+                'gameId': row['id'], 'gameTitle': training_schedule.numbered(row['title'], row['number']), 'createdAt': row['created_at'], 'ply': d['ply'],
                 'fen': d['fen'], 'turn': 'w' if board.turn else 'b', 'moveNumber': board.fullmove_number,
                 'played': d['played'], 'playedSan': d['playedSan'], 'best': d['best']['pv'][:1], 'bestSan': d['best']['san'][:1],
                 'line': d['best']['san'], 'loss': d['loss'], 'label': 'Errore' if d['loss'] >= 180 else 'Imprecisione',
@@ -717,7 +717,7 @@ def install(app, database, find_game, now, lock):
                             'label': 'Errore' if d['loss'] >= 180 else 'Imprecisione', 'theme': d['theme'],
                             'insight': (d.get('insight') or {}).get('label'),
                             'exerciseId': exercises.get(d['ply']), 'preventionId': positions.get(d['ply']), 'cards': cards.get(d['ply'], 0)})
-        return {'gameId': game_id, 'title': row['title'], 'createdAt': row['created_at'], 'playerColor': row['player_color'],
+        return {'gameId': game_id, 'title': training_schedule.numbered(row['title'], row['number']), 'createdAt': row['created_at'], 'playerColor': row['player_color'],
                 'quality': learning.quality(decisions), 'moments': moments,
                 'quiz': {'answered': quiz['answered'], 'score': quiz['score'], 'total': len(json.loads(quiz['questions']))} if quiz else None}
 

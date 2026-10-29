@@ -17,11 +17,13 @@ from . import diagnosis
 
 SAFE_CP = -100
 BLUNDER_CP = -200
-# Below SAFE_CP a move is still accepted when it gives up less than this against the best one:
-# starting from -0.80, a move to -1.20 is not a blunder.
-TOLERANCE_CP = 100
+# The exercise asks to avoid the game's blunder, not to find a good move: below SAFE_CP a move is still accepted
+# unless it gives up this much against the best one, the same gap that made the game move a blunder.
+AVOID_CP = 200
 RULE_VERSION = 1
-RULE = 'È accettata ogni mossa valutata almeno −1,00 dalla tua parte, oppure che perde meno di 1,00 rispetto alla migliore, senza matto forzato contro di te. Non è richiesta la migliore.'
+RULE = ('Basta evitare il blunder della partita: è accettata ogni mossa diversa da quella giocata allora che non è a sua '
+        'volta un blunder, cioè resta almeno a −1,00 dalla tua parte oppure perde meno di 2,00 rispetto alla migliore, '
+        'senza matto forzato contro di te. Non è richiesta la migliore: anche una mossa a −1,10 da quella va bene.')
 
 
 # «Alla portata»: a blunder is a lapse (abbaglio), not a skill gap, when humans of the game's level rarely play it
@@ -90,12 +92,15 @@ def safe(value):
     return value['mate'] > 0 if value['mate'] is not None else value['cp'] >= SAFE_CP
 
 
-def accepted(best, actual):
+def accepted(best, actual, original=False):
+    """The answer avoids the game's blunder: it is not the game move and is not a blunder itself."""
+    if original:
+        return False
     if safe(actual):
         return True
     if actual['mate'] is not None or best['mate'] is not None:
         return False
-    return best['cp'] - actual['cp'] < TOLERANCE_CP
+    return best['cp'] - actual['cp'] < AVOID_CP
 
 
 def eligible(best, actual):
@@ -103,7 +108,7 @@ def eligible(best, actual):
         return False
     if actual['mate'] is not None:
         return actual['mate'] < 0
-    return actual['cp'] <= BLUNDER_CP and (best['mate'] is not None or best['cp'] - actual['cp'] >= 200)
+    return actual['cp'] <= BLUNDER_CP and (best['mate'] is not None or best['cp'] - actual['cp'] >= AVOID_CP)
 
 
 def init_schema(con):
@@ -203,7 +208,7 @@ def install(app, database, reconstruct, now):
 
     def check(board, move):
         best, actual, _ = evaluator.compare(board, move, nodes=300000)
-        near_loss = best['mate'] is None and actual['mate'] is None and abs(best['cp'] - actual['cp'] - TOLERANCE_CP) <= 50
+        near_loss = best['mate'] is None and actual['mate'] is None and abs(best['cp'] - actual['cp'] - AVOID_CP) <= 50
         if near_loss or any(v['mate'] is None and abs(v['cp'] - SAFE_CP) <= 50 for v in (best, actual)):
             best, actual, _ = evaluator.compare(board, move, nodes=1200000)
         return best, actual
@@ -217,21 +222,21 @@ def install(app, database, reconstruct, now):
         row = find(con, position_id)
         active(con, position_id, session_id)
         tried = [r[0] for r in con.execute('SELECT move FROM prevention_attempts WHERE session_id=? AND success=0 AND assisted=0 ORDER BY id', (session_id,))]
-        return {'board': board_for(row), 'accepts': lambda board, move, evaluation, best: accepted(best, evaluation), 'tried': tried}
+        return {'board': board_for(row), 'accepts': lambda board, move, evaluation, best: accepted(best, evaluation, move.uci() == row['original_move']), 'tried': tried}
 
     diagnosis.register('prevention', diagnosis_position)
 
     @app.get('/api/prevention')
     def catalog():
         with database() as con:
-            rows = con.execute('''SELECT p.*,g.title,g.created_at AS game_created_at FROM prevention_positions p JOIN games g ON g.id=p.game_id
+            rows = con.execute('''SELECT p.*,g.title,g.number AS game_number,g.created_at AS game_created_at FROM prevention_positions p JOIN games g ON g.id=p.game_id
                 WHERE '''+training_schedule.PREVENTION_LISTED.format('p.')+'''
                 ORDER BY p.due_at<=? DESC, p.last_shown_at IS NOT NULL, p.last_shown_at, p.due_at, p.id''', (now(),)).fetchall()
             items = []
             for row in rows:
                 board = board_for(row)
                 items.append({'id': row['id'], 'gameId': row['game_id'], 'title': row['title'], 'ply': row['ply'],
-                              'gameCreatedAt': row['game_created_at'],
+                              'gameCreatedAt': row['game_created_at'], 'gameNumber': row['game_number'],
                               'fen': board.fen(), 'turn': 'w' if board.turn else 'b', 'moveNumber': board.fullmove_number,
                               'legalMoves': [m.uci() for m in board.legal_moves], 'dueAt': row['due_at'], 'streak': row['streak']})
             stats = con.execute('''SELECT count(*) AS firstAttempts,coalesce(sum(a.success),0) AS firstSuccesses
@@ -242,7 +247,7 @@ def install(app, database, reconstruct, now):
         return {'positions': items, 'stats': dict(stats), 'analyzedGames': analyzed,
                 'reach': {'lapse': counts.get('lapse', 0), 'typical': counts.get('typical', 0), 'complex': counts.get('complex', 0),
                           'pending': counts.get('pending', 0), 'available': maia.available(), 'description': REACH_RULE},
-                'rule': {'safeCp': SAFE_CP, 'toleranceCp': TOLERANCE_CP, 'description': RULE}}
+                'rule': {'safeCp': SAFE_CP, 'avoidCp': AVOID_CP, 'description': RULE}}
 
     @app.post('/api/prevention/{position_id}/sessions')
     def session(position_id: str):
@@ -296,7 +301,7 @@ def install(app, database, reconstruct, now):
         if move not in board.legal_moves:
             raise HTTPException(422, 'Mossa non legale')
         best, actual = check(board, move)
-        return {'success': accepted(best, actual), 'san': board.san(move), 'actual': actual}
+        return {'success': accepted(best, actual, body.move == row['original_move']), 'san': board.san(move), 'actual': actual}
 
     @app.post('/api/prevention/{position_id}/attempts')
     def attempt(position_id: str, body: AttemptBody):
@@ -308,7 +313,8 @@ def install(app, database, reconstruct, now):
         if move not in board.legal_moves:
             raise HTTPException(422, 'Mossa non legale')
         best, actual = check(board, move)
-        success = accepted(best, actual)
+        original = body.move == row['original_move']
+        success = accepted(best, actual, original)
         with database() as con:
             con.execute('BEGIN IMMEDIATE')
             current = find(con, position_id)
@@ -319,7 +325,9 @@ def install(app, database, reconstruct, now):
                 'insight': insights.public(insights.compare(board.fen(),body.move,best,actual)),
                 'example': best if success else None,
                 'original': explanation(row, json.loads(row['verification'])) if success else None,
-                'message': 'Blunder evitato: questa mossa mantiene la posizione difendibile.' if success else 'Secondo Stockfish questa mossa scende sotto −1,00 e perde almeno 1,00 rispetto alla migliore. Riprova: non serve trovare la migliore.'}
+                'message': ('Blunder evitato: non serve che sia la migliore.' if success else
+                            'È la stessa mossa della partita: cerca dove sta l’abbaglio.' if original else
+                            'Anche questa mossa è un blunder: secondo Stockfish scende sotto −1,00 e perde almeno 2,00 rispetto alla migliore. Riprova.')}
 
     @app.post('/api/prevention/{position_id}/reveal')
     def reveal(position_id: str, body: SessionBody):

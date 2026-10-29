@@ -41,7 +41,7 @@ test('The mistake explanation stays beside the board while the page scrolls and 
   await page.route('**/api/training/prevention/p/mistakes',route=>route.fulfill({json:[{id:1,fen,move:'g6g8',san:'Qg8+',createdAt:'2026-10-15T14:00:00Z',lossCp:null,reference:{cp:0,mate:1},actual}]}))
   await page.route('**/api/training/prevention/p/mistakes/1/explain',route=>route.fulfill({json:{cached:false,provider:'DeepSeek',explanation:{reason:'La donna è indifesa su g8.',continuation:'Il re la cattura.',lesson:'Controlla chi difende la casa d’arrivo.'}}}))
   await page.setViewportSize({width:1400,height:900})
-  await page.goto('/');await page.getByRole('button',{name:'Blunder prevention',exact:false}).click();await page.getByRole('button',{name:'Inizia Blunder prevention'}).click()
+  await page.goto('/');await page.getByRole('button',{name:'Blunder prevention',exact:false}).click()
   await expect(page.getByRole('button',{name:'Gioca Qg8+ contro Stockfish'})).toBeVisible()
   await page.getByRole('button',{name:'Spiega motivo',exact:true}).click()
   const panel=page.getByRole('dialog',{name:'Perché Qg8+ non va'})

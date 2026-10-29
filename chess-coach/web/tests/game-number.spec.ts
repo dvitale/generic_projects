@@ -17,3 +17,14 @@ test('each game shows its unique number in the list and in Review',async({page,r
   await expect(page.getByRole('heading',{level:1})).toHaveText(`Rivedi la partita #${second.number}`)
   await page.screenshot({path:'test-results/game-number-review.png'})
 })
+
+test('training screens name the source game by its number',async({page})=>{
+  await page.route('**/api/prevention',route=>route.fulfill({json:{positions:[{id:'p1',gameId:'g1',gameNumber:7,title:'Allenamento con Maia 600',gameCreatedAt:'2026-10-29T09:14:10Z',ply:6,fen:'rn1qkbnr/ppp2ppp/3pb3/4p3/3PP3/5N2/PPP2PPP/RNBQKB1R w KQkq - 1 4',turn:'w',legalMoves:['d4d5','d4e5'],moveNumber:4,dueAt:'2026-10-29T09:14:10Z',streak:0}],stats:{firstAttempts:0,firstSuccesses:0},rule:{description:'Test'}}}))
+  await page.route('**/api/prevention/p1/sessions',route=>route.fulfill({json:{id:'s',version:1,exposure:'new'}}))
+  await page.goto('/')
+  await page.getByRole('button',{name:'Blunder prevention',exact:true}).click()
+  const source=page.getByRole('region',{name:'Partita di origine'})
+  await expect(source.locator('.eyebrow')).toHaveText('DALLA TUA PARTITA #7')
+  await expect(source).toContainText('Allenamento con Maia 600')
+  await page.screenshot({path:'test-results/game-number-prevention.png'})
+})

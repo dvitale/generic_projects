@@ -36,7 +36,7 @@ def record(con, kind, target_id, attempt_id, board, move, best, actual, timestam
     evidence = {'fen': board.fen(), 'turn': 'w' if board.turn else 'b',
                 'move': move.uci(), 'san': board.san(move), 'best': best, 'actual': actual,
                 'lossCp': loss, 'engine': evaluator.name,
-                'criterion': 'Mantieni almeno −1,00 o perdi meno di 1,00 rispetto alla migliore, senza matto contro di te.' if kind == 'prevention'
+                'criterion': 'Evita il blunder della partita: resta almeno a −1,00 o perdi meno di 2,00 rispetto alla migliore, senza matto contro di te.' if kind == 'prevention'
                 else 'Perdi meno di 0,70 rispetto alla migliore mossa di Stockfish.'}
     con.execute('''INSERT INTO training_mistakes(kind,target_id,attempt_id,created_at,evidence)
                    VALUES(?,?,?,?,?)''', (kind, target_id, attempt_id, timestamp, json.dumps(evidence)))
@@ -82,8 +82,11 @@ def verified_context(evidence, kind):
     if move not in board.legal_moves:
         raise HTTPException(409, 'Tentativo salvato non legale per questa posizione.')
     best, actual, loss = evaluator.compare(board, move, nodes=320000)
-    accepted = loss < PUZZLE_TOLERANCE_CP if kind == 'puzzle' else (
-        actual['mate'] > 0 if actual['mate'] is not None else actual['cp'] >= -100)
+    if kind == 'puzzle':
+        accepted = loss < PUZZLE_TOLERANCE_CP
+    else:
+        from .prevention import accepted as avoids
+        accepted = avoids(best, actual)
     context = context_for({**evidence, 'best': best, 'actual': actual,
                           'lossCp': loss if best['mate'] is None and actual['mate'] is None else None})
     context['verification'] = {

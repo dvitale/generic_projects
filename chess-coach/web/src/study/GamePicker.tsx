@@ -9,6 +9,6 @@ export default function GamePicker({games,value,onChange}:{games:Saved[];value:s
   return <label className="game-picker"><span className="field-label">Partita</span>
     <select aria-label="Partita" value={value??''} onChange={e=>onChange(e.target.value)}>
       {!value&&<option value="" disabled>Scegli una partita analizzata</option>}
-      {options.map(g=><option key={g.id} value={g.id}>{new Date(g.createdAt).toLocaleDateString('it-IT')} · {g.title}{g.quality?` · ${g.quality.errors} errori`:''}</option>)}
+      {options.map(g=><option key={g.id} value={g.id}>{g.number!=null?`#${g.number} · `:''}{new Date(g.createdAt).toLocaleDateString('it-IT')} · {g.title}{g.quality?` · ${g.quality.errors} errori`:''}</option>)}
     </select></label>
 }

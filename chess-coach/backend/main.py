@@ -986,6 +986,7 @@ def exercise_view(row):
     return {"id": row["id"], "gameId": row["game_id"], "ply": row["ply"], "theme": row["theme"],
             "gameTitle": row['game_title'] if 'game_title' in row.keys() else None,
             "gameCreatedAt": row['game_created_at'] if 'game_created_at' in row.keys() else None,
+            "gameNumber": row['game_number'] if 'game_number' in row.keys() else None,
             "fen": board.fen(), "turn": "w" if board.turn else "b", "dueAt": row["due_at"],
             "streak": row["streak"], "legalMoves": [m.uci() for m in board.legal_moves]}
 
@@ -1002,7 +1003,7 @@ def exercises():
     with database() as con:
         # Due puzzles rotate: never shown first, then the least recently shown. Opening a puzzle without
         # answering leaves its due date unchanged, so ordering by due date alone always started with the same few.
-        return [exercise_view(r) for r in con.execute('''SELECT e.*,g.title AS game_title,g.created_at AS game_created_at
+        return [exercise_view(r) for r in con.execute('''SELECT e.*,g.title AS game_title,g.created_at AS game_created_at,g.number AS game_number
             FROM exercises e JOIN games g ON g.id=e.game_id
             ORDER BY e.due_at<=? DESC, e.last_shown_at IS NOT NULL, e.last_shown_at, e.due_at LIMIT 100''', (now(),))]
 
@@ -1010,7 +1011,7 @@ def exercises():
 @app.get("/api/exercises/{exercise_id}")
 def exercise_detail(exercise_id: str):
     with database() as con:
-        row = con.execute("SELECT e.*,g.title AS game_title,g.created_at AS game_created_at FROM exercises e JOIN games g ON g.id=e.game_id WHERE e.id=?", (exercise_id,)).fetchone()
+        row = con.execute("SELECT e.*,g.title AS game_title,g.created_at AS game_created_at,g.number AS game_number FROM exercises e JOIN games g ON g.id=e.game_id WHERE e.id=?", (exercise_id,)).fetchone()
         if row is None:
             raise HTTPException(404, "Esercizio non trovato")
         return exercise_view(row)
@@ -1136,7 +1137,7 @@ diagnosis.register('puzzle', puzzle_diagnosis_position)
 def drill_catalog():
     with database() as con:
         history = [json.loads(r[0]) for r in con.execute("SELECT moves FROM games WHERE source IN ('maia','pgn')")]
-        personal = con.execute("""SELECT e.*, g.title AS game_title FROM exercises e JOIN games g ON g.id=e.game_id
+        personal = con.execute("""SELECT e.*, g.title AS game_title, g.number AS game_number FROM exercises e JOIN games g ON g.id=e.game_id
                                   ORDER BY e.due_at,e.loss DESC LIMIT 10""").fetchall()
     result = []
     for template in CATALOG:
@@ -1149,7 +1150,7 @@ def drill_catalog():
         result.insert(0, {"id": "personal:" + ex["id"], "name": "Riparti da una tua decisione", "kind": "personal",
                           "theme": ex["theme"], "goal": "Trova una buona mossa e continua il piano contro Maia.",
                           "fen": board.fen(), "color": "w" if board.turn else "b", "reason": "Da un momento critico di una tua partita analizzata.",
-                          "source": f"{ex['game_title']} · mossa {board.fullmove_number}"})
+                          "source": f"{training_schedule.numbered(ex['game_title'], ex['game_number'])} · mossa {board.fullmove_number}"})
     return result
 
 

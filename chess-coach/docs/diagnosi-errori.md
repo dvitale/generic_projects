@@ -31,7 +31,7 @@ Decide Stockfish con regole fisse, non l'LLM. Il server ricostruisce la posizion
 | Soluzione non vista | Nessuna candidata, oppure la candidata non soddisfa il criterio della modalità. Le mosse provate e respinte compaiono nella spiegazione («Hai provato Qg8+, che non risolve…») ma non cambiano la categoria |
 | Vista ma scartata | La candidata soddisfa il criterio della modalità: l'avevi trovata e l'hai respinta |
 
-Il criterio è quello della modalità: nei Problemi la mossa della soluzione o qualsiasi matto; nei Puzzle una perdita inferiore a 0,70 rispetto alla migliore; in Blunder prevention almeno −1,00, o una perdita inferiore a 1,00 rispetto alla migliore, senza matto contro.
+Il criterio è quello della modalità: nei Problemi la mossa della soluzione o qualsiasi matto; nei Puzzle una perdita inferiore a 0,70 rispetto alla migliore; in Blunder prevention una mossa diversa da quella della partita che resti almeno a −1,00, o perda meno di 2,00 rispetto alla migliore, senza matto contro.
 
 **Lettura della posizione**, una o più:
 

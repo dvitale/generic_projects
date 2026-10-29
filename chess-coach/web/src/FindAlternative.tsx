@@ -13,7 +13,7 @@ type Attempt={id:number;move:string;san:string;verdict:string;label:string;helpL
 type Alternative={move:string;san:string;verdict:string;label:string;lossCp:number|null;scoreDrop:number;evaluation:{cp:number;mate:number|null;san:string[]}}
 type Classification={declared:string;inferred:string;inferredReason:string;corrected:string|null;final:string;area:string}
 export type Episode={id:string;role:string;roleLabel:string;parentId:string|null;origin:string;reasoningOrigin:string|null;exposure:string;status:string;createdAt:string;
-  fen:string;color:Color;moveNumber:number;ply:number|null;gameId:string|null;gameTitle:string|null;gameSource:string|null;onlineMaia:boolean;legalMoves:string[];
+  fen:string;color:Color;moveNumber:number;ply:number|null;gameId:string|null;gameNumber?:number|null;gameTitle:string|null;gameSource:string|null;onlineMaia:boolean;legalMoves:string[];
   playedMove:Move|null;reasoning:{threat:string|null;threatSan:string|null;threatNone:boolean;threatText:string;consideredSan:string[];consideredNone:boolean}|null;
   analysisReady:boolean;helpLevel:number;hints:Hint[];hintSource:string|null;attempts:Attempt[];found:{move?:string;san?:string;verdict?:string;level:number;revealed?:boolean;explanation?:Hint&{direction:string}|null}|null;
   prediction:{san:string;matches:boolean;strong:boolean;engineReply:string|null;message:string}|null;reflection:{considered:string;detail:string;note:string}|null;
@@ -100,7 +100,7 @@ export default function FindAlternative({episodeId,onEpisode,embedded=false,onCl
   const concession=e.status==='searching'&&latest?.verdict==='concession'?latest:null
   const answered=(threat!==undefined||threatText.trim()||!e.threatFen)&&(considered.length||noneConsidered)
   const side=e.color==='w'?'il Bianco':'il Nero', opponent=e.color==='w'?'il Nero':'il Bianco'
-  const source=e.gameId?<>{e.gameTitle??'Partita'}{e.onlineMaia&&' · Maia online'}</>:<>{e.gameTitle??'Posizione verificata'}</>
+  const source=e.gameId?<>{e.gameNumber!=null&&`#${e.gameNumber} · `}{e.gameTitle??'Partita'}{e.onlineMaia&&' · Maia online'}</>:<>{e.gameTitle??'Posizione verificata'}</>
   const boardNote=picking==='threat'?`Muovi un pezzo di ${opponent}: la mossa che temi.`:picking==='considered'?'Muovi le mosse che avevi considerato, una alla volta.':picking==='prediction'?`Muovi la risposta che ti aspetti da ${opponent}.`:solved?'Soluzione sulla scacchiera dell’esercizio: usa ◀ ▶ per la continuazione.':e.status==='searching'?'Muovi un pezzo per proporre la tua alternativa.':'Scacchiera dell’esercizio.'
 
   return <div className={`training-layout layout-alternative ${embedded?'alternative-embedded':''}`}>

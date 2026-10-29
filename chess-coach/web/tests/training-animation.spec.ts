@@ -18,7 +18,6 @@ for(const c of cases)test(`wrong ${c.name} is visible before a slow, complete un
     await route.fulfill({json:{success:false,closed:false,version:1,move:c.move,san:'Test',actual:{cp:-300,mate:null,pv:[c.move],san:['Test']},message:'Errore di prova'}})
   })
   await page.goto('/');await page.getByRole('button',{name:'Blunder prevention',exact:false}).click()
-  await page.getByRole('button',{name:'Inizia Blunder prevention'}).click()
   await expect(page.getByRole('heading',{name:'Evita il blunder',exact:true})).toBeVisible()
   const from=c.move.slice(0,2),to=c.move.slice(2,4)
   await page.locator(`[data-square="${from}"]`).click();await page.locator(`[data-square="${to}"]`).click()
@@ -43,7 +42,7 @@ test('an explanation can be opened, hidden and reopened without another provider
   await page.route('**/api/training/prevention/explain/mistakes',route=>route.fulfill({json:[{id:1,san:'Qg8+',createdAt:'2026-09-30T10:00:00Z',lossCp:400,reference:{cp:80,mate:null},actual:{cp:-320,mate:null,san:['Qg8+','Kxg8']}}]}))
   let calls=0
   await page.route('**/api/training/prevention/explain/mistakes/1/explain',route=>{calls++;return route.fulfill({json:{explanation:{reason:'La donna rimane in presa.',continuation:'Il re può catturarla.',lesson:'Controlla le catture avversarie.'},provider:'DeepSeek',cached:false}})})
-  await page.goto('/');await page.getByRole('button',{name:'Blunder prevention',exact:false}).click();await page.getByRole('button',{name:'Inizia Blunder prevention'}).click()
+  await page.goto('/');await page.getByRole('button',{name:'Blunder prevention',exact:false}).click()
   await expect(page.getByText('Calo 4.00 punti')).toBeVisible();expect(calls).toBe(0)
   await page.getByRole('button',{name:'Spiega motivo',exact:true}).click();await expect(page.getByText('La donna rimane in presa.')).toBeVisible()
   await page.getByRole('button',{name:'Nascondi spiegazione'}).click();await expect(page.getByText('La donna rimane in presa.')).toHaveCount(0)
@@ -66,7 +65,7 @@ test('comparison replays why Qh2 is mate after Qb1 but only check after Rg1',asy
   await page.route('**/api/training/prevention/contrast/mistakes/1/explain',route=>{
     calls++;return route.fulfill({json:{cached:false,provider:'DeepSeek',explanation:{reason:'Qb1 permette Qh2 matto.',sharedIdea:'Sono mosse senza scacco.',difference:'Rg1 libera f1 per il re.',alternative:'Dopo Qh2+ esiste Kf1.',continuation:'Confronta la stessa risposta.',lesson:'Prima cerca le minacce di matto.'},comparison:{fen,turn:'w',actual,best,lossCp:null,criterion:'Mantieni almeno −1,00.',verification:{acceptedNow:false,note:'Ricerca limitata.'},sameReply:{attemptReply:'Qh2#',alternativeReply:'Qh2+',legalAfterAlternative:true,line:same}}}})
   })
-  await page.goto('/');await page.getByRole('button',{name:'Blunder prevention',exact:false}).click();await page.getByRole('button',{name:'Inizia Blunder prevention'}).click()
+  await page.goto('/');await page.getByRole('button',{name:'Blunder prevention',exact:false}).click()
   await page.getByRole('button',{name:'Spiega motivo',exact:true}).click()
   await expect(page.getByText('Rg1 libera f1 per il re.',{exact:false})).toBeVisible()
   const comparison=page.getByRole('region',{name:'Confronto verificato delle mosse'})

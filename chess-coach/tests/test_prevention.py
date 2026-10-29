@@ -61,6 +61,7 @@ def test_retry_illegal_reveal_and_practice_do_not_inflate_independent_success(cl
     assert client.get('/api/prevention').json()['stats']==before
     wrong=attempt(client,p,s,'g6g8').json()
     assert not wrong['success'] and not wrong['closed'] and wrong['original'] is None and wrong['example'] is None
+    assert 'stessa mossa della partita' in wrong['message']
     assert attempt(client,p,s,'g6g7').status_code==409
     s['version']=wrong['version']
     good=attempt(client,p,s,'g6g7').json()
@@ -156,13 +157,16 @@ def test_practice_after_closing_checks_moves_without_recording(client):
         assert con.execute('SELECT count(*) FROM prevention_attempts WHERE session_id=?',(s['id'],)).fetchone()[0]==1
 
 
-def test_a_small_loss_below_the_safety_line_is_not_a_blunder():
+def test_any_move_that_avoids_the_game_blunder_is_accepted():
     from backend.prevention import accepted
     e = lambda cp=None, mate=None: {'cp': cp if mate is None else (100000 - mate if mate > 0 else -100000 - mate), 'mate': mate}
-    # From -0.80, losing 0.40 is accepted even below -1.00; losing 1.50 is not.
+    # Avoiding the blunder is enough: from -0.80, a move to -1.20 or -1.90 is not a blunder; to -2.80 it is.
     assert accepted(e(-80), e(-120))
-    assert not accepted(e(-80), e(-230))
+    assert accepted(e(0), e(-110)) and accepted(e(-80), e(-270))
+    assert not accepted(e(-80), e(-280))
     assert accepted(e(300), e(-90))
+    # The game move itself is never accepted, whatever a deeper search now says.
+    assert not accepted(e(-80), e(-90), original=True)
     # A mate against is never accepted; missing a mate is judged by the safety line only.
     assert not accepted(e(-50), e(mate=-5))
     assert not accepted(e(mate=3), e(-150))

@@ -5,6 +5,11 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
+
+def numbered(title, number):
+    """'#12 · title': the game number named in the archive and in Review."""
+    return f"#{number} · {title}" if number is not None and title else title
+
 INTERVAL_HOURS = [4, 24, 72, 168, 336, 720, 2160, 4320]
 TABLES = {'puzzle': 'exercises', 'prevention': 'prevention_positions'}
 # Prevention positions offered anywhere: confirmed by Stockfish and, once Maia judged them, lapses only.
@@ -74,13 +79,13 @@ def plan(con, timestamp):
     rows=[]
     for kind,table in TABLES.items():
         where='WHERE '+PREVENTION_LISTED.format('e.') if kind=='prevention' else ''
-        for r in con.execute(f'''SELECT e.*,g.title AS game_title,g.pgn_headers AS headers,
+        for r in con.execute(f'''SELECT e.*,g.title AS game_title,g.number AS game_number,g.pgn_headers AS headers,
           m.review_after,(SELECT count(*) FROM training_reviews v WHERE v.kind=? AND v.target_id=e.id AND v.independent=1) AS reviews
           FROM {table} e JOIN games g ON g.id=e.game_id
           LEFT JOIN training_memory m ON m.kind=? AND m.target_id=e.id {where}''',(kind,kind)):
             ready_at=max(r['due_at'],r['review_after'] or r['due_at'])
             rows.append({'kind':kind,'id':r['id'],'gameId':r['game_id'],'ply':r['ply'],
-              'title':r['game_title'],'theme':r['theme'] if kind=='puzzle' else 'Evita il blunder',
+              'title':numbered(r['game_title'],r['game_number']),'theme':r['theme'] if kind=='puzzle' else 'Evita il blunder',
               'stage':r['streak'],'dueAt':r['due_at'],'readyAt':ready_at,'new':not r['reviews'] and r['streak']==0})
     for provider in PROVIDERS:rows.extend(provider(con))
     rows.sort(key=lambda r:(r['new'],r['readyAt'],r['id']))

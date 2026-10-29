@@ -26,8 +26,6 @@ test('prevention exports current board before, after solution and after original
   await page.route('**/api/prevention/lichess/reveal',r=>r.fulfill({json:{success:false,assisted:true,closed:true,version:1,move:'g6g7',san:'Qg7#',actual:e,original:{move:'g6g8',san:'Qg8+',evaluation:e},message:'Esempio'}}))
   await page.goto('/')
   await page.getByRole('button',{name:'Blunder prevention',exact:true}).click()
-  await expect(page.getByRole('button',{name:/Analizza con Lichess/})).toHaveCount(0)
-  await page.getByRole('button',{name:'Inizia Blunder prevention'}).click()
   await checkLink(page,fen)
   await page.getByRole('button',{name:'Mostra una mossa sicura'}).click()
   await page.getByRole('button',{name:'Salta: mostra subito'}).click()
