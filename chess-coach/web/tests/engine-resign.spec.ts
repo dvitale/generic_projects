@@ -19,6 +19,12 @@ test('Maia asks to resign a clearly lost game and the accepted offer ends it',as
   await page.getByRole('button',{name:'Continua partita',exact:true}).click()
   const offer=page.getByRole('alertdialog',{name:'Maia ha manifestato l’intenzione di abbandonare. Accetti?'})
   await expect(offer).toBeVisible({timeout:30000})
+  // The offer lies over the middle of the board, in view, not below it where it went unnoticed.
+  await expect(offer).toBeInViewport()
+  const [box,board]=[await offer.boundingBox(),await page.locator('.board-stage').first().boundingBox()]
+  const middle=(b:{x:number;y:number;width:number;height:number})=>({x:b.x+b.width/2,y:b.y+b.height/2})
+  expect(Math.abs(middle(box!).y-middle(board!).y)).toBeLessThan(4)
+  expect(box!.x).toBeGreaterThan(board!.x);expect(box!.x+box!.width).toBeLessThan(board!.x+board!.width)
   await expect(page.locator('.game-over')).toHaveCount(0)
   expect((await(await request.get('/api/games/'+game.id)).json()).termination).toBeNull()
   await offer.getByRole('button',{name:'Accetta l’abbandono'}).click()

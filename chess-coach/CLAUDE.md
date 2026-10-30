@@ -1,6 +1,6 @@
 # SparringMate — istruzioni di progetto
 
-Allenamento scacchistico personale: backend FastAPI + SQLite (`backend/`), interfaccia React/TypeScript con Vite (`web/src`), Stockfish via python-chess, Maia (ONNX) nel browser. Il repository git parte da `/opt/generic_projects`: questa cartella è una sua sottocartella. Il manuale è `README.md`; le schede tecniche per area stanno in `docs/`.
+Allenamento scacchistico personale: backend FastAPI + SQLite (`backend/`), interfaccia React/TypeScript con Vite (`web/src`), Stockfish via python-chess, Maia (ONNX) sul server (`backend/maia.py`, `POST /api/maia/predict`). Il repository git parte da `/opt/generic_projects`: questa cartella è una sua sottocartella. Il manuale è `README.md`; le schede tecniche per area stanno in `docs/`.
 
 ## Comandi
 
@@ -34,6 +34,7 @@ make experimental                             # servizio del motore sperimentale
 - `experiments/` (ricerca locale: in git solo il codice; dati, pesi e `.venv`, diversi GB, sono esclusi dal suo `.gitignore`) è esclusa dalla sincronizzazione principale: `make deploy` ne copia a parte, con un filtro a inclusione, solo codice, `best.pt` accettati e ledger, e sul server gira come `sparringmate-experimental.service` con un `.venv` solo CPU. Se `make deploy` resta fermo su «Sincronizzo», cerca nuove cartelle pesanti non escluse in `scripts/deploy.sh`.
 - `docs/training-guide.html` si genera da `docs/training-guide.md` con `pwsh -File scripts/build_training_guide.ps1`. Se pwsh non è installato, l'HTML va aggiornato a mano con lo stesso contenuto.
 - Nelle prove, `exercises` e `prevention_positions` hanno `UNIQUE(game_id, ply)`: per creare più esercizi della stessa partita servono ply diversi.
+- Il modello Maia sta in `models/maia3/` (fuori da git, scaricato da `scripts/download_assets.py`, copiato da `make deploy`): l'interfaccia non lo scarica più.
 - Maia sul server (`backend/maia.py`): onnxruntime 1.23+ va in crash su questo modello con `ORT_ENABLE_ALL`. Resta `ORT_ENABLE_EXTENDED` e `onnxruntime==1.22.1` in `requirements.lock`; prima di aggiornarlo esegui `tests/test_maia.py`.
 - I problemi Lichess importati sono un campione ordinato per ID: gli ID iniziano tutti per "0".
 - Le valutazioni e le classificazioni didattiche (diagnosi, Blunder prevention, Puzzle) le decide Stockfish con regole fisse; il tutor DeepSeek interpreta soltanto.

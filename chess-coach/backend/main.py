@@ -32,6 +32,7 @@ from . import problems
 from . import diagnosis
 from . import auth
 from .maia import maia as maia_server
+from . import maia as maia_api
 from . import opponents
 from . import alternatives
 from .rating import rating_plan, summarize_rating, RATING_LEVELS, RATING_METHOD
@@ -168,8 +169,8 @@ async def local_headers(request, call_next):
             from starlette.responses import JSONResponse
             return JSONResponse({"detail": "Origine non consentita"}, status_code=403)
     response = await call_next(request)
+    # No Cross-Origin-Embedder-Policy any more: it served the browser's threaded Maia, which now runs on the server.
     response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
-    response.headers["Cross-Origin-Embedder-Policy"] = "require-corp"
     response.headers["X-Content-Type-Options"] = "nosniff"
     # Built assets carry a content hash in their name and never change; the page that names them must be
     # revalidated, or a browser keeps an old index.html pointing to the previous build after a deploy.
@@ -206,6 +207,11 @@ class MoveInput(BaseModel):
 class UndoInput(BaseModel):
     version: int = Field(ge=0, le=600)
     revision: int = Field(ge=0)
+
+
+class BotMoveInput(UndoInput):
+    # The opponent's thinking time as the page showed it, so its clock matches the one seen during the game.
+    elapsed_seconds: FiniteFloat | None = Field(default=None, ge=0, le=604800)
 
 
 class RatingInput(UndoInput):
@@ -359,7 +365,7 @@ def game_view(row):
 @app.get("/api/health")
 def health():
     return {"status": "ok", "stockfish": evaluator.name, "storage": "SQLite locale",
-            "maia": "maia3_simplified.onnx · browser", "maiaServer": "disponibile" if maia_server.available() else "assente"}
+            "maia": "maia3_simplified.onnx · server", "maiaServer": "disponibile" if maia_server.available() else "assente"}
 
 
 @app.post("/api/games")
@@ -385,7 +391,8 @@ def new_game(body: NewGame):
         if engine == opponents.MAIA:
             if body.move_selection not in opponents.MAIA_SELECTIONS:
                 raise HTTPException(422, 'Modalità di scelta delle mosse non prevista')
-            selection = body.move_selection
+            # Maia runs on the server: the server, not the page, names the model that will answer.
+            version, selection = maia_api.MODEL_VERSION, body.move_selection
         if engine == opponents.EXPERIMENTAL:
             state = opponents.status(ENV_PATH)
             if not state['enabled']:
@@ -640,6 +647,53 @@ def policy_move(game_id: str, body: UndoInput):
         con.execute('BEGIN IMMEDIATE')
         row, moves, board = opponent_position(con)
         times = (json.loads(row['move_times']) + [None] * len(moves))[:len(moves)] + [None]
+        con.execute('UPDATE games SET moves=?,move_times=?,move_choices=? WHERE id=?',
+                    (json.dumps(moves + [move]), json.dumps(times), json.dumps(aligned(row['move_choices'], len(moves)) + [choice]), game_id))
+        snapshot = dict(find_game(con, game_id))
+    board.push(chess.Move.from_uci(move))
+    if board.is_game_over(claim_draw=True):
+        queue_analysis(snapshot, automatic=True)
+    return get_game(game_id)
+
+
+@app.post('/api/games/{game_id}/maia-move')
+def maia_move(game_id: str, body: BotMoveInput):
+    """Maia's reply in Play and in Drills: predicted and drawn on the server with the game's selection and a recorded seed."""
+    def opponent_position(con):
+        row = find_game(con, game_id)
+        maia_game = row['source'] == 'maia' and (row['engine'] or opponents.MAIA) == opponents.MAIA
+        if not (maia_game or row['source'] == 'drill') or row['termination']:
+            raise HTTPException(409, 'Maia risponde solo nelle sue partite e nei Drill in corso')
+        moves = json.loads(row['moves'])
+        if len(moves) != body.version or row['revision'] != body.revision:
+            raise HTTPException(409, 'La posizione è cambiata: ricarica la partita')
+        board = reconstruct(row['initial_fen'], moves)
+        session = con.execute('SELECT * FROM drill_sessions WHERE game_id=?', (game_id,)).fetchone()
+        if session and decisions_played(row['initial_fen'], moves, session['start_ply'], row['player_color']) >= session['target']:
+            raise HTTPException(409, 'Drill completato: apri la revisione')
+        if board.is_game_over(claim_draw=True) or len(moves) >= 600:
+            raise HTTPException(409, 'Partita conclusa')
+        if board.turn == (row['player_color'] == 'w'):
+            raise HTTPException(409, 'Tocca a te')
+        return row, moves, board
+    with database() as con:
+        row, moves, board = opponent_position(con)
+    if resign_pending(row, moves) or bot_resigns(row, moves) and offer_resignation(game_id, body.version, body.revision):
+        return get_game(game_id)
+    if not maia_server.available():
+        raise HTTPException(503, 'Maia sul server non è disponibile.')
+    # Prediction and draw run outside the transaction; the position is checked again before committing.
+    prediction = maia_server.predict_cached([(board.fen(), row['elo'], row['elo'])])[0]
+    selection = row['move_selection'] or opponents.SELECTION
+    seed = secrets.randbits(63)
+    move, probability = maia_api.choose(prediction['moves'], selection, board.fullmove_number, seed)
+    choice = {'engine': opponents.MAIA, 'version': row['engine_version'] or maia_api.MODEL_VERSION, 'selection': selection,
+              'seed': seed, 'probability': round(probability, 6)}
+    with database() as con:
+        con.execute('BEGIN IMMEDIATE')
+        row, moves, board = opponent_position(con)
+        times = (json.loads(row['move_times']) + [None] * len(moves))[:len(moves)]
+        times.append({'emt': round(body.elapsed_seconds, 3)} if body.elapsed_seconds is not None else None)
         con.execute('UPDATE games SET moves=?,move_times=?,move_choices=? WHERE id=?',
                     (json.dumps(moves + [move]), json.dumps(times), json.dumps(aligned(row['move_choices'], len(moves)) + [choice]), game_id))
         snapshot = dict(find_game(con, game_id))
@@ -1278,6 +1332,7 @@ def request_tutor(game_id: str, body: TutorInput):
 
 
 prevention.install(app, database, reconstruct, now)
+maia_api.install(app)
 mistakes.install(app, database, tutor_lock)
 final_review.install(app, database, find_game, game_pgn, now, tutor_lock)
 study.install(app, database, find_game, now, tutor_lock)

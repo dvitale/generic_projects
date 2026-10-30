@@ -47,8 +47,8 @@ e il pulsante per iniziare resta disattivato solo per lo Sperimentale.
 
 1. **Avvio.** `POST /api/games` con `engine: "experimental"` interroga `/health` (2 s al massimo), controlla
    che il livello rientri nei rating del training (oggi 600–2596; il cursore si limita a 600–2500) e salva
-   nella partita `engine`, `engine_version` e `move_selection`. Per Maia il browser dichiara il modello
-   che carica (`maia3_simplified.onnx@official-browser-2026-09-23`).
+   nella partita `engine`, `engine_version` e `move_selection`. Per Maia il modello lo registra il server
+   (`MODEL_VERSION` in `backend/maia.py`: `maia3_simplified.onnx@official-browser-2026-09-23`).
 2. **Risposta.** Dopo la stessa pausa di presentazione usata per Maia (1,2–3,2 s, prima della richiesta:
    un turno annullato non registra nulla), il browser chiama `policy-move`. Se la partita è palesemente
    persa per il motore (vedi «Abbandonare una partita» nel README), il server registra una proposta di

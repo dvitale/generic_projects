@@ -1,6 +1,6 @@
 # Maia sul server
 
-Data: 29 ottobre 2026. `backend/maia.py` esegue sul server lo stesso Maia3 del browser: stesso file ONNX, stessa codifica della posizione, stessa tabella delle mosse. Serve ai calcoli a lotti che il browser farebbe lentamente o che non devono dipendere da una pagina aperta (selezione delle posizioni, stime per livello). Il gioco in Gioca e nei Drill resta nel browser.
+Data: 29 ottobre 2026, aggiornata il 30 ottobre. `backend/maia.py` esegue sul server lo stesso Maia3 del sito ufficiale: stesso file ONNX, stessa codifica della posizione, stessa tabella delle mosse. Dal 30 ottobre 2026 è **l'unico Maia del sito**: le mosse in Gioca e nei Drill, la barra Maia, Suggerisci mossa, Rivedi, Puzzle, Problemi e la somiglianza con i profili Maia chiedono le previsioni al server. Il browser non scarica più modello, worker e runtime WebAssembly.
 
 ## Uso
 
@@ -11,13 +11,26 @@ maia.predict(fen, 1500, 1500)                      # come maia.predict() di web/
 maia.predict_many([(fen, 800, 800), (fen, 2200, 2200)])   # a lotti di 32, risultati nello stesso ordine
 ```
 
-Il risultato ha le chiavi del browser: `moves` (UCI e probabilità, ordinate), `whiteExpectedScore`, `whiteOutcome`. Nelle posizioni senza mosse legali il modello non viene chiamato. La sessione si carica alla prima richiesta, non all'avvio del servizio. Le esecuzioni sono serializzate da un lock.
+Il risultato ha le chiavi dell'interfaccia: `moves` (UCI e probabilità, ordinate), `whiteExpectedScore`, `whiteOutcome`. Nelle posizioni senza mosse legali il modello non viene chiamato. La sessione si carica alla prima richiesta, non all'avvio del servizio. Le esecuzioni sono serializzate da un lock.
 
-Il modello si legge da `web/public/maia3/maia3_simplified.onnx` (scaricato da `scripts/install.sh`, escluso da git, copiato da `make deploy`), oppure da `MAIA_MODEL_PATH`. `MAIA_THREADS` limita i thread di calcolo (0, il predefinito, li usa tutti). `/api/health` riporta `maiaServer: disponibile | assente`.
+## API per l'interfaccia
+
+`POST /api/maia/predict` con `{"positions": [{"fen", "selfElo", "opponentElo"}, …]}` (da 1 a 64 posizioni) risponde `{"predictions": [...]}` nello stesso ordine; ogni mossa ha anche `san`. Una FEN non valida dà 422, il modello assente 503. Come ogni `/api`, richiede il login.
+
+- **Lotti:** `web/src/engine/maia.ts` raccoglie le richieste fatte nello stesso momento e le spedisce insieme; la somiglianza con i profili Maia chiede tutti i livelli di una decisione in una sola richiesta.
+- **Cache:** le ultime 4.096 previsioni restano in memoria (`CACHE`), così scorrere avanti e indietro una partita non ricalcola le stesse posizioni.
+- **Precedenza:** le richieste dell'interfaccia passano davanti ai calcoli di sfondo (per esempio la classificazione degli abbagli), che si fermano fra un lotto da 32 e l'altro. Al massimo si aspetta il lotto in corso, meno di un secondo.
+- **Mosse di Maia in Gioca e nei Drill:** le sceglie il server con `POST /api/games/{id}/maia-move` (`version`, `revision` e, facoltativo, `elapsed_seconds`, il tempo di riflessione mostrato dalla pagina). Il server ricostruisce la posizione, chiede la previsione al livello della partita e sorteggia con `choose()`, applicando temperatura e top-p della modalità fissata all'avvio (`SELECTIONS`; Bilanciata e Solida più varie fino alla mossa 8). Il seme del sorteggio, la modalità, la versione del modello e la probabilità della mossa vanno in `move_choices`, come per lo Sperimentale. Se la posizione è persa da tre turni, al posto della mossa registra la proposta di abbandono. La pausa di 1,2–3,2 s prima della risposta la fa la pagina, prima della richiesta: un turno annullato non registra nulla.
+- **Versione del modello:** la fissa il server alla creazione della partita (`MODEL_VERSION`), non più la pagina.
+- **Nell'interfaccia** di Maia restano solo le richieste di previsione da mostrare (barra, frecce, confronti) e i nomi delle modalità. Anche la tabella delle mosse è passata al backend (`backend/data/all_moves_maia3.json`). Senza Maia nel browser non serve più l'intestazione `Cross-Origin-Embedder-Policy`, che il WebAssembly multithread richiedeva: è stata tolta.
+
+## Modello
+
+Il modello si legge da `models/maia3/maia3_simplified.onnx` (scaricato da `scripts/download_assets.py`, escluso da git, copiato da `make deploy`; fino al 30 ottobre stava in `web/public/maia3`), oppure da `MAIA_MODEL_PATH`. `MAIA_THREADS` limita i thread di calcolo (0, il predefinito, li usa tutti). `/api/health` riporta `maiaServer: disponibile | assente`.
 
 Il primo uso è il filtro degli abbagli di Blunder prevention ([docs/blunder-prevention.md](blunder-prevention.md#abbagli-e-lacune)).
 
-## Fedeltà al browser
+## Fedeltà al modello del browser ufficiale
 
 `tests/fixtures/maia_reference.json` contiene, per nove posizioni (arrocchi, en passant, promozioni, Nero al tratto), la codifica prodotta da `encode()` di `maia.ts` in Node e le tre mosse più probabili calcolate dal worker in Chromium (ONNX Runtime Web 1.23.0) a 1500 contro 1500. `tests/test_maia.py` richiede codifica identica e probabilità entro 0,005. Le differenze misurate sono al massimo 0,003. Anche il browser varia di questo ordine fra un'esecuzione e l'altra: è arrotondamento in virgola mobile, non una differenza di modello.
 

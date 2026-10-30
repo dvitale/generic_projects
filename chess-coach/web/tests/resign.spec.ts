@@ -42,8 +42,8 @@ test('resign while Maia is thinking cancels its move',async({page,request})=>{
   await page.addInitScript(id=>localStorage.setItem('chess-coach-game',id),g.id)
   let release!:()=>void
   const gate=new Promise<void>(resolve=>{release=resolve})
-  await page.route('**/api/games/*/moves',async route=>{
-    if(route.request().postDataJSON()?.actor==='maia')await gate
+  await page.route('**/api/games/*/maia-move',async route=>{
+    await gate
     await route.continue()
   })
   await page.goto('/')

@@ -8,101 +8,40 @@ const reference=JSON.parse(readFileSync(new URL('./fixtures/maia-browser-referen
 let bundle:string
 test.beforeAll(async()=>{
   const root=resolve('.')
-  expect(createHash('sha256').update(readFileSync(join(root,'public/maia3/maia3_simplified.onnx'))).digest('hex')).toBe(reference.modelSha256)
+  expect(createHash('sha256').update(readFileSync(join(root,'../models/maia3/maia3_simplified.onnx'))).digest('hex')).toBe(reference.modelSha256)
   bundle=mkdtempSync(join(tmpdir(),'sparringmate-maia-check-'))
   await build({configFile:false,root,build:{lib:{entry:join(root,'src/engine/maia.ts'),name:'MaiaCheck',formats:['iife'],fileName:()=> 'engine.js'},outDir:bundle,emptyOutDir:false}})
 })
 async function load(page:Page){await page.goto('/');await page.addScriptTag({path:join(bundle,'engine.js')})}
 
-// Synthetic positions cross-checked against CSSLab preprocessing and postprocessing.
-// Keep the reference revision and model hash explicit when updating the fixtures.
-test('Maia tokenization and legal mask match reference positions for both colors and special moves',async({page})=>{
-  await load(page)
-  for(const item of reference.cases){
-    const result=await page.evaluate(fen=>{
-      const encoded=(window as any).MaiaCheck.encode(fen)
-      return {tokens:Array.from(encoded.tokens as Float32Array).flatMap((v,i)=>v===1?[i]:[]),legal:encoded.legal.map((m:any)=>m.index).sort((a:number,b:number)=>a-b)}
-    },item.fen)
-    expect(result.tokens).toEqual(item.occupiedTokenIndices)
-    expect(result.legal).toEqual(item.legalIndices)
-  }
-})
+// Encoding and move table are checked against these references on the server: tests/test_maia.py.
+// Move selection (temperature, top-p, opening) is drawn on the server: tests/test_maia.py.
 
-test('Full-policy sampling can select a low-probability move and does not mean top-1 selection',async({page})=>{
+test('Maia on the server reproduces the browser reference predictions at 600, 1500 and 2600, in one request',async({page})=>{
+  const requests:{positions:{fen:string;selfElo:number;opponentElo:number}[]}[]=[]
+  page.on('request',r=>{if(r.url().endsWith('/api/maia/predict'))requests.push(r.postDataJSON())})
   await load(page)
-  const policy={whiteExpectedScore:.5,moves:[
-    {uci:'e2e4',san:'e4',probability:.8},
-    {uci:'d2d4',san:'d4',probability:.19},
-    {uci:'g2g4',san:'g4',probability:.01},
-  ]}
-  for(const [draw,expected] of [[.4,'e2e4'],[.9,'d2d4'],[.999,'g2g4']] as const){
-    expect(await page.evaluate(({policy,draw})=>{
-      const original=Math.random
-      try{Math.random=()=>draw;return (window as any).MaiaCheck.sample(policy)}finally{Math.random=original}
-    },{policy,draw})).toBe(expected)
-  }
-})
-
-test('Temperature and top-p selections drop rare moves; top-move always plays the first choice',async({page})=>{
-  await load(page)
-  const policy={whiteExpectedScore:.5,moves:[
-    {uci:'e2e4',san:'e4',probability:.5},
-    {uci:'d2d4',san:'d4',probability:.3},
-    {uci:'c2c4',san:'c4',probability:.15},
-    {uci:'g2g4',san:'g4',probability:.05},
-  ]}
-  const draw=(selection:string,value:number)=>page.evaluate(({policy,selection,value})=>{
-    const original=Math.random
-    try{Math.random=()=>value;return (window as any).MaiaCheck.sample(policy,selection)}finally{Math.random=original}
-  },{policy,selection,value})
-  // Even the last draw never reaches the 5% move once the tail is cut.
-  for(const selection of ['temperature-0.7-top-p-0.95','temperature-0.4-top-p-0.8'])expect(await draw(selection,.9999)).not.toBe('g2g4')
-  expect(await draw('sample-full-distribution',.9999)).toBe('g2g4')
-  // At temperature 0.4 e4 and d4 weigh 1 and 0.28: c4 (0.05) is outside top-p 0.8.
-  expect(await draw('temperature-0.4-top-p-0.8',.9999)).toBe('d2d4')
-  expect(await draw('temperature-0.4-top-p-0.8',.5)).toBe('e2e4')
-  for(const value of [0,.5,.9999])expect(await draw('top-move',value)).toBe('e2e4')
-})
-
-test('Sharpened selections keep variety in the opening, then apply their own rule',async({page})=>{
-  await load(page)
-  const policy={whiteExpectedScore:.5,moves:[
-    {uci:'e2e4',san:'e4',probability:.5},
-    {uci:'d2d4',san:'d4',probability:.3},
-    {uci:'c2c4',san:'c4',probability:.15},
-    {uci:'g2g4',san:'g4',probability:.05},
-  ]}
-  const draw=(selection:string,value:number,moveNumber:number)=>page.evaluate(({policy,selection,value,moveNumber})=>{
-    const original=Math.random
-    try{Math.random=()=>value;return (window as any).MaiaCheck.sample(policy,selection,moveNumber)}finally{Math.random=original}
-  },{policy,selection,value,moveNumber})
-  // Up to move 8: temperature 1 and top-p 0.9, so c4 is possible but g4 (the last 5%) is not.
-  for(const selection of ['temperature-0.4-top-p-0.8','temperature-0.7-top-p-0.95']){
-    expect(await draw(selection,.9999,8)).toBe('c2c4')
-    expect(await draw(selection,.6,1)).toBe('d2d4')
-  }
-  expect(await draw('temperature-0.4-top-p-0.8',.9999,9)).toBe('d2d4')
-  expect(await draw('top-move',.9999,1)).toBe('e2e4')
-})
-
-test('Real browser Maia reproduces reference predictions at 600, 1500 and 2600',async({page})=>{
-  await page.addInitScript(()=>{
-    const NativeWorker=window.Worker
-    ;(window as any).maiaInputs=[]
-    window.Worker=class extends NativeWorker{
-      postMessage(message:any,transfer:any){
-        if(message.type==='inference')(window as any).maiaInputs.push({self:new Float32Array(message.eloSelfs)[0],opponent:new Float32Array(message.eloOppos)[0]})
-        super.postMessage(message,transfer)
-      }
-    }
+  const results=await page.evaluate(async cases=>Promise.all(cases.map((item:any)=>(window as any).MaiaCheck.maia.predict(item.fen,item.level,item.level))),reference.cases)
+  // Asked in the same tick, every position travels in a single request.
+  expect(requests).toHaveLength(1)
+  expect(requests[0].positions).toEqual(reference.cases.map((item:any)=>({fen:item.fen,selfElo:item.level,opponentElo:item.level})))
+  reference.cases.forEach((item:any,c:number)=>{
+    const result=results[c]
+    expect(result.moves[0].uci).toBe(item.topMoves[0].uci)
+    // Server and browser runtimes differ only by floating-point rounding (docs/maia-server.md): near ties may swap places.
+    for(const move of item.topMoves)expect(Math.abs(result.moves.find((m:any)=>m.uci===move.uci).probability-move.probability)).toBeLessThan(.005)
+    expect(result.moves.reduce((sum:number,m:any)=>sum+m.probability,0)).toBeCloseTo(1,4)
+    expect(Math.abs(result.whiteExpectedScore-item.whiteExpectedScore)).toBeLessThan(.005)
+    expect(result.moves.every((m:any)=>typeof m.san==='string'&&m.san.length>0)).toBe(true)
   })
-  await load(page)
-  for(const item of reference.cases){
-    const result=await page.evaluate(async item=>(window as any).MaiaCheck.maia.predict(item.fen,item.level,item.level),item)
-    expect(result.moves.slice(0,3).map((m:any)=>m.uci)).toEqual(item.topMoves.map(m=>m.uci))
-    for(let i=0;i<item.topMoves.length;i++)expect(result.moves[i].probability).toBeCloseTo(item.topMoves[i].probability,5)
-    expect(result.moves.reduce((sum:number,m:any)=>sum+m.probability,0)).toBeCloseTo(1,8)
-    expect(Math.abs(result.whiteExpectedScore-item.whiteExpectedScore)).toBeLessThan(.0001)
-    expect(await page.evaluate(()=>(window as any).maiaInputs.at(-1))).toEqual({self:item.level,opponent:item.level})
-  }
+})
+
+test('The interface no longer downloads the Maia model or ONNX Runtime',async({page,request})=>{
+  const loaded:string[]=[]
+  page.on('request',r=>loaded.push(new URL(r.url()).pathname))
+  await page.goto('/')
+  await page.getByRole('button',{name:'Gioca',exact:true}).click()
+  await expect(page.getByText('Maia pronto',{exact:false})).toBeVisible()
+  expect(loaded.filter(path=>/maia3|\.onnx|\/ort\/|maia-worker/.test(path))).toEqual([])
+  for(const path of ['/maia3/maia3_simplified.onnx','/maia-worker.js','/ort/ort.wasm.min.js'])expect((await request.get(path)).status()).toBe(404)
 })

@@ -8,10 +8,9 @@ async function prepare(page:Page,request:APIRequestContext,fen=new Chess().fen()
   await page.addInitScript(id=>localStorage.setItem('chess-coach-game',id),game.id)
   const humanMoves:string[]=[]
   // Keep the board stable after the human move; the main suite tests real Maia replies.
+  await page.route('**/api/games/*/maia-move',route=>route.abort())
   await page.route('**/api/games/*/moves',async route=>{
-    const body=route.request().postDataJSON()
-    if(body.actor==='maia'){await route.abort();return}
-    humanMoves.push(body.move);await route.continue()
+    humanMoves.push(route.request().postDataJSON().move);await route.continue()
   })
   await page.goto('/')
   await expect(page.getByRole('button',{name:'Continua partita',exact:true})).toBeVisible()
@@ -153,7 +152,6 @@ test('A dropped piece stays on its destination while the server answers',async({
   await play(page)
   let release=()=>{}
   await page.route('**/api/games/*/moves',async route=>{
-    if(route.request().postDataJSON().actor==='maia'){await route.abort();return}
     await new Promise<void>(resolve=>{release=resolve})
     await route.continue()
   })

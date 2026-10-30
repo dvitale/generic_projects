@@ -23,7 +23,7 @@ Il server ospita anche altri siti, con i propri virtual host in `/etc/nginx/site
 | Dati | `/opt/sparringmate/data` (utente `sparringmate`, permessi 750): `coach.sqlite3` e `session.key` |
 | Credenziali di accesso | `/opt/sparringmate/.env` (`SPARRINGMATE_USER`, `SPARRINGMATE_PASSWORD`; utente `sparringmate`, permessi 600) |
 | Python | `/opt/sparringmate/.venv`, Python 3.12.14, dipendenze da `requirements.lock` |
-| Maia sul server | `backend/maia.py` legge `web/public/maia3/maia3_simplified.onnx`, copiato dal deploy; onnxruntime da `requirements.lock`. Caricato alla prima richiesta: circa 150–200 MB di RAM in più per `sparringmate.service` (misure in `docs/maia-server.md`) |
+| Maia sul server | `backend/maia.py` legge `models/maia3/maia3_simplified.onnx`, copiato dal deploy; è l'unico Maia del sito: l'interfaccia chiede le previsioni con `POST /api/maia/predict`; onnxruntime da `requirements.lock`. Caricato alla prima richiesta: circa 150–200 MB di RAM in più per `sparringmate.service` (misure in `docs/maia-server.md`) |
 | Stockfish | `/opt/sparringmate/engine/stockfish`, Stockfish 19 compilato sul server (vedi sotto) |
 | Servizio | `sparringmate.service`, utente `sparringmate`, Uvicorn su `127.0.0.1:8033` con `--proxy-headers` (copia in `sparringmate.service`) |
 | nginx | `/etc/nginx/sites-enabled/sparringmate.conf` (copia in `sparringmate.conf`) |
@@ -43,7 +43,7 @@ SSHPASS='…' make deploy    # in alternativa, la password tramite sshpass
 
 `scripts/deploy.sh` esegue questi passi:
 
-1. controlla che `web/public/maia3/maia3_simplified.onnx` esista e abbia l'hash del manifest: senza, `--delete` lo toglierebbe anche dal server; poi compila l'interfaccia (`SKIP_BUILD=1` per saltare la compilazione);
+1. controlla che `models/maia3/maia3_simplified.onnx` esista e abbia l'hash del manifest: senza, `--delete` lo toglierebbe anche dal server; poi compila l'interfaccia (`SKIP_BUILD=1` per saltare la compilazione);
 2. sincronizza la cartella con `rsync --delete --no-owner --no-group --chmod=Dgo-w,Fgo-w`: il codice resta di `root` e non è scrivibile da gruppo e altri, qualunque siano i permessi della copia locale; non tocca `.env`, `.secrets/`, `data/`, `.venv/` né `engine/`;
    se esiste in locale, copia anche `data/lichess_puzzles.sqlite3` (i problemi di `make puzzles`, sola lettura); gli altri file di `data/` restano solo sul server;
    copia a parte il motore sperimentale (codice, `best.pt` accettati con `verification.json`, `data/cycles/ledger.json`); il suo `.venv` sul server non viene toccato;

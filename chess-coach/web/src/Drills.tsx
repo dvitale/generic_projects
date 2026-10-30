@@ -7,7 +7,7 @@ import PgnExport from './PgnExport'
 import {useMoveTime} from './useMoveTime'
 import { api } from './api'
 import {ThinkingGuide} from './ChessInsights'
-import { chooseMaiaMove } from './engine/play'
+import { paceServerReply } from './engine/play'
 import type { Color, Game } from './types'
 import MiniBoard from './MiniBoard'
 import {useMoveSuggestion,SuggestionBox} from './MoveSuggestion'
@@ -44,9 +44,7 @@ export default function Drills({onReview,startTemplateId,onStarted}:{onReview:(g
     const snapshot=game
     setThinking(true)
     ;(async()=>{
-      const move=await chooseMaiaMove(snapshot.fen,snapshot.elo,controller.signal)
-      if(cancelled||controller.signal.aborted||!move)return
-      const next=await api<Game>(`/games/${snapshot.id}/moves`,{move,version:snapshot.version,revision:snapshot.revision,actor:'maia',elapsed_seconds:moveTime.elapsed(snapshot)})
+      const next=await paceServerReply(()=>api<Game>(`/games/${snapshot.id}/maia-move`,{version:snapshot.version,revision:snapshot.revision,elapsed_seconds:moveTime.elapsed(snapshot)}),controller.signal)
       if(!cancelled&&!controller.signal.aborted)keep(next,true)
     })().catch(e=>{if(!cancelled&&!controller.signal.aborted)fail(e)}).finally(()=>{if(!cancelled)setThinking(false)})
     return()=>{cancelled=true;controller.abort();setThinking(false)}

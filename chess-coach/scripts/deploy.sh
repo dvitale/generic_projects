@@ -17,9 +17,9 @@ if [ -n "$(git status --porcelain -- .)" ]; then
   echo "Attenzione: modifiche non committate, vengono pubblicate così come sono." >&2
 fi
 
-# rsync --delete would remove the model from the server too: Play (browser) and the backend both need it.
-model=web/public/maia3/maia3_simplified.onnx
-expected=$(python3 -c "import json;print(next(f['sha256'] for f in json.load(open('model-manifests/maia-browser.json'))['files'] if f['path']=='public/maia3/maia3_simplified.onnx'))")
+# rsync --delete would remove the model from the server too: every Maia prediction runs there.
+model=models/maia3/maia3_simplified.onnx
+expected=$(python3 -c "import json;print(next(f['sha256'] for f in json.load(open('model-manifests/maia-browser.json'))['files'] if f['path']=='models/maia3/maia3_simplified.onnx'))")
 [ -f "$model" ] && [ "$(sha256sum "$model" | cut -d' ' -f1)" = "$expected" ] || { echo "Modello Maia assente o diverso dal manifest: esegui python3 scripts/download_assets.py" >&2; exit 1; }
 
 if [ "${SKIP_BUILD:-0}" != 1 ]; then

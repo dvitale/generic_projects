@@ -5,6 +5,7 @@ from pathlib import Path
 import chess
 import pytest
 
+from backend.maia import MODEL_VERSION
 from backend import main, opponents
 from test_coach import client  # noqa: F401
 
@@ -30,10 +31,11 @@ def test_selector_is_hidden_without_configuration_and_maia_games_record_their_en
     assert client.get('/api/opponents').json()['experimental'] == {'enabled': False}
     assert client.post('/api/games', json={'engine': 'experimental'}).status_code == 409
     g = client.post('/api/games', json={'elo': 1100, 'engine_version': 'maia3-test'}).json()
-    assert (g['engine'], g['engineLabel'], g['engineVersion'], g['moveSelection']) == ('maia', 'Maia', 'maia3-test', opponents.SELECTION)
+    # The server names the model it runs: a version sent by the page is ignored.
+    assert (g['engine'], g['engineLabel'], g['engineVersion'], g['moveSelection']) == ('maia', 'Maia', MODEL_VERSION, opponents.SELECTION)
     g = client.post(f"/api/games/{g['id']}/moves", json={'move': 'e2e4', 'version': 0, 'actor': 'human'}).json()
     g = client.post(f"/api/games/{g['id']}/moves", json={'move': 'e7e5', 'version': 1, 'actor': 'maia'}).json()
-    assert '[OpponentEngine "maia"]' in g['pgn'] and '[OpponentEngineVersion "maia3-test"]' in g['pgn'] and '[Black "Maia 1100"]' in g['pgn']
+    assert '[OpponentEngine "maia"]' in g['pgn'] and f'[OpponentEngineVersion "{MODEL_VERSION}"]' in g['pgn'] and '[Black "Maia 1100"]' in g['pgn']
     # Maia moves come from the browser, never from the experimental endpoint.
     assert reply(client, g).status_code == 409
 
@@ -117,7 +119,7 @@ def test_maia_game_fixes_its_move_selection_and_records_it_per_move(client):
     assert '[MoveSelection "temperature-0.4-top-p-0.8"]' in g['pgn']
     with main.database() as con:
         choices = json.loads(main.find_game(con, g['id'])['move_choices'])
-    assert choices == [None, {'engine': 'maia', 'version': 'maia3-test', 'selection': 'temperature-0.4-top-p-0.8'}]
+    assert choices == [None, {'engine': 'maia', 'version': MODEL_VERSION, 'selection': 'temperature-0.4-top-p-0.8'}]
 
 
 def test_experimental_game_ignores_the_maia_selection(client, policy):

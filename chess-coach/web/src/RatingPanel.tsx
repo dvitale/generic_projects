@@ -27,16 +27,17 @@ export default function RatingPanel({game,disabled,onRated}:{game:Game;disabled:
       const scores=plan.levels.map(()=>0)
       let completed=0
       for(const position of plan.positions){
-        for(let i=0;i<plan.levels.length;i++){
-          if(controller.signal.aborted)return
-          // Match the official drill comparison: both conditioning ratings vary together.
-          const prediction=await maia.predict(position.fen,plan.levels[i],plan.levels[i],controller.signal)
-          if(controller.signal.aborted)return
+        if(controller.signal.aborted)return
+        // Match the official drill comparison: both conditioning ratings vary together. All levels travel in one request.
+        const predictions=await Promise.all(plan.levels.map(level=>maia.predict(position.fen,level,level,controller.signal)))
+        if(controller.signal.aborted)return
+        predictions.forEach((prediction,i)=>{
           const probability=prediction.moves.find(m=>m.uci===position.move)?.probability
           if(probability===undefined||!Number.isFinite(probability))throw new Error('Maia non ha restituito una probabilità valida. Riprova.')
           scores[i]+=Math.log(Math.max(probability,plan.probabilityFloor))
-          setProgress(Math.round(++completed/(plan.positions.length*plan.levels.length)*100))
-        }
+        })
+        completed+=plan.levels.length
+        setProgress(Math.round(completed/(plan.positions.length*plan.levels.length)*100))
       }
       const result=await api<Rating>(`/games/${game.id}/rating`,{version:plan.version,revision:plan.revision,method:RATING_METHOD,log_scores:scores})
       if(!controller.signal.aborted){setRating(result);onRated(result)}

@@ -35,8 +35,8 @@ test('Live move list revisits positions without modifying the game and retains h
   await expect(page.getByText('Tocca a te · trascina un pezzo o usa due clic')).toBeVisible()
   let releaseReply!:()=>void
   const replyGate=new Promise<void>(resolve=>{releaseReply=resolve})
-  await page.route('**/api/games/*/moves',async route=>{
-    if(route.request().postDataJSON()?.actor==='maia')await replyGate
+  await page.route('**/api/games/*/maia-move',async route=>{
+    await replyGate
     await route.continue()
   })
   await page.locator('[data-square="f1"]').click();await page.locator('[data-square="c4"]').click()

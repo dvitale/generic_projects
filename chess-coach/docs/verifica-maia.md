@@ -1,5 +1,7 @@
 # Verifica del motore Maia e della scelta delle mosse
 
+> Dal 30 ottobre 2026 Maia gira solo sul server ([docs/maia-server.md](maia-server.md)), con lo stesso modello verificato qui. Le prove `web/tests/maia-engine.spec.ts` confrontano ora le risposte del server con le previsioni di riferimento del browser.
+
 Data: 29 settembre 2026. Questa verifica distingue compatibilità con il modello browser ufficiale e parità di gioco con il sito. La prima è verificabile; la seconda richiede anche il comportamento del server ufficiale.
 
 ## Risultati verificati
@@ -23,7 +25,7 @@ Restano quindi non verificati: pesi effettivamente usati dal server, uso della s
 
 ## Come sceglie SparringMate
 
-`chooseMaiaMove` chiama il modello locale sulla posizione corrente; `sample` applica la modalità di scelta fissata all’avvio della partita (campo `move_selection`, scelto in Gioca sotto **Scelta delle mosse di Maia**):
+Dal 30 ottobre 2026 la mossa la sceglie il server: `POST /api/games/{id}/maia-move` chiede a Maia la posizione corrente al livello della partita e `choose()` di `backend/maia.py` applica, con un seme casuale salvato nella partita, la modalità di scelta fissata all’avvio (fino ad allora lo facevano `chooseMaiaMove` e `sample` nel browser) (campo `move_selection`, scelto in Gioca sotto **Scelta delle mosse di Maia**):
 
 | Modalità | `move_selection` | Regola |
 |---|---|---|

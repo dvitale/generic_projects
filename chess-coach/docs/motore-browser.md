@@ -2,6 +2,8 @@
 
 Scaricato il 23 settembre 2026 da https://www.maiachess.com/.
 
+**Dal 30 ottobre 2026 Maia non gira più nel browser.** Il modello sta in `models/maia3/` ed è eseguito solo dal server ([docs/maia-server.md](maia-server.md)); worker e ONNX Runtime Web sono stati tolti dall'interfaccia e dal manifest. Questa scheda resta come documentazione della provenienza.
+
 Il modello pronto all'uso è `public/maia3/maia3_simplified.onnx` (45.683.686 byte). Il worker JavaScript lo esegue tramite ONNX Runtime Web 1.23.0 e WebAssembly. Non occorre addestrarlo, convertirlo o scegliere un checkpoint PyTorch.
 
 Il pacchetto binario è stato scaricato nella cartella locale di lavoro e non è incluso in questo repository. Gli URL e i checksum per recuperare i singoli file sono nel [manifest](../model-manifests/maia-browser.json).

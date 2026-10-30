@@ -4,34 +4,10 @@
   "frontendRevision": "a6e52f5c811ee18863cb2f0e81f2433a5b9905de",
   "files": [
     {
-      "path": "public/maia3/maia3_simplified.onnx",
+      "path": "models/maia3/maia3_simplified.onnx",
       "url": "https://www.maiachess.com/maia3/maia3_simplified.onnx",
       "bytes": 45683686,
       "sha256": "405bf76c15727dad8728b352c06a8f3c1b80fb2760e8d666b32485c63d75b856"
-    },
-    {
-      "path": "public/maia-worker.js",
-      "url": "https://www.maiachess.com/maia-worker.js",
-      "bytes": 6609,
-      "sha256": "db44a23840a6f200508d0a5ff1c502488aba59efa2d1d083134eccba40b59394"
-    },
-    {
-      "path": "public/ort/ort.wasm.min.js",
-      "url": "https://www.maiachess.com/ort/ort.wasm.min.js",
-      "bytes": 49926,
-      "sha256": "aec37bf5b223afd8ac358e6647369c724cc08727c258760bb88e4f6ce69ab68f"
-    },
-    {
-      "path": "public/ort/ort-wasm-simd-threaded.mjs",
-      "url": "https://www.maiachess.com/ort/ort-wasm-simd-threaded.mjs",
-      "bytes": 20321,
-      "sha256": "c0bc2244e2c95fbf39a5eccb595bca31defb9eefdffa6f9ce0325a1c47524461"
-    },
-    {
-      "path": "public/ort/ort-wasm-simd-threaded.wasm",
-      "url": "https://www.maiachess.com/ort/ort-wasm-simd-threaded.wasm",
-      "bytes": 11815498,
-      "sha256": "3260fcdb33b4fc4ec33e89caf392e13625823e01049d3bf32c38464f9dbfe14c"
     },
     {
       "path": "upstream/src/lib/engine/maia.ts",
@@ -99,5 +75,6 @@
       "bytes": 1073,
       "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
     }
-  ]
+  ],
+  "note": "Dal 30 ottobre 2026 Maia gira solo sul server: worker e ONNX Runtime Web non sono più scaricati; il modello sta in models/maia3."
 }

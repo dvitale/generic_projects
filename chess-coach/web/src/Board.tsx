@@ -10,7 +10,7 @@ const names: Record<string, string> = {k:'re',q:'donna',r:'torre',b:'alfiere',n:
 type Gesture = {id:number;from:string;startX:number;startY:number;fen:string;orientation:Color;code:string;size:number;active:boolean;element:HTMLButtonElement}
 type Annotation = {from:string;to:string}
 type Drawing = {id:number;from:string;fen:string;orientation:Color;element:HTMLButtonElement}
-export type AnalysisArrow = {move:string;source:'stockfish'|'maia'|'played';rank:number}
+export type AnalysisArrow = {move:string;source:'stockfish'|'maia'|'played'|'solution';rank:number}
 
 function squareCenter(square:string,orientation:Color){
     const file=square.charCodeAt(0)-97,rank=Number(square[1])-1
@@ -23,6 +23,8 @@ const brushes:Record<string,Brush>={
   annotation:{key:'g',color:'#15781B',opacity:1,width:10},
   stockfish:{key:'b',color:'#003088',opacity:1,width:8},
   maia:{key:'r',color:'#882020',opacity:1,width:10},
+  // The move that solved a puzzle: green, never Maia's red, even when Maia would play it too.
+  solution:{key:'s',color:'#2f8f46',opacity:1,width:10},
   playedOutline:{key:'po',color:'#4A8FB3',opacity:.95,width:11},
   played:{key:'pw',color:'#FFFFFF',opacity:.98,width:8},
 }
@@ -49,7 +51,7 @@ function BoardAnnotation({from,to,orientation,brush=brushes.annotation,extra=0,s
 }
 // Stacking order as on maiachess.com: Maia, Stockfish, then the played move on top. Arrows of the same
 // move from different sources hide each other, so `turn` rotates which one is in the foreground.
-const arrowOrder={maia:0,stockfish:1,played:2}
+const arrowOrder={maia:0,solution:1,stockfish:2,played:3}
 const arrowKey=(a:AnalysisArrow)=>a.move.slice(0,4)
 const overlapping=(arrows:AnalysisArrow[])=>arrows.some((a,i)=>arrows.some((b,j)=>j>i&&arrowKey(a)===arrowKey(b)&&a.source!==b.source))
 function stackArrows(arrows:AnalysisArrow[],turn:number){

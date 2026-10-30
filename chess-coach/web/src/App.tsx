@@ -50,8 +50,8 @@ import Study from './study/Study'
 import {ExamProgress} from './study/MockExam'
 import type {StudySection,Refutation} from './study/types'
 import { api } from './api'
-import { maia, MAIA_MODEL_VERSION, SELECTIONS, FULL_SELECTION, type Prediction, type Selection } from './engine/maia'
-import { chooseMaiaMove, paceServerReply } from './engine/play'
+import { maia, SELECTIONS, FULL_SELECTION, type Prediction, type Selection } from './engine/maia'
+import { paceServerReply } from './engine/play'
 import OpponentChoice,{useOpponents,experimentalRange,type Engine} from './OpponentChoice'
 import type { Game, Color, Exercise, Attempt, Profile, Analysis, Evaluation, PuzzleSession, Practice } from './types'
 
@@ -188,11 +188,7 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
       let updated: Game
       if (snapshot.source === 'stockfish') updated = await api<Game>(`/games/${snapshot.id}/engine-move`, {version:snapshot.version, revision:snapshot.revision})
       else if (snapshot.engine === 'experimental') updated = await paceServerReply(()=>api<Game>(`/games/${snapshot.id}/policy-move`, {version:snapshot.version, revision:snapshot.revision}), controller.signal)
-      else {
-        const move = await chooseMaiaMove(snapshot.fen, snapshot.elo, controller.signal, (snapshot.moveSelection as Selection|null) ?? FULL_SELECTION)
-        if (cancelled || controller.signal.aborted || !move) return
-        updated = await api<Game>(`/games/${snapshot.id}/moves`, {move, version:snapshot.version, revision:snapshot.revision, actor:'maia',elapsed_seconds:moveTime.elapsed(snapshot)})
-      }
+      else updated = await paceServerReply(()=>api<Game>(`/games/${snapshot.id}/maia-move`, {version:snapshot.version, revision:snapshot.revision, elapsed_seconds:moveTime.elapsed(snapshot)}), controller.signal)
       if (!cancelled && !controller.signal.aborted && currentGame.current?.id === snapshot.id) keepGame(updated,true)
     })().catch(e => { if (!cancelled && !controller.signal.aborted) fail(e) }).finally(()=> { if (!cancelled) setBotThinking(false) })
     return () => { cancelled = true; controller.abort(); setBotThinking(false) }
@@ -247,10 +243,13 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
   const reviewedMove=(game?.analysis?.moves||game?.analysis?.decisions)?.find(d=>d.ply===cursor)
   const moveHint=useMoveSuggestion(tab==='play'&&!browsingHistory?game:null)
   const analysisArrows:AnalysisArrow[]=[]
+  const puzzleSolution=attempt?.success?attempt.actual?.pv[0]:undefined
   if(tab==='play'&&game?.fen===boardFen)analysisArrows.push(...moveHint.arrows)
   if(tab==='train'&&puzzleComparing){
     if(puzzleComparison.data?.played)analysisArrows.push({move:puzzleComparison.data.played,source:'played',rank:1})
-    if(puzzleComparison.data?.maia)analysisArrows.push({move:puzzleComparison.data.maia,source:'maia',rank:1})
+    if(puzzleSolution)analysisArrows.push({move:puzzleSolution,source:'solution',rank:1})
+    // Red is Maia's alone: when Maia would play the solution too, the legend says so instead of a red arrow on it.
+    if(puzzleComparison.data?.maia&&puzzleComparison.data.maia!==puzzleSolution)analysisArrows.push({move:puzzleComparison.data.maia,source:'maia',rank:1})
   }
   if(tab==='review'&&reviewedMove?.fen===boardFen){
     if(arrowSources.stockfish)(reviewedMove.stockfishCandidates||[reviewedMove.best]).slice(0,1).forEach((choice,index)=>{if(choice.pv[0])analysisArrows.push({move:choice.pv[0],source:'stockfish',rank:index+1})})
@@ -328,7 +327,7 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
     if ((game?.source === 'maia'||game?.source === 'stockfish') && !game.result && !window.confirm(`Vuoi iniziare una nuova partita contro ${engine==='experimental'?'lo Sperimentale':'Maia'} a livello ${elo}? La partita attuale resterà salvata e potrai riprenderla dall’archivio.`)) return
     setBusy(true); setError(''); setNotice('')
     try {
-      const next = await api<Game>('/games',{color:firstMove?'w':color==='random'?(Math.random()<.5?'w':'b'):color,elo,engine,engine_version:engine==='maia'?MAIA_MODEL_VERSION:undefined,move_selection:engine==='maia'?selection:undefined})
+      const next = await api<Game>('/games',{color:firstMove?'w':color==='random'?(Math.random()<.5?'w':'b'):color,elo,engine,move_selection:engine==='maia'?selection:undefined})
       keepGame(next,true); setTab('play'); setCursor(0)
       if (firstMove) keepGame(await api<Game>(`/games/${next.id}/moves`,{move:firstMove,version:next.version,revision:next.revision,actor:'human',elapsed_seconds:moveTime.elapsed(next)}),true)
       await refresh(); if(engine==='maia')maia.load().catch(fail)
@@ -344,7 +343,7 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
     if ((game?.source === 'maia'||game?.source === 'stockfish') && !game.result && game.id !== sourceId && !window.confirm('Vuoi iniziare una nuova partita? La partita attuale resterà salvata e potrai riprenderla dall’archivio.')) return
     setBusy(true); setError(''); setNotice('')
     try {
-      const next = await api<Game>('/games',{color,elo:gameElo,fen,title:title.slice(0,160),engine_version:MAIA_MODEL_VERSION,move_selection:selection})
+      const next = await api<Game>('/games',{color,elo:gameElo,fen,title:title.slice(0,160),move_selection:selection})
       keepGame(next,true); resetBoardFlip(); setPlayPosition(null); setTab('play'); setCursor(0); await refresh(); maia.load().catch(fail)
     } catch (e) {fail(e)} finally {setBusy(false)}
   }
@@ -516,6 +515,8 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
           {flipped?playerBar:opponentBar}
           {/* Stockfish bar on the left of the board, Maia bar on the right. */}
           <div className={`board-stage ${evalValue!==undefined?'with-eval':''} ${maiaValue!==undefined?'with-maia':''}`}>
+            {/* Over the middle of the board: Maia waits for the answer and must not stop out of sight. */}
+            {tab==='play'&&game?.resignOffer&&!game.result&&<div className="resign-offer" role="alertdialog" aria-labelledby="resign-offer-title"><strong id="resign-offer-title">{opponentName} ha manifestato l’intenzione di abbandonare. Accetti?</strong><span>Secondo Stockfish la sua posizione è persa da tre mosse. Se rifiuti, la partita continua e non te lo richiederà per altre dieci mosse.</span><div><button className="primary" disabled={busy} onClick={()=>void answerResignOffer(true)}>Accetta l’abbandono</button><button disabled={busy} onClick={()=>void answerResignOffer(false)}>Continua a giocare</button></div></div>}
             {evalValue!==undefined&&<div className="eval-bars"><EvalBar value={evalValue} orientation={boardOrientation}/></div>}
             <Board badge={moveBadge} analysisArrows={analysisArrows} reverseMove={tab==='train'&&puzzleMotion.reverse} animateMove={tab==='train'||tab==='play'&&!browsingHistory&&!!game&&game.turn===game.playerColor} fen={boardFen} orientation={boardOrientation} interactive={canMove} legalMoves={legal} onMove={submitMove} lastMove={tab==='train'?(puzzleComparing?undefined:puzzleMotion.lastMove):tab==='play'?game?.moves[playPly-1]:tab==='review'&&game&&cursor>0?game.moves[cursor-1]:undefined}/>
             {maiaValue!==undefined&&<div className="eval-bars"><MaiaBar score={maiaValue} orientation={boardOrientation}/></div>}
@@ -526,7 +527,6 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
             {game.engineVersion&&<details><summary>Versione del motore</summary><small>{game.engineVersion}</small></details>}
           </div>}
           {outcome&&<div className={`game-over game-over-${outcome.tone}`} role="status"><strong>{outcome.title}</strong><span>{outcome.detail}</span></div>}
-          {tab==='play'&&game?.resignOffer&&!game.result&&<div className="resign-offer" role="alertdialog" aria-labelledby="resign-offer-title"><strong id="resign-offer-title">{opponentName} ha manifestato l’intenzione di abbandonare. Accetti?</strong><span>Secondo Stockfish la sua posizione è persa da tre mosse. Se rifiuti, la partita continua e non te lo richiederà per altre dieci mosse.</span><div><button className="primary" disabled={busy} onClick={()=>void answerResignOffer(true)}>Accetta l’abbandono</button><button disabled={busy} onClick={()=>void answerResignOffer(false)}>Continua a giocare</button></div></div>}
           {tab==='play'&&game&&<div className="board-actions">{!game.result&&<button className="primary" title="Nuova partita con livello, colore e motore scelti nel pannello" disabled={busy||!!jobId||botThinking||engine==='experimental'&&!opponents.status?.available} onClick={()=>void startGame()}><span aria-hidden="true">＋</span> Nuova partita</button>}<button title={`Ritorna alla tua ultima scelta e annulla anche la risposta di ${game.source==='stockfish'?'Stockfish':game.engineLabel??'Maia'}.`} disabled={!game.canUndo||busy||!!jobId||browsingHistory} onClick={undo}><span aria-hidden="true">↶</span> Annulla ultima mossa</button>{!game.result&&<button disabled={!canMove||!!moveHint.suggestion?.loading} onClick={()=>void moveHint.request()} title="Prima scelta di Stockfish (blu) e di Maia (rosso) nella posizione attuale"><span aria-hidden="true">💡</span> Suggerisci mossa</button>}{game.source==='maia'&&!game.result&&<StuckButton game={game} ply={game.version} origin="live" disabled={!canMove} onGuide={setGuided} onMarked={setNotice}/>}{(game.source==='maia'||game.source==='stockfish')&&!game.result&&<button className="danger" disabled={busy||!!jobId} onClick={resign}><span aria-hidden="true">⚑</span> Abbandona partita</button>}</div>}
           {tab==='play'&&game&&<SuggestionBox suggestion={moveHint.suggestion} elo={game.elo}/>}
           {browsingHistory&&<div className="play-history-notice"><span>Posizione precedente · {playPly} / {game!.moves.length}</span><span className="play-history-actions">{playFromButton(game!,playPly)}<button className="primary" onClick={()=>setPlayPosition(null)}>Torna alla posizione corrente</button></span></div>}
@@ -534,7 +534,9 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
           {tab==='review'&&game&&<div className="analysis-arrow-controls" role="group" aria-label="Frecce di analisi">{([['stockfish','Stockfish · blu'],['maia','Maia · rosso'],['played','Giocata · bianco']] as const).map(([source,label])=><label key={source}><input type="checkbox" checked={arrowSources[source]} onChange={e=>setArrowSources(current=>({...current,[source]:e.target.checked}))}/><span className={'arrow-swatch source-'+source}/>{label}</label>)}</div>}
           {tab==='train'&&attempt?.success&&!practicing&&<div className="panel" aria-label="Confronto del puzzle">
             <p>{puzzleComparison.visible?'Confronto dalla posizione iniziale del puzzle.':'La scacchiera mostra la tua soluzione.'}</p>
-            <div className="analysis-arrow-controls"><span><i className="arrow-swatch source-played"/> Giocata in partita · bianco</span><span><i className="arrow-swatch source-maia"/> Maia {puzzleComparison.data?.elo??''} · rosso</span></div>
+            <div className="analysis-arrow-controls"><span><i className="arrow-swatch source-solution"/> La tua soluzione · verde</span><span><i className="arrow-swatch source-played"/> Giocata in partita · bianco</span>{puzzleComparison.data?.maia&&puzzleComparison.data.maia===puzzleSolution
+              ?<span>Maia {puzzleComparison.data.elo??''} avrebbe giocato la stessa mossa</span>
+              :<span><i className="arrow-swatch source-maia"/> Maia {puzzleComparison.data?.elo??''} · rosso</span>}</div>
             {puzzleComparison.data?.loading&&<p role="status">Calcolo della prima scelta di Maia…</p>}
             {puzzleComparison.data?.error&&<p role="status">{puzzleComparison.data.error} <button onClick={puzzleComparison.retry}>Riprova confronto</button></p>}
             {puzzleComparison.data?.played&&<button onClick={puzzleComparison.toggle}>{puzzleComparison.visible?'Mostra la tua soluzione':'Mostra confronto con frecce'}</button>}

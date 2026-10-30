@@ -1,16 +1,8 @@
 import {test,expect} from '@playwright/test'
 
 test('Review compares every move before it is played and uses the selected Maia level',async({page,request})=>{
-  await page.addInitScript(()=>{
-    const NativeWorker=window.Worker
-    ;(window as any).reviewInputs=[]
-    window.Worker=class extends NativeWorker{
-      postMessage(message:any,transfer:any){
-        if(message.type==='inference')(window as any).reviewInputs.push({self:new Float32Array(message.eloSelfs)[0],opponent:new Float32Array(message.eloOppos)[0]})
-        super.postMessage(message,transfer)
-      }
-    }
-  })
+  const inputs:{self:number;opponent:number}[]=[]
+  page.on('request',r=>{if(r.url().endsWith('/api/maia/predict'))for(const p of r.postDataJSON().positions)inputs.push({self:p.selfElo,opponent:p.opponentElo})})
   const imported=await(await request.post('/api/import',{data:{pgn:'1. e4 e5 2. Qh5 Nc6 3. Qxe5+ Nxe5 *'}})).json()
   await page.addInitScript(id=>localStorage.setItem('chess-coach-game',id),imported.id)
   await page.goto('/')
@@ -52,7 +44,7 @@ test('Review compares every move before it is played and uses the selected Maia 
   await review.getByRole('combobox',{name:'Livello Maia per l’analisi'}).selectOption('2100')
   await expect(table.getByRole('columnheader',{name:'Maia 2100'})).toBeVisible()
   await expect(table.locator('tbody td').nth(2)).toContainText('%',{timeout:60000})
-  expect(await page.evaluate(()=>(window as any).reviewInputs.at(-1))).toEqual({self:2100,opponent:2100})
+  await expect.poll(()=>inputs.at(-1)).toEqual({self:2100,opponent:2100})
   await review.getByRole('combobox',{name:'Mossa da confrontare'}).selectOption('4')
   await expect(table.locator('tbody td').nth(0)).toContainText('Qxe5+')
   await expect(page.locator('.analysis-arrow[data-source="played"]')).toHaveAttribute('data-move','h5e5')

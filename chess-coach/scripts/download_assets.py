@@ -25,8 +25,8 @@ def download(url, target, expected):
 
 manifest = json.loads((ROOT / 'model-manifests/maia-browser.json').read_text())
 for asset in manifest['files']:
-    if asset['path'].startswith('public/'):
-        download(asset['url'], ROOT / 'web' / asset['path'], asset['sha256'])
+    if asset['path'].startswith('models/'):
+        download(asset['url'], ROOT / asset['path'], asset['sha256'])
 
 if not os.environ.get('STOCKFISH_PATH'):
     if platform.machine() not in ('x86_64', 'AMD64'):

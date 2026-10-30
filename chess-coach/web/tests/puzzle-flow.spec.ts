@@ -1,28 +1,15 @@
 import {test,expect} from '@playwright/test'
-import {readFileSync} from 'node:fs'
-const mapping=JSON.parse(readFileSync(new URL('../src/engine/data/all_moves_maia3.json',import.meta.url),'utf8'))
 
 // Background refreshes may still be routed after a test ends: drop the routes so they cannot fail it.
 test.afterEach(async({page})=>{await page.unrouteAll({behavior:'ignoreErrors'})})
 
 test('Puzzle feedback distinguishes retry, success and reveal and advances without repeating completed puzzles',async({page,request})=>{
-  await page.addInitScript(({index})=>{
-    ;(window as any).puzzlePredictions=[]
-    ;(window as any).Worker=class {
-      onmessage:any
-      postMessage(message:any){
-        setTimeout(()=>{
-          if(message.type==='init')this.onmessage?.({data:{type:'status',status:'ready'}})
-          if(message.type==='inference'){
-            ;(window as any).puzzlePredictions.push(new Float32Array(message.eloSelfs)[0])
-            const logitsMove=new Float32Array(4352);logitsMove[index]=20
-            this.onmessage?.({data:{type:'inference-result',id:message.id,logitsMove:logitsMove.buffer,logitsValue:new Float32Array(3).buffer}})
-          }
-        },0)
-      }
-      terminate(){}
-    }
-  },{index:mapping.g6g7})
+  const predictions:number[]=[]
+  await page.route('**/api/maia/predict',route=>{
+    const positions=route.request().postDataJSON().positions
+    for(const p of positions)predictions.push(p.selfElo)
+    return route.fulfill({json:{predictions:positions.map(()=>({moves:[{uci:'g6g7',san:'Qg7#',probability:.9},{uci:'g6g8',san:'Qg8+',probability:.1}],whiteExpectedScore:.9,whiteOutcome:{win:.9,draw:0,loss:.1}}))}})
+  })
   const ids:string[]=[]
   for(let i=0;i<2;i++){
     const game=await(await request.post('/api/games',{data:{elo:600,fen:'7k/8/5KQ1/8/8/8/8/8 w - - 0 1'}})).json()
@@ -43,7 +30,7 @@ test('Puzzle feedback distinguishes retry, success and reveal and advances witho
   const feedback=page.getByRole('region',{name:'Esito del puzzle'})
   await expect(feedback).toContainText('Trova una buona mossa')
   await expect(page.locator('.analysis-arrow')).toHaveCount(0)
-  expect(await page.evaluate(()=>(window as any).puzzlePredictions)).toEqual([])
+  expect(predictions).toEqual([])
   await page.locator('[data-square="g6"]').click()
   await page.locator('[data-square="g8"]').click()
   await expect(page.locator('[data-square="g8"] img')).toBeVisible()
@@ -62,10 +49,13 @@ test('Puzzle feedback distinguishes retry, success and reveal and advances witho
   await expect(page.locator('[data-square="g7"] img')).toBeVisible()
   await expect(page.locator('[data-square="g6"] img')).toHaveCount(0)
   await expect(page.locator('.analysis-arrow[data-source="played"]')).toHaveAttribute('data-move','g6g8')
-  await expect(page.locator('.analysis-arrow[data-source="maia"]')).toHaveAttribute('data-move','g6g7')
+  // The solution is green; Maia picks the same move here, so no red arrow sits on it and the legend says so.
+  await expect(page.locator('.analysis-arrow[data-source="solution"]')).toHaveAttribute('data-move','g6g7')
+  await expect(page.locator('.analysis-arrow[data-source="maia"]')).toHaveCount(0)
+  await expect(page.getByText('avrebbe giocato la stessa mossa',{exact:false})).toBeVisible()
   await expect(page.locator('.analysis-arrow')).toHaveCount(2)
   await expect(page.locator('[data-square="g6"] img')).toBeVisible()
-  expect(await page.evaluate(()=>(window as any).puzzlePredictions)).toEqual([600])
+  expect(predictions).toEqual([600])
   await expect(feedback).toContainText('resta nella lista')
   await expect(page.locator('.exercise-list button')).toHaveCount(2)
   await page.getByRole('button',{name:'Mostra la tua soluzione',exact:true}).click()

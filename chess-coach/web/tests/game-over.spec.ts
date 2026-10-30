@@ -23,8 +23,12 @@ test('Delivering checkmate is announced and the mated king is highlighted',async
 
 test('Being checkmated is announced as a defeat',async({page,request})=>{
   const g=await(await request.post('/api/games',{data:{color:'w',fen:'r5k1/8/8/8/8/8/5PPP/6K1 b - - 0 1'}})).json()
-  // Whatever Maia samples, the reply sent to the server is the mating move.
-  await page.route('**/moves',route=>{const body=route.request().postDataJSON();return route.continue(body?.actor==='maia'?{postData:JSON.stringify({...body,move:'a8a1'})}:undefined)})
+  // Whatever Maia would draw on the server, its reply here is the mating move.
+  await page.route('**/maia-move',async route=>{
+    const body=route.request().postDataJSON()
+    const mated=await request.post(`/api/games/${g.id}/moves`,{data:{move:'a8a1',actor:'maia',version:body.version,revision:body.revision}})
+    await route.fulfill({json:await mated.json()})
+  })
   await open(page,g.id)
   const banner=page.locator('.game-over')
   await expect(banner).toContainText('Scacco matto · Hai perso')

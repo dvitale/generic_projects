@@ -4,7 +4,7 @@ test('Real Maia play, black orientation, drill and mobile layout',async({page,re
   const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message))
   let humanResponseAt=0,maiaRequestAt=0
   page.on('response',response=>{if(response.url().endsWith('/moves')&&response.request().postDataJSON()?.actor==='human')humanResponseAt=Date.now()})
-  page.on('request',request=>{if(request.url().endsWith('/moves')&&request.postDataJSON()?.actor==='maia')maiaRequestAt=Date.now()})
+  page.on('request',request=>{if(request.url().endsWith('/maia-move'))maiaRequestAt=Date.now()})
   await page.goto('/')
   await expect(page.locator('.piece-image,.piece')).toHaveCount(32)
   await expect.poll(()=>page.locator('.piece-image').evaluateAll(images=>images.every(img=>(img as HTMLImageElement).complete&&(img as HTMLImageElement).naturalWidth>0))).toBe(true)
