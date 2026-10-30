@@ -156,6 +156,8 @@ L'installazione sul PC usa il tema **Green** e i pezzi **Neo** richiesti, scaric
 
 Il menu **Scacchiera** in alto a destra cambia tema (Verde, Legno, Blu; gli ultimi due sono colori CSS senza immagini) e attiva o disattiva i suoni delle mosse, sintetizzati nel browser senza file audio. La scelta resta salvata nel browser. I font Inter e Fraunces (licenza SIL OFL 1.1) sono inclusi nel bundle tramite i pacchetti `@fontsource-variable`: l’interfaccia non contatta servizi di font esterni.
 
+L'icona dell'applicazione (un cavallo con guantoni e caschetto da sparring) sta in `web/public`: `favicon.ico` (16, 32 e 48 pixel), `icon-192.png` e `icon-512.png` per `manifest.webmanifest`, che permette di aggiungere SparringMate alla schermata Home del telefono, e `apple-touch-icon.png` (180 pixel, con fondo pieno perché iOS arrotonda da solo gli angoli). Le icone non richiedono il login.
+
 ## Configurazione del tutor
 
 `python3 scripts/configure_deepseek.py` configura la chiave con input nascosto. La credenziale rimane in `.secrets/deepseek.json`, esclusa da Git. La spiegazione viene salvata nel database con l'analisi a cui si riferisce. Dettagli sui dati inviati, sul modello e sui limiti in `docs/tutor-deepseek.md`.
