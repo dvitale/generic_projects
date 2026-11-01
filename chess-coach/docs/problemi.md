@@ -56,11 +56,25 @@ La verifica avviene sul server, mossa per mossa. Il browser riceve posizione, pr
 
 A problema concluso, **↺ Riprova da capo** riparte dalla mossa dell’avversario. La soluzione è ormai nota al browser, che verifica le mosse da solo con la stessa regola (mossa salvata o qualsiasi matto) e gioca le risposte: nulla arriva al server, quindi il rating non cambia. Accanto, **Gioca da qui col Bianco/Nero** avvia una partita contro Maia, al livello selezionato in Gioca, dalla posizione dopo la mossa dell’avversario, col colore che deve risolvere; il titolo è «Problema ‹ID› · ‹mossa›».
 
+## Indizi
+
+**Chiedi un indizio** (`POST /api/problems/sessions/{id}/hint`, con `step`) dà a ogni richiesta un livello in più per la mossa corrente:
+
+1. il tipo di mossa, classificato da Stockfish sulla mossa della soluzione (`diagnosis.solution_of` con la mossa imposta): forzante, tranquilla con una minaccia, profilassi, miglioramento;
+2. il motivo tattico: i temi Lichess del problema, esclusi quelli di lunghezza, esito e provenienza (`short`, `advantage`, `master`…) e quelli già detti dal primo indizio (`quietMove`, `defensiveMove`, `long`). Se non ne resta nessuno il livello manca;
+3. il pezzo che muove, evidenziato sulla scacchiera.
+
+Dopo una mossa giusta gli indizi ripartono dalla mossa successiva. Come su Lichess, il primo indizio conta come errore per il rating (una sola volta per problema). La classificazione della mossa corrente resta nella sessione (`problem_sessions.hint`).
+
+## Percorso di studio
+
+Con un percorso attivo (vedi [lacune-studio.md](lacune-studio.md)), `POST /api/problems/next` con `{"path": id}` sceglie il problema del percorso al posto di fascia e tema; la sessione registra percorso, fase e se il problema porta il tema (`path_id`, `path_stage`, `path_themed`). Il rating cambia come per ogni altro problema.
+
 ## Verifiche ripetibili
 
 ```bash
 .venv/bin/python -m pytest tests/test_problems.py -q
-cd web && npm run build && npx playwright test tests/problems.spec.ts
+cd web && npm run build && npx playwright test tests/problems.spec.ts tests/study-path.spec.ts
 ```
 
 I test usano `tests/fixtures/lichess-puzzles.csv`: 11 problemi reali, uno per fascia più un matto in uno. Le prove del browser importano la fixture nella cartella dati temporanea prima di avviare il server.

@@ -9,4 +9,5 @@ export interface Exercise { id: string; gameTitle?:string; gameNumber?:number|nu
 export interface Attempt { firstTry?:boolean; scheduled?:boolean; success: boolean; assisted: boolean; message: string; best: Evaluation | null; actual: Evaluation | null; dueAt: string; loss: number | null; version:number; closed:boolean; insight?:Insight }
 export interface Practice { success:boolean; san:string }
 export interface PuzzleSession {id:string; version:number; exposure:string}
+export interface PuzzleHint {level:number; title:string; text:string; squares?:string[]; themes?:string[]}
 export interface Profile { games: number; attempts: number; independentAttempts:number; unaidedSuccesses: number; due: number; themes: {theme: string; examples: number}[]; confidence: string; plan: {title: string; minutes: number; description: string}[]; domains?:{kind:string;label:string;examples:number}[] }

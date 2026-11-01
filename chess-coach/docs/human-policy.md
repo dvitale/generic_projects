@@ -72,3 +72,7 @@ Il servizio di gioco e il registro dei checkpoint accettati non vengono aggiorna
 
 Esito: [rapporto del primo pilota tattico](../experiments/human-policy/RISULTATI-TATTICA.md).
 Tre bracci completati e quattro partite offline; nessun candidato promosso.
+
+## Guida alla sperimentazione e distillazione
+
+Risultati, limiti e proposta delle tre varianti sono raccolti in [SPERIMENTAZIONE-GUIDA.md](../experiments/human-policy/SPERIMENTAZIONE-GUIDA.md). Il pilota resta nel laboratorio e non promuove automaticamente i pesi.

@@ -52,6 +52,18 @@ function BoardAnnotation({from,to,orientation,brush=brushes.annotation,extra=0,s
 // Stacking order as on maiachess.com: Maia, Stockfish, then the played move on top. Arrows of the same
 // move from different sources hide each other, so `turn` rotates which one is in the foreground.
 const arrowOrder={maia:0,solution:1,stockfish:2,played:3}
+const arrowNames={stockfish:'Freccia blu · Stockfish',maia:'Freccia rossa · Maia',played:'Freccia bianca · giocata',solution:'Freccia verde · soluzione'}
+/** Hover text for the squares an arrow joins: the arrows layer lets clicks through, so it cannot show a title itself. */
+function arrowTitles(arrows:AnalysisArrow[],fen:string){
+  const titles:Record<string,string[]>={}
+  for(const arrow of arrows){
+    let san=arrow.move
+    try{san=new Chess(fen).move({from:arrow.move.slice(0,2),to:arrow.move.slice(2,4),promotion:arrow.move[4]}).san}catch{/* not legal here: keep UCI */}
+    const text=`${arrowNames[arrow.source]}${arrow.rank>1?` (${arrow.rank}ª scelta)`:''}: ${san}`
+    for(const square of [arrow.move.slice(0,2),arrow.move.slice(2,4)])(titles[square]??=[]).push(text)
+  }
+  return titles
+}
 const arrowKey=(a:AnalysisArrow)=>a.move.slice(0,4)
 const overlapping=(arrows:AnalysisArrow[])=>arrows.some((a,i)=>arrows.some((b,j)=>j>i&&arrowKey(a)===arrowKey(b)&&a.source!==b.source))
 function stackArrows(arrows:AnalysisArrow[],turn:number){
@@ -253,6 +265,7 @@ export default function Board({fen, orientation, interactive:enabled, legalMoves
     if(!rect||x<rect.left||x>=rect.right||y<rect.top||y>=rect.bottom)return null
     return files[Math.floor((x-rect.left)/rect.width*8)]+ranks[Math.floor((y-rect.top)/rect.height*8)]
   }
+  const titles=arrowTitles(optimistic?[]:analysisArrows,fen)
   return <div className="board-wrap">
     <div ref={boardElement} className={`board board-theme-${theme}`} role="group" aria-label="Scacchiera"
       onContextMenu={event=>event.preventDefault()}
@@ -262,7 +275,7 @@ export default function Board({fen, orientation, interactive:enabled, legalMoves
         const piece = board.get(square as Square)
         const checked = piece?.type==='k' && piece.color===board.turn() && board.inCheck()
         const lit = shownLastMove?.slice(0,2) === square || shownLastMove?.slice(2,4) === square
-        return <button key={square} type="button" data-square={square} aria-label={`${square}${piece ? ` ${names[piece.type]} ${piece.color === 'w' ? 'bianco' : 'nero'}` : ''}`} aria-pressed={selected === square}
+        return <button key={square} type="button" data-square={square} title={titles[square]?.join('\n')} aria-label={`${square}${piece ? ` ${names[piece.type]} ${piece.color === 'w' ? 'bianco' : 'nero'}` : ''}`} aria-pressed={selected === square}
           className={`square ${(ri+fi)%2 ? 'dark-square' : 'light-square'} ${selected === square ? 'selected-square' : ''} ${lit ? 'last-square' : ''} ${checked ? 'check-square' : ''} ${highlights.includes(square)?'hint-square':''} ${drag?.from===square?'drag-origin':''} ${interactive&&!promotion.length&&legalMoves.some(m=>m.startsWith(square))?'can-drag':''}`}
           draggable={false} onDragStart={event=>event.preventDefault()}
           onPointerDown={event=>pointerDown(event,square)} onPointerMove={pointerMove} onPointerUp={pointerUp}

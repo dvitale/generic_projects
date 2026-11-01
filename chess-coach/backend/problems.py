@@ -38,6 +38,20 @@ def expected(rating, opponent):
     return 1 / (1 + 10 ** ((opponent - rating) / 400))
 
 
+def current_rating(con):
+    row = con.execute('SELECT rating_after, (SELECT COUNT(*) FROM problem_attempts) n FROM problem_attempts ORDER BY id DESC LIMIT 1').fetchone()
+    return (row['rating_after'], row['n']) if row else (START_RATING, 0)
+
+
+def open_store(data_dir):
+    path = data_dir / PUZZLES_FILE
+    if not path.exists():
+        return None
+    con = sqlite3.connect(f'file:{path}?mode=ro', uri=True)
+    con.row_factory = sqlite3.Row
+    return con
+
+
 def init_schema(con):
     con.executescript('''
     CREATE TABLE IF NOT EXISTS problem_sessions(
@@ -57,6 +71,7 @@ def init_schema(con):
 class NextBody(BaseModel):
     band: int | None = Field(default=None, ge=0, le=len(BANDS) - 1)
     theme: str | None = Field(default=None, max_length=40, pattern=r'^[A-Za-z0-9]+$')
+    path: str | None = Field(default=None, max_length=50)
 
 
 class MoveBody(BaseModel):
@@ -69,13 +84,10 @@ class StepBody(BaseModel):
 
 
 def install(app, database, data_dir, now):
+    from . import gaps
+
     def puzzles():
-        path = data_dir() / PUZZLES_FILE
-        if not path.exists():
-            return None
-        con = sqlite3.connect(f'file:{path}?mode=ro', uri=True)
-        con.row_factory = sqlite3.Row
-        return con
+        return open_store(data_dir())
 
     def require():
         con = puzzles()
@@ -83,9 +95,7 @@ def install(app, database, data_dir, now):
             raise HTTPException(404, 'Database dei problemi non installato: esegui make puzzles.')
         return con
 
-    def rating(con):
-        row = con.execute('SELECT rating_after, (SELECT COUNT(*) FROM problem_attempts) n FROM problem_attempts ORDER BY id DESC LIMIT 1').fetchone()
-        return (row['rating_after'], row['n']) if row else (START_RATING, 0)
+    rating = current_rating
 
     def puzzle(store, puzzle_id):
         row = store.execute('SELECT * FROM puzzles WHERE id=?', (puzzle_id,)).fetchone()
@@ -122,6 +132,7 @@ def install(app, database, data_dir, now):
         after = round(before + k_factor(games) * ((1 if success else 0) - expected(before, row['rating'])))
         con.execute('INSERT INTO problem_attempts(session_id,puzzle_id,puzzle_rating,success,rating_before,rating_after,created_at) VALUES(?,?,?,?,?,?,?)',
                     (session['id'], row['id'], row['rating'], int(success), before, after, now()))
+        gaps.advance(con, session['id'], now())
         return outcome(con, session['id'], row)
 
     def outcome(con, session_id, row):
@@ -174,28 +185,37 @@ def install(app, database, data_dir, now):
     @app.post('/api/problems/next')
     def next_problem(body: NextBody):
         with closing(require()) as store, database() as con:
-            seen = {r[0] for r in con.execute('SELECT puzzle_id FROM problem_attempts')}
-            args: list[int | str]
-            if body.band is None:
-                value, _ = rating(con)
-                where, args = 'rating BETWEEN ? AND ?', [value - ADAPTIVE_RANGE, value + ADAPTIVE_RANGE]
+            stage, themed = None, None
+            if body.path:
+                chosen, stage, themed = gaps.pick(con, store, body.path, rating(con)[0], now())
+                fresh = True
             else:
-                where, args = 'band=?', [body.band]
-            if body.theme:
-                where += ' AND themes LIKE ?'
-                args.append(f'% {body.theme} %')
-            # Unseen problems first; repeat the oldest ones only when the selection is exhausted.
-            candidates = [r['id'] for r in store.execute(f'SELECT id FROM puzzles WHERE {where}', args)]
-            if not candidates:
-                raise HTTPException(404, 'Nessun problema con questi filtri.')
-            fresh = [c for c in candidates if c not in seen]
-            chosen = random.choice(fresh or candidates)
+                chosen, fresh = choose(con, store, body)
             row = puzzle(store, chosen)
             session_id = str(uuid.uuid4())
-            con.execute('INSERT INTO problem_sessions(id,puzzle_id,created_at) VALUES(?,?,?)', (session_id, chosen, now()))
+            con.execute('INSERT INTO problem_sessions(id,puzzle_id,created_at,path_id,path_stage,path_themed) VALUES(?,?,?,?,?,?)',
+                        (session_id, chosen, now(), body.path, stage, themed))
             board = board_at(row, 1)
-            return {'sessionId': session_id, 'step': 1, 'repeated': not fresh, 'puzzle': view(row),
+            return {'sessionId': session_id, 'step': 1, 'repeated': not fresh, 'puzzle': view(row), 'path': body.path,
                     'legalMoves': [m.uci() for m in board.legal_moves]}
+
+    def choose(con, store, body):
+        seen = {r[0] for r in con.execute('SELECT puzzle_id FROM problem_attempts')}
+        args: list[int | str]
+        if body.band is None:
+            value, _ = rating(con)
+            where, args = 'rating BETWEEN ? AND ?', [value - ADAPTIVE_RANGE, value + ADAPTIVE_RANGE]
+        else:
+            where, args = 'band=?', [body.band]
+        if body.theme:
+            where += ' AND themes LIKE ?'
+            args.append(f'% {body.theme} %')
+        # Unseen problems first; repeat the oldest ones only when the selection is exhausted.
+        candidates = [r['id'] for r in store.execute(f'SELECT id FROM puzzles WHERE {where}', args)]
+        if not candidates:
+            raise HTTPException(404, 'Nessun problema con questi filtri.')
+        fresh = [c for c in candidates if c not in seen]
+        return random.choice(fresh or candidates), bool(fresh)
 
     @app.post('/api/problems/sessions/{session_id}/moves')
     def play(session_id: str, body: MoveBody):
@@ -251,6 +271,42 @@ def install(app, database, data_dir, now):
             con.execute("UPDATE problem_sessions SET status='closed', revealed=1 WHERE id=?", (session_id,))
             result = outcome(con, session_id, row) if session['failed'] else rate(con, session, row, False)
             return {'remaining': row['moves'].split()[session['step']:], 'result': result}
+
+    @app.post('/api/problems/sessions/{session_id}/hint')
+    def hint(session_id: str, body: StepBody):
+        """Graduated hints for the current step: kind of move, Lichess motif, piece. As on Lichess, a hint costs the rating."""
+        with closing(require()) as store, database() as con:
+            session = session_row(con, session_id)
+            if session['status'] != 'active':
+                raise HTTPException(409, 'Problema già concluso')
+            if body.step != session['step']:
+                raise HTTPException(409, 'La posizione è cambiata: ricarica il problema')
+            row = puzzle(store, session['puzzle_id'])
+        board = board_at(row, body.step)
+        stored = json.loads(session['hint'] or 'null')
+        if stored is None or stored['step'] != body.step:
+            move = chess.Move.from_uci(row['moves'].split()[body.step])
+            stored = {'step': body.step, 'level': 0, 'solution': diagnosis.solution_of(board, move)}
+        found = stored['solution']
+        given = diagnosis.hints(board, found) if found else []
+        themes = [t for t in gaps.motifs(row['themes'].split()) if t not in gaps.METHOD_THEMES]
+        if themes:
+            given.insert(1, {'level': 2, 'title': 'Motivo', 'text': '', 'themes': themes})
+        for level, item in enumerate(given, 1):
+            item['level'] = level
+        stored['level'] = min(stored['level'] + 1, len(given))
+        with database() as con:
+            con.execute('BEGIN IMMEDIATE')
+            session = session_row(con, session_id)
+            if session['status'] != 'active' or session['step'] != body.step:
+                raise HTTPException(409, 'La posizione è cambiata: ricarica il problema')
+            con.execute('UPDATE problem_sessions SET hint=? WHERE id=?', (json.dumps(stored), session_id))
+            result = None
+            if not session['failed']:
+                con.execute('UPDATE problem_sessions SET failed=1 WHERE id=?', (session_id,))
+                rated = rate(con, session, row, False)
+                result = {key: rated[key] for key in ('success', 'ratingBefore', 'ratingAfter')}
+        return {'hints': given[:stored['level']], 'last': stored['level'] == len(given), 'result': result}
 
     @app.post('/api/problems/sessions/{session_id}/skip')
     def skip(session_id: str):

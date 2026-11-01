@@ -16,7 +16,7 @@ from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
 from .engine import evaluator
-from . import insights
+from . import explain, insights
 from .learning import category, value
 
 RULE_VERSION = 2
@@ -142,6 +142,47 @@ def solution(board, best, threat):
              'openRooks': later['openRooks'] if later['openRooks'] != before['openRooks'] else None,
              'center': later['center'] if len(later['center']) > len(before['center']) else None}
     return {**found, 'kind': 'improvement', 'facts': facts}
+
+
+def solution_of(board, move=None):
+    """The engine's solution (or the given one, as in a Lichess problem) and its kind, with a diagnosis's evidence."""
+    best = evaluator.evaluate(board, move, nodes=NODES)
+    passed, threat = threat_board(board), None
+    if passed is not None:
+        e = player_view(evaluator.evaluate(passed, nodes=NODES))
+        threat = {'move': e['pv'][0] if e['pv'] else None, 'san': e['san'][0] if e['san'] else None, 'evaluation': e}
+    return solution(board, best, threat)
+
+
+HINT_LEVELS = 2
+HINT_TITLES = {'forcing': 'Mossa forzante', 'quiet_threat': 'Mossa tranquilla con una minaccia',
+               'prophylaxis': 'Profilassi', 'improvement': 'Miglioramento di un pezzo'}
+FORCING_NAMES = {'check': 'uno scacco', 'capture': 'una cattura', 'promotion': 'una promozione'}
+
+
+def hints(board, found):
+    """Graduated hints from the classified solution: what kind of move to look for, then which piece plays it."""
+    kind = found['kind']
+    if kind == 'forcing':
+        first = (f"La soluzione è {' e '.join(FORCING_NAMES[f] for f in found['forcing'])}. Se l’avevi vista e scartata, "
+                 'calcolala fino in fondo: cerca la risposta dell’avversario che ti era sembrata sufficiente e verifica se regge davvero.')
+    elif kind == 'quiet_threat':
+        first = ('Non è uno scacco né una cattura: è una mossa tranquilla che prepara una minaccia, e l’avversario dovrà occuparsene. '
+                 'Chiediti: se potessi muovere due volte di fila, che cosa giocheresti?')
+    elif kind == 'prophylaxis':
+        first = ('Non è uno scacco né una cattura: la mossa giusta toglie forza all’idea migliore dell’avversario. '
+                 'Prima di cercare la tua mossa, chiediti che cosa giocherebbe lui se toccasse a lui.')
+    else:
+        first = ('Non c’è un colpo tattico: la mossa giusta migliora un pezzo. '
+                 'Cerca il tuo pezzo meno attivo e chiediti su quale casa lavorerebbe meglio.')
+    move = chess.Move.from_uci(found['move'])
+    square = chess.square_name(move.from_square)
+    name, _, gender = explain.NAMES[board.piece_at(move.from_square).piece_type]
+    second = f"Guarda {'la tua' if gender == 'f' else 'il tuo'} {name} in {square}: è il pezzo che muove."
+    if kind == 'prophylaxis':
+        second += f" L’idea da fermare è {found['stopped']['san']}."
+    return [{'level': 1, 'title': HINT_TITLES[kind], 'text': first},
+            {'level': 2, 'title': 'Dove guardare', 'text': second, 'squares': [square]}]
 
 
 def classify(board, accepts, answer):

@@ -98,6 +98,7 @@ label.chip input{width:16px;height:16px;accent-color:#fff}
 .info-note-body p+p{margin-top:6px}
 .variation{font-family:ui-monospace,"SF Mono",Menlo,monospace;background:var(--surface-2);padding:10px;border-radius:var(--r-sm);line-height:1.8;font-size:var(--fs-xs)!important;overflow-wrap:anywhere}
 .hint{margin-top:12px;background:var(--inaccuracy-bg);border-radius:var(--r-sm);padding:12px;color:var(--inaccuracy)}
+.puzzle-hints{list-style:none;margin:0;padding:0}.puzzle-hints .hint strong{display:block;margin-bottom:4px}
 
 /* Shell: dark sidebar, content column */
 .app-shell{--side-w:208px;display:grid;grid-template-columns:var(--side-w) minmax(0,1fr);min-height:100vh;background:linear-gradient(to right,var(--side-bg) var(--side-w),transparent var(--side-w))}
@@ -903,3 +904,7 @@ details.panel>summary{font-weight:650;font-size:var(--fs-lg)}
 @media(max-width:680px){.stuck-control .stuck-menu{position:fixed;left:16px;right:16px;bottom:76px;top:auto;min-width:0}}
 .layout-alternative .player-row small{display:block}
 .selection-choice button{padding-inline:4px}
+.study-path-steps{display:flex;flex-wrap:wrap;gap:6px;list-style:none;margin:0 0 12px;padding:0}.study-path-steps li{padding:4px 10px;border-radius:999px;background:var(--accent-soft);font-size:.85em;color:var(--muted)}.study-path-steps li.done{opacity:.7;text-decoration:line-through}.study-path-steps li.current{background:var(--accent);color:#fff}
+.study-path-example{display:flex;gap:12px;align-items:flex-start;margin:12px 0}.study-path-example .mini-board{width:140px;flex:none}
+.gap-row .footnote button{margin-left:6px}
+.study-path h3{margin:14px 0 4px}

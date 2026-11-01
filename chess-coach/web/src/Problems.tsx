@@ -6,12 +6,13 @@ import FailureDiagnosis from './FailureDiagnosis'
 import {useBoardOrientation} from './boardFlip'
 import {maia} from './engine/maia'
 import {api} from './api'
-import type {Color} from './types'
+import {StudyPathPanel,pathStatus,closedNotice,type StudyPathView,type ClosedPath} from './StudyPath'
+import type {Color,PuzzleHint} from './types'
 
 interface Band {id:number;label:string;min:number;max:number;count:number;attempts:number;solved:number}
 interface Overview {available:boolean;source:string;rating:number;attempts:number;solved:number;total:number;adaptiveRange:number;bands:Band[];themes:{id:string;count:number}[];importedAt?:string}
 interface Puzzle {id:string;fen:string;opponentMove:string;turn:Color;length:number}
-interface Problem {sessionId:string;step:number;repeated:boolean;puzzle:Puzzle;legalMoves:string[]}
+interface Problem {sessionId:string;step:number;repeated:boolean;puzzle:Puzzle;legalMoves:string[];path?:string|null}
 interface Result {success:boolean;ratingBefore:number|null;ratingAfter:number|null;rating:number;ratingDeviation:number;plays:number;popularity:number;themes:string[];gameUrl:string;opening:string|null;solution:string[]}
 interface MoveResponse {correct:boolean;step:number;reply?:string|null;done?:boolean;legalMoves?:string[];result:Result|Pick<Result,'success'|'ratingBefore'|'ratingAfter'>|null}
 type Phase='opponent'|'solving'|'checking'|'wrong'|'done'
@@ -80,16 +81,41 @@ export default function Problems({onPlayFrom}:{onPlayFrom?:(fen:string,color:Col
   const [practice,setPractice]=useState<{line:string[];state:'solving'|'wrong'|'solved'}|null>(null)
   const practiceTicket=useRef(0)
   const orientation=useBoardOrientation(problem?.puzzle.turn??'w')
+  const [hints,setHints]=useState<PuzzleHint[]>([]),[hintsDone,setHintsDone]=useState(false)
+  // The active study path; «Problemi liberi» sets it aside without abandoning it.
+  const [path,setPath]=useState<StudyPathView|null>(null),[free,setFree]=useState(false),[notice,setNotice]=useState('')
+  const hadPath=useRef<string|null>(null)
+  const onPath=!!path&&!free&&['themed','mixed','review'].includes(path.stage)
 
   async function refresh(){const next=await api<Overview>('/problems');setOverview(next);return next}
-  useEffect(()=>{refresh().catch(e=>setError(e.message));return()=>{token.current++}},[])
+  async function refreshPath(){
+    const r=await api<{path:StudyPathView|null;last:ClosedPath|null}>('/study-paths/active')
+    if(!r.path&&hadPath.current&&r.last)setNotice(closedNotice(r.last))
+    hadPath.current=r.path?.id??null;setPath(r.path)
+    return r.path
+  }
+  useEffect(()=>{refresh().catch(e=>setError(e.message));refreshPath().catch(()=>{});return()=>{token.current++}},[])
+  async function pathAction(action:'start'|'abandon'){
+    if(!path)return
+    setBusy(true);setError('')
+    try{const r=await api<{path:StudyPathView|null}>(`/study-paths/${path.id}/${action}`,{});if(action==='abandon')hadPath.current=null;setPath(r.path);if(action==='start')await start(true)}
+    catch(e){setError(e instanceof Error?e.message:'Percorso non disponibile')}finally{setBusy(false)}
+  }
+  async function hint(){
+    if(!problem||phase!=='solving')return
+    setBusy(true)
+    try{
+      const r=await api<{hints:PuzzleHint[];last:boolean;result:Pick<Result,'success'|'ratingBefore'|'ratingAfter'>|null}>(`/problems/sessions/${problem.sessionId}/hint`,{step:problem.step})
+      setHints(r.hints);setHintsDone(r.last);if(r.result)setFailed(true)
+    }catch(e){setError(e instanceof Error?e.message:'Indizio non disponibile')}finally{setBusy(false)}
+  }
 
-  async function start(){
+  async function start(withPath=onPath){
     const ticket=++token.current
     if(problem&&phase!=='done'&&!failed&&problem.step===1)await api(`/problems/sessions/${problem.sessionId}/skip`,{}).catch(()=>{})
-    setBusy(true);setError('');setResult(null);setFailed(false);setCursor(null);setPractice(null);practiceTicket.current++;setEstimate(null);setEstimateError('')
+    setBusy(true);setError('');setResult(null);setFailed(false);setCursor(null);setPractice(null);practiceTicket.current++;setEstimate(null);setEstimateError('');setHints([]);setHintsDone(false);setNotice('')
     try{
-      const next=await api<Problem>('/problems/next',{band,theme:theme||null})
+      const next=await api<Problem>('/problems/next',withPath&&path?{path:path.id}:{band,theme:theme||null})
       if(ticket!==token.current)return
       setProblem(next);setLine([]);setLegal(next.legalMoves);setPhase('opponent')
       // The opponent's move is the mistake to punish: show it, then hand over the board.
@@ -101,8 +127,9 @@ export default function Problems({onPlayFrom}:{onPlayFrom?:(fen:string,color:Col
   }
 
   function finish(final:Result){
-    setResult(final);setPhase('done')
+    setResult(final);setPhase('done');setHints([]);setHintsDone(false)
     refresh().catch(()=>{})
+    if(problem?.path)refreshPath().catch(()=>{})
     const ticket=token.current
     maiaEstimate(problem!.puzzle.fen,[problem!.puzzle.opponentMove,...final.solution]).then(e=>{if(ticket===token.current)setEstimate(e)}).catch(e=>{if(ticket===token.current)setEstimateError(e.message)})
   }
@@ -120,7 +147,7 @@ export default function Problems({onPlayFrom}:{onPlayFrom?:(fen:string,color:Col
         if(ticket!==token.current)return
         setLine(l=>l.slice(0,-1));setPhase('solving');return
       }
-      setProblem(p=>p&&{...p,step:r.step})
+      setProblem(p=>p&&{...p,step:r.step});setHints([]);setHintsDone(false)
       if(r.reply){
         await pause(450)
         if(ticket!==token.current)return
@@ -196,12 +223,14 @@ export default function Problems({onPlayFrom}:{onPlayFrom?:(fen:string,color:Col
 
   return <div className="prevention problems">
     {error&&<div className="alert" role="alert">{error}<button disabled={busy} onClick={()=>{setError('');void refresh()}}>Riprova</button></div>}
+    {notice&&<p className="notice" role="status">{notice}</p>}
     {overview?.available&&<div className="prevention-summary"><span><strong>{overview.rating}</strong> il tuo rating problemi</span><span><strong>{overview.solved} / {overview.attempts}</strong> risolti al primo tentativo</span><span><strong>{overview.total.toLocaleString('it-IT')}</strong> problemi da partite reali</span></div>}
     {!overview?<p role="status">Caricamento…</p>:!overview.available?<section className="panel prevention-intro"><span className="eyebrow">DA INSTALLARE</span><h2>Database dei problemi non presente</h2>
       <p>I problemi provengono dal database pubblico di Lichess (licenza CC0). Per scaricarne una selezione per fasce di rating esegui, nella cartella del progetto:</p>
       <pre className="command">make puzzles</pre>
       <p>Il download scorre il file compresso senza salvarlo e si ferma quando tutte le fasce sono piene: in genere pochi secondi e circa 7 MB su disco. Poi ricarica questa pagina.</p></section>
-    :!problem?<>{filters}<section className="panel prevention-intro"><span className="eyebrow">COME FUNZIONA</span><h2>Punisci l’errore dell’avversario</h2>
+    :!problem&&path&&!free?<StudyPathPanel path={path} busy={busy} onBegin={()=>void pathAction('start')} onContinue={()=>void start(true)} onLeave={()=>setFree(true)} onAbandon={()=>void pathAction('abandon')}/>
+    :!problem?<>{path&&<p className="notice">Hai un percorso di studio in corso: <b>{path.lesson.title}</b>. <button onClick={()=>setFree(false)}>Riprendi il percorso</button></p>}{filters}<section className="panel prevention-intro"><span className="eyebrow">COME FUNZIONA</span><h2>Punisci l’errore dell’avversario</h2>
       <p>Ogni problema nasce da una partita reale giocata su Lichess. La prima mossa, mostrata sulla scacchiera, è quella dell’avversario: di solito un errore. Tocca a te trovare la sequenza che lo sfrutta.</p>
       <p>La difficoltà è il rating del problema, calcolato su Lichess dai tentativi di chi lo ha risolto: non è l’Elo di chi ha giocato la partita. Il tuo rating sale o scende solo al primo tentativo.</p>
       <button className="primary" disabled={busy} onClick={()=>void start()}>Inizia →</button>
@@ -211,7 +240,7 @@ export default function Problems({onPlayFrom}:{onPlayFrom?:(fen:string,color:Col
         <div className="player-row"><span className="avatar">{problem.puzzle.turn==='w'?'♙':'♟'}</span><div className="player-info"><strong>{problem.puzzle.turn==='w'?'Muove il Bianco':'Muove il Nero'}</strong><small>{phase==='done'?`Problema ${problem.puzzle.id}`:`Trova ${solverMoves===1?'la mossa vincente':`la sequenza vincente · ${solverMoves} mosse`}`}</small></div></div>
         <Board fen={board!.fen()} orientation={orientation} legalMoves={practice?board!.moves({verbose:true}).map(m=>m.from+m.to+(m.promotion??'')):legal}
           interactive={practice?practice.state==='solving'&&practice.line.length%2===1:phase==='solving'&&!busy&&cursor===null&&diagnosing!==problem.sessionId}
-          onMove={m=>void (practice?practiceMove(m):move(m))} lastMove={lastMove} animateMove/>
+          onMove={m=>void (practice?practiceMove(m):move(m))} lastMove={lastMove} animateMove highlights={phase==='solving'&&!practice?hints.flatMap(h=>h.squares??[]):undefined}/>
         {phase==='done'&&!practice&&<div className="board-toolbar review-controls"><button aria-label="Posizione iniziale" onClick={()=>setCursor(0)} disabled={cursor===0}>⏮</button><button aria-label="Mossa precedente" onClick={()=>setCursor(c=>Math.max(0,(c??line.length)-1))} disabled={cursor===0}>◀</button><span>{cursor??line.length} / {line.length}</span><button aria-label="Mossa successiva" onClick={()=>setCursor(c=>c===null||c+1>=line.length?null:c+1)} disabled={cursor===null}>▶</button><button aria-label="Ultima posizione" onClick={()=>setCursor(null)} disabled={cursor===null}>⏭</button></div>}
       </section>
       <aside className="coach-column">
@@ -224,10 +253,12 @@ export default function Problems({onPlayFrom}:{onPlayFrom?:(fen:string,color:Col
             <p>{phase==='wrong'?'La scacchiera torna alla posizione precedente: il primo tentativo è già registrato, ma puoi continuare.':phase==='done'?(change!==null?`Rating ${result!.ratingBefore} → ${result!.ratingAfter} (${change>=0?'+':''}${change}).`:'Questo problema era già stato valutato.'):'Cerca catture, scacchi e minacce: il vantaggio nasce dall’ultima mossa dell’avversario.'}</p>
           </div>}
           <div className="row">
-            {phase!=='done'?<><button disabled={busy||phase!=='solving'||diagnosing===problem.sessionId} onClick={()=>setDiagnosing(problem.sessionId)}>Mostra soluzione</button><button disabled={busy} onClick={()=>void start()}>{failed||problem.step>1?'Prossimo problema':'Salta'}</button></>
-            :<><button className="primary" disabled={busy} onClick={()=>void start()}>Prossimo problema →</button><button title="Riporta la scacchiera alla posizione iniziale per riprovare: non cambia il rating" onClick={restart}>↺ Riprova da capo</button>{onPlayFrom&&<button className="play-from" title="Nuova partita contro Maia dalla posizione in cui tocca a te" onClick={playFrom}>Gioca da qui col {problem.puzzle.turn==='w'?'Bianco':'Nero'}</button>}</>}
+            {phase!=='done'?<><button disabled={busy||phase!=='solving'||hintsDone} title={hintsDone?'Hai visto tutti gli indizi di questa mossa':failed?undefined:'Come su Lichess, con un indizio il problema conta come non risolto per il rating'} onClick={()=>void hint()}><span aria-hidden="true">💡</span> {hints.length?'Un altro indizio':'Chiedi un indizio'}</button><button disabled={busy||phase!=='solving'||diagnosing===problem.sessionId} onClick={()=>setDiagnosing(problem.sessionId)}>Mostra soluzione</button><button disabled={busy} onClick={()=>void start()}>{failed||problem.step>1?'Prossimo problema':'Salta'}</button></>
+            :<>{problem.path&&path&&!onPath?<button className="primary" disabled={busy} onClick={()=>{token.current++;setProblem(null)}}>Torna al percorso →</button>:<button className="primary" disabled={busy} onClick={()=>void start()}>Prossimo problema →</button>}<button title="Riporta la scacchiera alla posizione iniziale per riprovare: non cambia il rating" onClick={restart}>↺ Riprova da capo</button>{onPlayFrom&&<button className="play-from" title="Nuova partita contro Maia dalla posizione in cui tocca a te" onClick={playFrom}>Gioca da qui col {problem.puzzle.turn==='w'?'Bianco':'Nero'}</button>}</>}
             <button className="quiet" disabled={busy&&phase!=='done'} onClick={()=>{token.current++;setProblem(null);setBusy(false)}}>Cambia fascia</button>
           </div>
+          {!!hints.length&&phase!=='done'&&<ol className="puzzle-hints" aria-label="Indizi">{hints.map(h=><li key={h.level} className="hint"><strong>{h.title}</strong> {h.themes?h.themes.map(themeLabel).join(', '):h.text}</li>)}</ol>}
+          {problem.path&&path?.id===problem.path&&<p className="footnote study-path-status">Percorso · {pathStatus(path)}</p>}
           {problem.repeated&&phase!=='done'&&<p className="footnote">Hai già visto tutti i problemi di questa selezione: questo è una ripetizione.</p>}
         </section>
         {diagnosing===problem.sessionId&&<FailureDiagnosis kind="problem" targetId={problem.puzzle.id} sessionId={problem.sessionId} onReveal={()=>void reveal()} onCancel={()=>setDiagnosing(null)}/>}

@@ -261,3 +261,5 @@ in [TATTICA.md](TATTICA.md). Nessuna promozione del checkpoint attivo.
 Primo pilota completato: [risultati e limiti](RISULTATI-TATTICA.md).
 La corrispondenza con le mosse umane migliora, ma non la gestione della donna in
 presa; nessuna variante è stata attivata nel gioco.
+
+Guida ai risultati e al prossimo confronto: [SPERIMENTAZIONE-GUIDA.md](SPERIMENTAZIONE-GUIDA.md).

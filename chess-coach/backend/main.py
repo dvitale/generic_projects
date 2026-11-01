@@ -30,6 +30,7 @@ from . import training_schedule, pgn_import, learning
 from . import study
 from . import problems
 from . import diagnosis
+from . import gaps
 from . import auth
 from .maia import maia as maia_server
 from . import maia as maia_api
@@ -116,6 +117,9 @@ def init_db():
         con.execute('CREATE UNIQUE INDEX IF NOT EXISTS games_number ON games(number)')
         con.execute('''CREATE TRIGGER IF NOT EXISTS games_assign_number AFTER INSERT ON games WHEN NEW.number IS NULL BEGIN
                        UPDATE games SET number=(SELECT COALESCE(MAX(number),0)+1 FROM games) WHERE rowid=NEW.rowid; END''')
+        # The classified solution of a puzzle the player asked help for: what kind of move was missed.
+        if 'solution' not in {r[1] for r in con.execute('PRAGMA table_info(puzzle_sessions)')}:
+            con.execute('ALTER TABLE puzzle_sessions ADD COLUMN solution TEXT')
         if 'last_shown_at' not in {r[1] for r in con.execute('PRAGMA table_info(exercises)')}:
             con.execute('ALTER TABLE exercises ADD COLUMN last_shown_at TEXT')
         columns = {r[1] for r in con.execute("PRAGMA table_info(attempts)")}
@@ -129,6 +133,7 @@ def init_db():
         final_review.init_schema(con)
         study.init_schema(con)
         problems.init_schema(con)
+        gaps.init_schema(con)
         diagnosis.init_schema(con)
         alternatives.init_schema(con)
         for row in con.execute('SELECT * FROM games WHERE analysis IS NOT NULL').fetchall():
@@ -1096,13 +1101,54 @@ def active_session(con, exercise_id, session_id, version=None):
     return session
 
 
+GENERIC_HINT = "Prima di decidere: cerca gli scacchi, poi le catture e le minacce di entrambi i colori. Confronta almeno due mosse candidate."
+
+
+def exercise_solution(row):
+    """The kind of solution of a puzzle, classified once per exercise; the endgame flag feeds the gap analysis."""
+    if row.get("solution"):
+        return json.loads(row["solution"])
+    board = reconstruct(row["initial_fen"], json.loads(row["history"]))
+    found = diagnosis.solution_of(board)
+    if found:
+        found["endgame"] = gaps.endgame(board)
+        with database() as con:
+            con.execute("UPDATE exercises SET solution=? WHERE id=?", (json.dumps(found), row["id"]))
+    return found
+
+
+def solution_by_id(exercise_id):
+    with database() as con:
+        row = dict(find_exercise(con, exercise_id))
+    return exercise_solution(row)
+
+
+def classify_later(exercise_id):
+    # A solved puzzle is classified in the background, so the gap analysis knows its kind without slowing the answer.
+    def run():
+        try:
+            solution_by_id(exercise_id)
+        except Exception:
+            pass
+    threading.Thread(target=run, daemon=True).start()
+
+
 @app.post("/api/exercises/{exercise_id}/hint")
 def hint(exercise_id: str, body: SessionInput):
     with database() as con:
-        con.execute("BEGIN IMMEDIATE")
+        row = dict(find_exercise(con, exercise_id))
         active_session(con, exercise_id, body.session_id)
-        con.execute("UPDATE puzzle_sessions SET hints=hints+1 WHERE id=?", (body.session_id,))
-    return {"hint": "Prima di decidere: cerca gli scacchi, poi le catture e le minacce di entrambi i colori. Confronta almeno due mosse candidate."}
+    found = exercise_solution(row)
+    with database() as con:
+        con.execute("BEGIN IMMEDIATE")
+        session = active_session(con, exercise_id, body.session_id)
+        level = min(session["hints"] + 1, diagnosis.HINT_LEVELS)
+        con.execute("UPDATE puzzle_sessions SET hints=?,solution=COALESCE(solution,?) WHERE id=?",
+                    (level, json.dumps(found) if found else None, body.session_id))
+    if found is None:
+        return {"hint": GENERIC_HINT, "hints": [{"level": 1, "title": "Metodo", "text": GENERIC_HINT}], "last": True}
+    given = diagnosis.hints(reconstruct(row["initial_fen"], json.loads(row["history"])), found)[:level]
+    return {"hint": given[-1]["text"], "hints": given, "last": level == diagnosis.HINT_LEVELS}
 
 
 @app.post("/api/exercises/{exercise_id}/attempts")
@@ -1130,6 +1176,8 @@ def attempt(exercise_id: str, body: AttemptInput):
         if not success:
             mistakes.record(con, 'puzzle', exercise_id, inserted.lastrowid, board, move, best, actual, now())
         con.execute("UPDATE puzzle_sessions SET guesses=guesses+1,status=? WHERE id=?", ("complete" if success else "active", body.session_id))
+    if success and not row.get("solution"):
+        classify_later(exercise_id)
     return {"success": success, "assisted": assisted, "loss": loss, "best": best if success else None, "actual": actual,
             "insight": insights.public(insights.compare(board.fen(), body.move, best, actual)),
             "dueAt": due, "version": body.version + 1, "closed": success,
@@ -1142,10 +1190,12 @@ def reveal(exercise_id: str, body: SessionInput):
     with database() as con:
         row = dict(find_exercise(con, exercise_id))
         active_session(con, exercise_id, body.session_id)
+    found = exercise_solution(row)
     best = evaluator.evaluate(reconstruct(row["initial_fen"], json.loads(row["history"])), nodes=80000)
     with database() as con:
         con.execute("BEGIN IMMEDIATE")
         session = active_session(con, exercise_id, body.session_id)
+        con.execute("UPDATE puzzle_sessions SET solution=COALESCE(solution,?) WHERE id=?", (json.dumps(found) if found else None, body.session_id))
         if not session["guesses"]:
             con.execute("INSERT INTO attempts(exercise_id,move,success,assisted,created_at,session_id,is_first,exposure) VALUES(?,?,0,1,?,?,1,?)",
                         (exercise_id, "reveal", now(), body.session_id, session["exposure"]))
@@ -1338,6 +1388,7 @@ final_review.install(app, database, find_game, game_pgn, now, tutor_lock)
 study.install(app, database, find_game, now, tutor_lock)
 auth.install(app, ENV_PATH, lambda: DB_PATH.parent)
 problems.install(app, database, lambda: DB_PATH.parent, now)
+gaps.install(app, database, lambda: problems.open_store(DB_PATH.parent), solution_by_id, now)
 diagnosis.install(app, database, now)
 # A move found in the guided path reaches the game only through the usual checks on version and revision.
 alternatives.install(app, database, now, find_game, PLAYABLE,

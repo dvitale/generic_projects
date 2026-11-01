@@ -91,7 +91,7 @@ test('PGN review creates personalized puzzles and tracks assistance',async({page
   await page.getByRole('button',{name:/^Puzzle/}).click()
   await expect(page.getByRole('button',{name:'Chiedi un indizio'})).toBeVisible()
   await page.getByRole('button',{name:'Chiedi un indizio'}).click()
-  await expect(page.locator('.hint')).toContainText('mosse candidate')
+  await expect(page.getByRole('list',{name:'Indizi'})).toContainText(/Mossa forzante|Mossa tranquilla|Profilassi|Miglioramento|Metodo/)
   await page.getByRole('button',{name:'Mostra soluzione'}).click()
   await page.getByRole('button',{name:'Salta: mostra subito'}).click()
   await expect(page.getByText(/Soluzione mostrata/)).toBeVisible({timeout:30000})

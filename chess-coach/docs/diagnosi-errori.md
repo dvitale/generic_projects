@@ -56,6 +56,15 @@ Il risultato mostra un riquadro **La soluzione: …** con la spiegazione e il mo
 
 Le fasce sono quelle di *Valuta la posizione*: equilibrio fra −1 e +1, forte vantaggio o svantaggio da ±3. Quando la posizione è un matto forzato, qualunque minaccia che lo cancella risulta concreta, anche se il risultato resta favorevole: per esempio, nel problema 007mr la spinta a3 del Bianco apre la casa a2 e smonta il matto sulla traversa.
 
+## Indizi dei Puzzle
+
+Nei Puzzle delle tue partite **Chiedi un indizio** non ripete più il metodo generale («cerca scacchi, catture e minacce»), che chi chiede aiuto ha già applicato. Usa la stessa classificazione della soluzione (`diagnosis.solution_of`, `diagnosis.hints`) e la rivela a scala:
+
+1. **Tipo di mossa:** forzante, dicendo se è uno scacco, una cattura o una promozione e invitando a ricalcolare la risposta che sembrava sufficiente; mossa tranquilla con una minaccia («se potessi muovere due volte di fila, che cosa giocheresti?»); profilassi («che cosa giocherebbe l'avversario se toccasse a lui?»); miglioramento di un pezzo.
+2. **Dove guardare:** il pezzo che muove, evidenziato sulla scacchiera; per la profilassi anche l'idea da fermare.
+
+Dopo il secondo livello il pulsante si disattiva: resta la mossa da provare o la soluzione. Qualsiasi indizio rende l'esercizio assistito, come prima. La classificazione si calcola una volta per esercizio (`exercises.solution`, con l'indicatore di finale) e resta anche nella sessione (`puzzle_sessions.solution`) quando chiedi un indizio o la soluzione. Alimenta le lacune ricorrenti e i percorsi di studio: vedi [`lacune-studio.md`](lacune-studio.md). Se la posizione non ha una soluzione classificabile resta l'indizio generale.
+
 ## Dati
 
 Tabella SQLite `failure_diagnoses`, una riga per sessione (`UNIQUE(kind, session_id)`): modalità, esercizio, FEN, risposte grezze (`answer`), prove del motore (`evidence`), categoria di ricerca, categorie di lettura, temi Lichess (solo Problemi) e `rule_version`. Le risposte grezze permettono di riclassificare lo storico quando cambiano le regole. Fa parte del backup SQLite e non viene inviata a servizi esterni.

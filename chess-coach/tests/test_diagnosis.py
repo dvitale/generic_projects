@@ -1,3 +1,6 @@
+import chess
+
+from backend import diagnosis
 from test_problems import client, stocked, start  # noqa: F401
 from test_coach import wait_analysis
 from test_prevention import attempt, seed, session
@@ -134,6 +137,14 @@ def test_solution_kind_tells_forcing_moves_from_quiet_ones(client):
     # A quiet opening position: no forcing move, no threat to make or stop.
     calm = describe('r1b1k2r/ppppqppp/2n2n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQK2R w KQkq - 0 1')
     assert calm['kind'] == 'improvement' and calm['facts']['piece'] in 'KQRBNP'
+
+
+def test_hints_for_a_quiet_solution_never_point_to_checks_and_captures(client):
+    board = chess.Board('r5k1/5ppp/8/8/8/1Q6/5PPP/6K1 w - - 0 1')
+    found = diagnosis.solution_of(board)
+    first, second = diagnosis.hints(board, found)
+    assert found['kind'] == 'prophylaxis' and first['title'] == 'Profilassi' and first['text'].startswith('Non è uno scacco né una cattura')
+    assert second['squares'] == [chess.square_name(chess.Move.from_uci(found['move']).from_square)] and second['text'].endswith('L’idea da fermare è Ra1+.')
 
 
 def test_obstacle_is_stored_and_missed_solutions_are_counted_by_kind(stocked):

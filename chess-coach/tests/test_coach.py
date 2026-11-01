@@ -77,6 +77,26 @@ def test_puzzle_first_attempt_retry_hint_and_early_practice(client):
     assert client.get('/api/exercises').json()[0]['streak'] == 0
 
 
+def test_puzzle_hints_name_the_kind_of_move_then_the_piece_and_record_what_was_missed(client):
+    ex = seed_exercise()
+    path = '/api/exercises/' + ex
+    s = client.post(path + '/sessions').json()
+    first = client.post(path + '/hint', json={'session_id': s['id']}).json()
+    assert [h['title'] for h in first['hints']] == ['Mossa forzante'] and 'uno scacco' in first['hint'] and not first['last']
+    second = client.post(path + '/hint', json={'session_id': s['id']}).json()
+    assert second['hints'][1] == {'level': 2, 'title': 'Dove guardare', 'text': 'Guarda la tua donna in g6: è il pezzo che muove.', 'squares': ['g6']}
+    assert second['last'] and client.post(path + '/hint', json={'session_id': s['id']}).json()['hints'] == second['hints']
+    with main.database() as con:
+        stored = con.execute('SELECT hints, solution FROM puzzle_sessions WHERE id=?', (s['id'],)).fetchone()
+    assert stored['hints'] == 2 and json.loads(stored['solution'])['kind'] == 'forcing'
+    # A solution shown without hints is recorded as well.
+    client.post(path + '/attempts', json={'move': 'g6g7', 'session_id': s['id'], 'version': 0})
+    again = client.post(path + '/sessions').json()
+    assert client.post(path + '/reveal', json={'session_id': again['id']}).json()['closed']
+    with main.database() as con:
+        assert json.loads(con.execute('SELECT solution FROM puzzle_sessions WHERE id=?', (again['id'],)).fetchone()[0])['move'] == 'g6g7'
+
+
 def test_reveal_and_review_schedule(client):
     seed_exercise()
     s = client.post('/api/exercises/ex/sessions').json()
