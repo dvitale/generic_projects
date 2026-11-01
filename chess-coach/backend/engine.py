@@ -1,5 +1,6 @@
 """Stockfish boundary: keep every comparison in the decision maker's perspective."""
 import json
+import math
 import os
 import threading
 from pathlib import Path
@@ -23,6 +24,11 @@ def stockfish_path():
     if Path("/usr/games/stockfish").exists():
         return "/usr/games/stockfish"
     raise RuntimeError("Stockfish non trovato. Imposta STOCKFISH_PATH.")
+
+
+# A line that ends where the engine's next move is a capture or a check is continued by SETTLE_PLIES,
+# at most SETTLE_STEPS times, each step judged with SETTLE_NODES (idea from the Queen paper, arXiv 2610.03695).
+SETTLE_NODES, SETTLE_PLIES, SETTLE_STEPS = 10000, 2, 6
 
 
 class Evaluator:
@@ -86,6 +92,33 @@ class Evaluator:
             # Rank the returned evaluations consistently for comparison and display.
             return sorted((self._format(board, info) for info in infos), key=lambda value: value['cp'], reverse=True)
 
+    def rank(self, board, moves, nodes=12000):
+        """Each given root move with its own line, in one MultiPV search restricted to those moves."""
+        with self.lock:
+            infos = self._analyse(board, nodes * len(moves), multipv=len(moves), root_moves=moves)
+            return [self._format(board, info) for info in infos if info.get("pv")]
+
+    def settle(self, board, evaluation, nodes=SETTLE_NODES):
+        """The line continued while the engine's next move at its end is a capture or a check: never cut mid-exchange."""
+        with self.lock:
+            cursor = board.copy(stack=False)
+            for uci in evaluation["pv"]:
+                cursor.push_uci(uci)
+            pv, san = list(evaluation["pv"]), list(evaluation["san"])
+            for _ in range(SETTLE_STEPS):
+                if not pv or cursor.is_game_over():
+                    break
+                follow = self._analyse(cursor, nodes).get("pv", [])[:SETTLE_PLIES]
+                if not follow or not (cursor.is_capture(follow[0]) or cursor.gives_check(follow[0])):
+                    break
+                for move in follow:
+                    if move not in cursor.legal_moves:
+                        break
+                    san.append(cursor.san(move))
+                    pv.append(move.uci())
+                    cursor.push(move)
+            return {**evaluation, "pv": pv, "san": san} if len(pv) > len(evaluation["pv"]) else evaluation
+
     def compare_candidates(self, board, played, nodes=24000):
         with self.lock:
             choices = self.candidates(board, nodes=nodes)
@@ -96,7 +129,10 @@ class Evaluator:
                 choices = self.candidates(board, nodes=nodes * 2)
                 actual = next((c for c in choices if c["pv"] and c["pv"][0] == played.uci()), actual)
             best = choices[0]
-            return best, actual, review_loss(best, actual), choices
+            settled = {id(best): self.settle(board, best)}
+            settled.setdefault(id(actual), self.settle(board, actual))
+            choices = [settled.get(id(c), c) for c in choices]
+            return settled[id(best)], settled[id(actual)], review_loss(best, actual), choices
 
     def compare(self, board, played, nodes=24000):
         # One lock prevents interleaved jobs from changing the engine's state mid-comparison.
@@ -105,7 +141,15 @@ class Evaluator:
             actual = best if best["pv"] and best["pv"][0] == played.uci() else self.evaluate(board, played, nodes)
             if actual["cp"] > best["cp"] + 30:
                 best = self.evaluate(board, nodes=nodes * 2)
-            return best, actual, max(0, best["cp"] - actual["cp"])
+            settled = self.settle(board, best)
+            return settled, settled if actual is best else self.settle(board, actual), max(0, best["cp"] - actual["cp"])
+
+
+def expected(e):
+    """Expected score of the side to move, Lichess's logistic curve on centipawns."""
+    if e['mate'] is not None:
+        return 1.0 if e['mate'] > 0 else 0.0
+    return 1 / (1 + math.exp(-0.00368208 * e['cp']))
 
 
 # Review severity: a missed or allowed mate longer than SHORT_MATE moves is not something to demand at

@@ -170,17 +170,18 @@ def fill(ids, solution_of):
 
 
 def own_records(con):
-    """First-try outcomes of closed own puzzles with their kind of solution, and the puzzles not classified yet."""
+    """First-try outcomes of closed own puzzles with their kind of solution and motif, and the puzzles not classified yet."""
     rows = [dict(r) for r in con.execute('''SELECT s.created_at, s.status, s.hints, s.guesses, e.id exercise, e.solution
         FROM puzzle_sessions s JOIN exercises e ON e.id=s.exercise_id WHERE s.status IN ('complete','revealed')
         ORDER BY s.created_at DESC LIMIT ?''', (WINDOW,))]
-    missing = list(dict.fromkeys(r['exercise'] for r in rows if not r['solution']))
+    # Solutions stored before the motif existed are completed in the same background pass.
+    missing = list(dict.fromkeys(r['exercise'] for r in rows if not r['solution'] or 'motif' not in json.loads(r['solution'])))
     records = []
     for r in rows:
         if not r['solution']:
             continue
         found = json.loads(r['solution'])
-        keys = ['kind:' + found['kind']] + (['phase:endgame'] if found.get('endgame') else [])
+        keys = ['kind:' + found['kind']] + (['phase:endgame'] if found.get('endgame') else []) + (['theme:' + found['motif']] if found.get('motif') else [])
         records.append({'keys': keys, 'success': r['status'] == 'complete' and not r['hints'] and r['guesses'] == 1,
                         'at': r['created_at'], 'example': r['exercise'], 'expected': None})
     base = sum(r['success'] for r in records) / len(records) if records else 0

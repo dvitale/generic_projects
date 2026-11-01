@@ -5,6 +5,7 @@ escapes) and the engine line agrees on the material outcome. Otherwise the text 
 the line shows; with no verified motif it only names Stockfish's line as the source."""
 import chess
 
+from .engine import expected
 from .insights import VALUES, features, material
 
 KING_VALUE = 100
@@ -19,6 +20,11 @@ TITLES = {'mate': 'Matto contro', 'missed_mate': 'Matto non visto', 'hanging': '
           'material': 'Perdita di materiale', 'king': 'Re esposto', 'positional': 'Svantaggio di posizione',
           'engine': 'Deriva dalla linea di Stockfish'}
 MIN_LOSS = 80
+# Queen paper (arXiv 2610.03695): the better move is presented as the point only when it beats every other choice by
+# UNIQUE expected score; otherwise several moves were good and the text says so instead of claiming its motif.
+UNIQUE = 0.05
+# Motifs whose sentence names only the attempted line, never the better move: safe before a solution is revealed.
+SAFE_MOTIFS = {'mate', 'hanging', 'undefended', 'ignored_threat', 'skewer', 'fork', 'trapped', 'discovered', 'pin', 'promotion', 'material', 'king'}
 
 
 def the(piece):
@@ -166,7 +172,7 @@ def balance(gained, given):
 
 
 def sans(positions, pv, start, count=8):
-    # The default covers the whole stored line, so the text shows every capture the balance counts.
+    # explain() passes the whole line, so the text shows every capture the balance counts.
     return ' '.join(label(positions[i], chess.Move.from_uci(pv[i])) if i == start or positions[i].turn else positions[i].san(chess.Move.from_uci(pv[i]))
                     for i in range(start, min(len(positions) - 1, start + count)))
 
@@ -291,7 +297,7 @@ def positional(board, played, best_move, opponent):
     return reasons[:2]
 
 
-def explain(fen, played, best, actual):
+def explain(fen, played, best, actual, choices=None):
     board = chess.Board(fen)
     pv, best_pv = actual.get('pv') or [], best.get('pv') or []
     if not pv or not best_pv or pv[0] != played or best_pv[0] == played:
@@ -311,7 +317,7 @@ def explain(fen, played, best, actual):
     best_net = settled(best_positions, best_pv, me, best_taken) - material(board, me)
     shown, shown_pv = extend(positions, pv)
     best_shown, best_shown_pv = extend(best_positions, best_pv)
-    line_text, best_text = sans(shown, shown_pv, 1, 9), sans(best_shown, best_shown_pv, 0, 9)
+    line_text, best_text = sans(shown, shown_pv, 1, len(shown_pv)), sans(best_shown, best_shown_pv, 0, len(best_shown_pv))
     focus, motif, text = [], None, None
     if mated:
         motif, text = 'mate', f"Dopo {san} {opponent} ha un matto in {abs(actual['mate'])}: {line_text}."
@@ -343,11 +349,17 @@ def explain(fen, played, best, actual):
             motif, text = 'positional', f"Non perdi materiale subito, ma rispetto a {best_san} la tua mossa {' e '.join(reasons)}: è uno svantaggio che pesa più avanti."
         else:
             # No verified motif: name the source and let the replayed line show the trend.
-            motif, text = 'engine', f"Linea di Stockfish: {sans(shown, shown_pv, 0, 9)}."
+            motif, text = 'engine', f"Linea di Stockfish: {sans(shown, shown_pv, 0, len(shown_pv))}."
     gained, given = balance(best_taken[me], best_taken[not me])
     better, best_wins = None, best_net >= 2 and bool(gained)
+    rival = next((c for c in choices or [] if c.get('pv') and c['pv'][0] not in (best_pv[0], played)
+                  and expected(best) - expected(c) < UNIQUE), None)
     if motif != 'missed_mate':
-        if best_wins:
+        if rival:
+            best_wins = False
+            better = (f"Stockfish preferisce {best_san}: {best_text}. Quasi altrettanto buona era "
+                      f"{board.san(chess.Move.from_uci(rival['pv'][0]))}: non c’era un solo colpo da trovare.")
+        elif best_wins:
             traded = f", in cambio di {pieces_text(given)}" if given else ''
             better = f"Con {best_san} vincevi {pieces_text(gained)}{traded}: {best_text}."
         else:

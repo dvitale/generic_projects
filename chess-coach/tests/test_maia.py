@@ -137,14 +137,14 @@ def test_temperature_and_top_p_cut_rare_moves_and_top_move_plays_the_first(monke
 
 def test_sharpened_selections_keep_variety_in_the_opening(monkeypatch):
     from backend.maia import choose
-    # Up to move 8: temperature 1 and top-p 0.9, so c4 is possible but g4 (the last 5%) is not.
+    # Up to move 5: Maia's full distribution, so even g4 (the last 5%) is possible.
     for selection in ('temperature-0.4-top-p-0.8', 'temperature-0.7-top-p-0.95'):
         draw_with(monkeypatch, .9999)
-        assert choose(POLICY, selection, 8, 1)[0] == 'c2c4'
+        assert choose(POLICY, selection, 5, 1)[0] == 'g2g4'
         draw_with(monkeypatch, .6)
         assert choose(POLICY, selection, 1, 1)[0] == 'd2d4'
     draw_with(monkeypatch, .9999)
-    assert choose(POLICY, 'temperature-0.4-top-p-0.8', 9, 1)[0] == 'd2d4'
+    assert choose(POLICY, 'temperature-0.4-top-p-0.8', 6, 1)[0] == 'd2d4'
 
 
 def test_the_same_seed_gives_the_same_move():

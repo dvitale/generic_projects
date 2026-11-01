@@ -27,9 +27,10 @@ from . import prevention
 from . import mistakes
 from . import insights
 from . import training_schedule, pgn_import, learning
-from . import study
+from . import study, openings, visualization
 from . import problems
 from . import diagnosis
+from . import piece_moves
 from . import gaps
 from . import auth
 from .maia import maia as maia_server
@@ -136,6 +137,7 @@ def init_db():
         gaps.init_schema(con)
         diagnosis.init_schema(con)
         alternatives.init_schema(con)
+        visualization.init_schema(con)
         for row in con.execute('SELECT * FROM games WHERE analysis IS NOT NULL').fetchall():
             if row['analysis_version'] == len(json.loads(row['moves'])):
                 # Startup stays fast: Maia judges unassessed positions afterwards, on the analysis worker.
@@ -308,6 +310,9 @@ def game_pgn(row, include_times=True):
         pgn.headers['White'] = 'Tu' if row['player_color'] == 'w' else bot
         pgn.headers['Black'] = bot if row['player_color'] == 'w' else 'Tu'
         pgn.headers['TimeControl'] = '-'  # Free play, without a countdown clock.
+    opening = openings.classify(row['initial_fen'], moves)
+    if opening and 'ECO' not in stored_headers and 'Opening' not in stored_headers:
+        pgn.headers['ECO'], pgn.headers['Opening'] = opening['eco'], opening['name']
     pgn.headers['GameId'] = row['id']
     if row['engine']:
         # Which model answered, at which requested level and how its moves were chosen.
@@ -356,7 +361,7 @@ def game_view(row):
             "canUndo": not row['termination'] and row['source'] in PLAYABLE and undo_ply(row, session) is not None,
             "termination": row['termination'], "resignOffer": resign_pending(row, moves),
             "rating": json.loads(rating['response']) if rating else None, "analysisJobId": analysis_job,
-            "elo": row["elo"], "title": row["title"], "pgn": str(pgn),
+            "elo": row["elo"], "title": row["title"], "pgn": str(pgn), "opening": openings.classify(row['initial_fen'], moves),
             "timedMoves": sum(bool(t) for t in json.loads(row['move_times'])),
             "assistedPlies": json.loads(row['assisted_plies']),
             "moveTimes": [t.get('emt') if t else None for t in json.loads(row['move_times'])],
@@ -423,6 +428,11 @@ def opponent_engines():
     return {'maia': {'enabled': True, 'available': True}, 'experimental': opponents.status(ENV_PATH)}
 
 
+def opening_label(initial_fen, moves):
+    opening = openings.classify(initial_fen, moves)
+    return {key: opening[key] for key in ('eco', 'name', 'bookPlies')} if opening else None
+
+
 @app.get("/api/games")
 def games():
     with database() as con:
@@ -437,7 +447,7 @@ def games():
         result.append({"id": r["id"], "number": r["number"], "title": r["title"], "createdAt": r["created_at"],
                        "plies": len(moves), "source": r["source"], "playerColor": r["player_color"], "elo": r["elo"],
                        "engine": r["engine"], "engineLabel": opponents.label(r) if r["source"] == 'maia' else None, "engineVersion": r["engine_version"],
-                       "result": None if outcome == '*' else outcome, "fen": board.fen(),
+                       "result": None if outcome == '*' else outcome, "fen": board.fen(), "opening": opening_label(r["initial_fen"], moves),
                        "quality": learning.quality(learning.decisions(r, r["start_ply"])) if analyzed else None})
     return result
 
@@ -971,7 +981,7 @@ def analyze_game(job_id, snapshot):
                                   "stockfishCandidates": choices,
                                   "isPlayer": is_player, "forced": forced,
                                   "label": "Mossa obbligata" if forced else "Errore" if loss >= 180 else "Imprecisione" if loss >= 80 else "Buona scelta"}
-                item['insight'] = insights.public(insights.compare(board.fen(), uci, best, actual))
+                item['insight'] = insights.public(insights.compare(board.fen(), uci, best, actual, choices))
                 if theme == 'Calcolo e mosse candidate':
                     item['theme'] = {'tactical':'Conseguenze tattiche', 'mixed':'Tattica e posizione',
                                      'positional':'Valutare la posizione e scegliere un piano',
@@ -1105,13 +1115,18 @@ GENERIC_HINT = "Prima di decidere: cerca gli scacchi, poi le catture e le minacc
 
 
 def exercise_solution(row):
-    """The kind of solution of a puzzle, classified once per exercise; the endgame flag feeds the gap analysis."""
-    if row.get("solution"):
-        return json.loads(row["solution"])
+    """The kind of solution of a puzzle, classified once per exercise; the endgame flag and the motif feed the gap analysis.
+    Solutions stored before the motif existed get it on the next read, without asking Stockfish again."""
+    found = json.loads(row["solution"]) if row.get("solution") else None
+    if found and "motif" in found:
+        return found
     board = reconstruct(row["initial_fen"], json.loads(row["history"]))
-    found = diagnosis.solution_of(board)
+    if found is None:
+        found = diagnosis.solution_of(board)
+        if found:
+            found["endgame"] = gaps.endgame(board)
     if found:
-        found["endgame"] = gaps.endgame(board)
+        found["motif"] = diagnosis.motif(board, found)
         with database() as con:
             con.execute("UPDATE exercises SET solution=? WHERE id=?", (json.dumps(found), row["id"]))
     return found
@@ -1133,22 +1148,41 @@ def classify_later(exercise_id):
     threading.Thread(target=run, daemon=True).start()
 
 
+def exercise_extras(row, found, board):
+    """Maia's tempting move and the candidate moves for a puzzle, stored with its solution once Maia could judge them."""
+    if "tempting" not in found or "candidates" not in found:
+        with database() as con:
+            rating = problems.current_rating(con)[0]
+        tempt = found["tempting"] if "tempting" in found else diagnosis.tempting(board, found, rating)
+        choices = diagnosis.candidates(board, found, rating, tempt)
+        if not diagnosis.maia.available():
+            return tempt, choices
+        found["tempting"], found["candidates"] = tempt, choices
+        with database() as con:
+            con.execute("UPDATE exercises SET solution=? WHERE id=?", (json.dumps(found), row["id"]))
+    return found["tempting"], found["candidates"]
+
+
 @app.post("/api/exercises/{exercise_id}/hint")
 def hint(exercise_id: str, body: SessionInput):
     with database() as con:
         row = dict(find_exercise(con, exercise_id))
         active_session(con, exercise_id, body.session_id)
     found = exercise_solution(row)
+    board = reconstruct(row["initial_fen"], json.loads(row["history"]))
+    given = diagnosis.hints(board, found, *exercise_extras(row, found, board)) if found else [{"level": 1, "title": "Metodo", "text": GENERIC_HINT}]
+    if found and found.get("motif"):
+        # As in Problemi: the motif's name, recognised from the position, after the kind of move.
+        given.insert(1, {"level": 2, "title": "Motivo", "text": "", "themes": [found["motif"]]})
+        for level, item in enumerate(given, 1):
+            item["level"] = level
     with database() as con:
         con.execute("BEGIN IMMEDIATE")
         session = active_session(con, exercise_id, body.session_id)
-        level = min(session["hints"] + 1, diagnosis.HINT_LEVELS)
+        level = min(session["hints"] + 1, len(given))
         con.execute("UPDATE puzzle_sessions SET hints=?,solution=COALESCE(solution,?) WHERE id=?",
                     (level, json.dumps(found) if found else None, body.session_id))
-    if found is None:
-        return {"hint": GENERIC_HINT, "hints": [{"level": 1, "title": "Metodo", "text": GENERIC_HINT}], "last": True}
-    given = diagnosis.hints(reconstruct(row["initial_fen"], json.loads(row["history"])), found)[:level]
-    return {"hint": given[-1]["text"], "hints": given, "last": level == diagnosis.HINT_LEVELS}
+    return {"hint": given[level - 1]["text"], "hints": given[:level], "last": level == len(given)}
 
 
 @app.post("/api/exercises/{exercise_id}/attempts")
@@ -1237,6 +1271,33 @@ def puzzle_diagnosis_position(con, exercise_id, session_id):
 diagnosis.register('puzzle', puzzle_diagnosis_position)
 
 
+def repertoire_games(con):
+    """The player's games from the standard start, newest first, as openings.repertoire wants them.
+    Drills (preset openings), refutation games and snapshots are left out."""
+    rows = con.execute("""SELECT * FROM games WHERE source NOT IN ('snapshot','drill','stockfish') AND initial_fen=?
+                          ORDER BY created_at DESC""", (chess.STARTING_FEN,)).fetchall()
+    result = []
+    for r in rows:
+        moves = json.loads(r['moves'])
+        outcome = game_result(r, reconstruct(r['initial_fen'], moves))
+        win = '1-0' if r['player_color'] == 'w' else '0-1'
+        result.append({'id': r['id'], 'number': r['number'], 'title': r['title'], 'color': r['player_color'], 'moves': moves,
+                       'opening': openings.classify(r['initial_fen'], moves), 'decisions': learning.decisions(r),
+                       'score': None if outcome == '*' else 1 if outcome == win else 0.5 if outcome == '1/2-1/2' else 0})
+    return result
+
+
+def opening_exit_drill(f):
+    return {"name": f"Fine della teoria: {f['family']}", "theme": "Piano dopo l’apertura",
+            "goal": "La teoria finisce qui: scegli un piano coerente con l’apertura e controlla scacchi, catture e minacce."}
+
+
+@app.get('/api/openings/repertoire')
+def opening_repertoire():
+    with database() as con:
+        return openings.repertoire(repertoire_games(con))
+
+
 @app.get("/api/drills")
 def drill_catalog():
     with database() as con:
@@ -1249,6 +1310,13 @@ def drill_catalog():
         matches = sum(bool(moves) and h[:len(moves)] == moves for h in history)
         result.append({**{k: template[k] for k in ('id','name','kind','theme','goal')}, "fen": fen,
                        "color": template.get("color"), "reason": f"Presente in {matches} tue partite." if matches else "Posizione del catalogo iniziale."})
+    with database() as con:
+        families = openings.repertoire(repertoire_games(con))['families']
+    for f in sorted([f for f in families if f['exit']], key=lambda f: (f['status'] != 'weak', -f['games']))[:3][::-1]:
+        result.insert(0, {**opening_exit_drill(f), "id": "opening:" + f['exit']['gameId'], "kind": "personal",
+                          "fen": f['exit']['fen'], "color": f['color'],
+                          "reason": f"Apertura da curare: {f['games']} partite." if f['status'] == 'weak' else f"Una delle aperture che giochi di più: {f['games']} partite.",
+                          "source": f"{training_schedule.numbered(f['exit']['title'], f['exit']['number'])} · fine della teoria"})
     for ex in personal:
         board = reconstruct(ex["initial_fen"], json.loads(ex["history"]))
         result.insert(0, {"id": "personal:" + ex["id"], "name": "Riparti da una tua decisione", "kind": "personal",
@@ -1260,7 +1328,15 @@ def drill_catalog():
 
 @app.post("/api/drills/{template_id}/start")
 def start_drill(template_id: str, body: DrillInput):
-    if template_id.startswith("personal:"):
+    if template_id.startswith("opening:"):
+        with database() as con:
+            row = find_game(con, template_id.removeprefix("opening:"))
+        opening = openings.classify(row["initial_fen"], json.loads(row["moves"]))
+        if not opening:
+            raise HTTPException(404, "Apertura non riconosciuta")
+        initial, moves = row["initial_fen"], json.loads(row["moves"])[:opening["bookPlies"]]
+        template = {**opening_exit_drill({'family': openings.family(opening['name'])}), "color": row["player_color"]}
+    elif template_id.startswith("personal:"):
         with database() as con:
             ex = find_exercise(con, template_id.removeprefix("personal:"))
             initial, moves = ex["initial_fen"], json.loads(ex["history"])
@@ -1296,7 +1372,7 @@ def profile():
                 if d['loss']<80 or identity in seen:continue
                 seen.add(identity)
                 saved=d.get('insight')
-                kind=(saved if saved and saved.get('version')==insights.VERSION else insights.compare(d['fen'],d['played'],d['best'],d['actual']))['kind']
+                kind=(saved if saved and saved.get('version')==insights.VERSION else insights.compare(d['fen'],d['played'],d['best'],d['actual'],d.get('stockfishCandidates')))['kind']
                 if kind in domains:domains[kind]+=1
     return {"games": game_count, "attempts": attempts_count, "independentAttempts": independent, "unaidedSuccesses": unaided, "due": due,
             "themes": themes, "domains": [{'kind':key,'label':insights.LABELS[key],'examples':value} for key,value in domains.items()], "confidence": "Dati raccolti finora",
@@ -1340,7 +1416,7 @@ def request_tutor(game_id: str, body: TutorInput):
             analysis = load_analysis(row['analysis'])
             decisions = sorted(analysis['decisions'], key=lambda d: -d['loss'])[:3]
             for d in decisions:
-                d['insight'] = insights.compare(d['fen'],d['played'],d['best'],d['actual'])
+                d['insight'] = insights.compare(d['fen'],d['played'],d['best'],d['actual'],d.get('stockfishCandidates'))
             if not decisions:
                 raise HTTPException(422, 'Non ci sono decisioni analizzate da discutere.')
             selected_plies = {d['ply'] for d in decisions}
@@ -1389,6 +1465,8 @@ study.install(app, database, find_game, now, tutor_lock)
 auth.install(app, ENV_PATH, lambda: DB_PATH.parent)
 problems.install(app, database, lambda: DB_PATH.parent, now)
 gaps.install(app, database, lambda: problems.open_store(DB_PATH.parent), solution_by_id, now)
+piece_moves.install(app)
+visualization.install(app, database, now)
 diagnosis.install(app, database, now)
 # A move found in the guided path reaches the game only through the usual checks on version and revision.
 alternatives.install(app, database, now, find_game, PLAYABLE,

@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { Chess, type Square } from 'chess.js'
 import type { Color } from './types'
+import type {MoveLabel} from './pieceOdds'
 import {useBoardSettings} from './boardSettings'
 import {playMoveSound} from './sound'
 import {moveClassInfo,type MoveClass} from './moveClass'
@@ -78,7 +79,7 @@ function Piece({code}:{code:string}) {
   return missing?<span aria-hidden="true" className={`piece ${code[0]==='w'?'white-piece':'black-piece'}`}>{symbols[code]}</span>:
     <img className="piece-image" src={`/pieces/neo/${code}.png`} alt="" aria-hidden="true" draggable={false} onError={()=>setMissing(true)}/>
 }
-export default function Board({fen, orientation, interactive:enabled, legalMoves, onMove, lastMove, animateMove=false,reverseMove=false,analysisArrows=[],badge,highlights=[]}: {fen:string; orientation:Color; interactive:boolean; legalMoves:string[]; onMove:(uci:string)=>void|Promise<unknown>; lastMove?:string;animateMove?:boolean;reverseMove?:boolean;analysisArrows?:AnalysisArrow[];badge?:{square:string;kind:MoveClass};highlights?:string[]}) {
+export default function Board({fen, orientation, interactive:enabled, legalMoves, onMove, lastMove, animateMove=false,reverseMove=false,analysisArrows=[],badge,highlights=[],inspect}: {fen:string; orientation:Color; interactive:boolean; legalMoves:string[]; onMove:(uci:string)=>void|Promise<unknown>; lastMove?:string;animateMove?:boolean;reverseMove?:boolean;analysisArrows?:AnalysisArrow[];badge?:{square:string;kind:MoveClass};highlights?:string[];inspect?:{square:string|null;onSelect:(square:string|null)=>void;labels:MoveLabel[]}}) {
   const {theme}=useBoardSettings()
   const [selected, setSelected] = useState<string | null>(null)
   const [promotion, setPromotion] = useState<string[]>([])
@@ -198,6 +199,8 @@ export default function Board({fen, orientation, interactive:enabled, legalMoves
       setSelected(null)
   }
   function click(square: string) {
+    // A board that does not move can still select a piece to inspect its moves (review).
+    if (!interactive && inspect) { inspect.onSelect(inspect.square === square ? null : square); return }
     if (!interactive || promotion.length) return
     if (selected && legalMoves.some(m=>m.startsWith(selected+square))) {
       submit(selected,square)
@@ -275,8 +278,9 @@ export default function Board({fen, orientation, interactive:enabled, legalMoves
         const piece = board.get(square as Square)
         const checked = piece?.type==='k' && piece.color===board.turn() && board.inCheck()
         const lit = shownLastMove?.slice(0,2) === square || shownLastMove?.slice(2,4) === square
-        return <button key={square} type="button" data-square={square} title={titles[square]?.join('\n')} aria-label={`${square}${piece ? ` ${names[piece.type]} ${piece.color === 'w' ? 'bianco' : 'nero'}` : ''}`} aria-pressed={selected === square}
-          className={`square ${(ri+fi)%2 ? 'dark-square' : 'light-square'} ${selected === square ? 'selected-square' : ''} ${lit ? 'last-square' : ''} ${checked ? 'check-square' : ''} ${highlights.includes(square)?'hint-square':''} ${drag?.from===square?'drag-origin':''} ${interactive&&!promotion.length&&legalMoves.some(m=>m.startsWith(square))?'can-drag':''}`}
+        const odds = inspect?.labels.find(l => l.to === square)
+        return <button key={square} type="button" data-square={square} title={[...(titles[square]??[]),...(odds?[odds.title]:[])].join('\n')||undefined} aria-label={`${square}${piece ? ` ${names[piece.type]} ${piece.color === 'w' ? 'bianco' : 'nero'}` : ''}${odds ? `, ${odds.title}` : ''}`} aria-pressed={selected === square || inspect?.square === square}
+          className={`square ${(ri+fi)%2 ? 'dark-square' : 'light-square'} ${selected === square || inspect?.square === square ? 'selected-square' : ''} ${lit ? 'last-square' : ''} ${checked ? 'check-square' : ''} ${highlights.includes(square)?'hint-square':''} ${drag?.from===square?'drag-origin':''} ${interactive&&!promotion.length&&legalMoves.some(m=>m.startsWith(square))?'can-drag':''}`}
           draggable={false} onDragStart={event=>event.preventDefault()}
           onPointerDown={event=>pointerDown(event,square)} onPointerMove={pointerMove} onPointerUp={pointerUp}
           onPointerCancel={event=>{if(gesture.current?.id===event.pointerId)cancelDrag();if(drawing.current?.id===event.pointerId)cancelDrawing()}}
@@ -286,6 +290,7 @@ export default function Board({fen, orientation, interactive:enabled, legalMoves
           {ri === 7 && <span className="file-label">{file}</span>}
           {piece && <Piece key={piece.color+piece.type} code={piece.color+piece.type}/>}
           {targets.includes(square) && <span className={piece ? 'capture-ring' : 'move-dot'} aria-hidden="true"/>}
+          {odds && <span className={`move-odds odds-${odds.tone}${odds.top ? ' odds-top' : ''}`}>{odds.text}</span>}
           {!optimistic&&badge?.square===square&&<span className={`move-badge move-class-${badge.kind}`} title={moveClassInfo[badge.kind].label} aria-hidden="true">{moveClassInfo[badge.kind].symbol}</span>}
         </button>
       }))}

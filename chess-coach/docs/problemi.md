@@ -62,7 +62,9 @@ A problema concluso, **↺ Riprova da capo** riparte dalla mossa dell’avversar
 
 1. il tipo di mossa, classificato da Stockfish sulla mossa della soluzione (`diagnosis.solution_of` con la mossa imposta): forzante, tranquilla con una minaccia, profilassi, miglioramento;
 2. il motivo tattico: i temi Lichess del problema, esclusi quelli di lunghezza, esito e provenienza (`short`, `advantage`, `master`…) e quelli già detti dal primo indizio (`quietMove`, `defensiveMove`, `long`). Se non ne resta nessuno il livello manca;
-3. il pezzo che muove, evidenziato sulla scacchiera.
+3. la mossa che tenta: la mossa naturale secondo Maia al tuo livello, confutata da Stockfish, con **Mostra** per la sola linea confutata (stessa regola dei Puzzle, vedi [`diagnosi-errori.md`](diagnosi-errori.md#indizi-dei-puzzle)). Se Maia non trova una mossa tentatrice sbagliata il livello manca;
+4. le mosse candidate: la soluzione fra una o due mosse sbagliate che vale la pena considerare, in ordine alfabetico (stessa regola dei Puzzle). Se non ce ne sono il livello manca;
+5. il pezzo che muove, evidenziato sulla scacchiera.
 
 Dopo una mossa giusta gli indizi ripartono dalla mossa successiva. Come su Lichess, il primo indizio conta come errore per il rating (una sola volta per problema). La classificazione della mossa corrente resta nella sessione (`problem_sessions.hint`).
 

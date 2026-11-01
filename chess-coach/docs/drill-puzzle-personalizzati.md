@@ -42,12 +42,13 @@ Maia3 è basato su Transformer/Chessformer. Il riferimento iniziale a una CNN ri
 
 - Catalogo iniziale: Italiana, Siciliana, Caro-Kann, Gambetto di donna e finale re e torre contro re.
 - Posizioni personali ricavate dagli esercizi creati nelle revisioni. Il colore coincide con chi doveva decidere nella partita originale.
+- **Fine della teoria**: fino a tre drill dall'ultima posizione di teoria della partita più recente di un'apertura del tuo repertorio, prima quelle da curare e poi le più giocate; colore e mosse precedenti sono quelli della tua partita (`opening:<id partita>`, vedi `docs/aperture.md`).
 - Livello Maia, colore dove applicabile e durata da 3 a 12 decisioni del giocatore.
 - Conservazione della storia precedente alla posizione, utile per ricostruzione, arrocco, en passant e ripetizioni.
 - Risposte campionate dalla distribuzione Maia sulle mosse legali, senza sostituzione silenziosa con un altro motore.
 - Fine al numero previsto di decisioni o al termine della partita; l'ultima decisione può chiudere il drill prima della risposta del bot.
 - Revisione Stockfish delle sole decisioni effettivamente giocate nel drill: la sequenza preparata non contribuisce ai risultati.
-- Motivazione delle proposte: provenienza da un errore personale oppure presenza della sequenza iniziale nelle partite libere/importate. Nessuna diagnosi di repertorio inventata.
+- Motivazione delle proposte: provenienza da un errore personale oppure presenza della sequenza iniziale nelle partite libere/importate. Il repertorio lo giudicano regole fisse su partite e analisi Stockfish (`docs/aperture.md`), non il tutor.
 
 ### Puzzle
 

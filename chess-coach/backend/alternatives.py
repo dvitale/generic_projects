@@ -9,7 +9,6 @@ already seen and new positions stay apart in the statistics.
 """
 import hashlib
 import json
-import math
 import os
 import re
 import sqlite3
@@ -24,7 +23,7 @@ from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from . import diagnosis, explain, learning, pgn_import, training_schedule, tutor
-from .engine import evaluator
+from .engine import evaluator, expected
 from .insights import material
 
 MODEL_VERSION = 1
@@ -79,8 +78,7 @@ TAILS = {'counter_threat': 'può creare una minaccia più forte di quella avvers
          'indirect_defense': 'come può rendere la minaccia svantaggiosa per l’avversario?', 'king_activity': 'quale casa controlla quelle decisive?',
          'pawn_move': 'quale avanzata cambia la posizione?', 'improve_piece': 'in quale casa lavorerebbe meglio?', 'remove_attacker': 'quale pezzo avversario può catturare?'}
 TACTICAL = {'remove_attacker', 'offer_exchange', 'counter_threat', 'return_material', 'sacrifice', 'win_material', 'check', 'attack'}
-# explain.py motifs whose sentence names only the attempted line, never the better move.
-SAFE_MOTIFS = {'mate', 'hanging', 'undefended', 'ignored_threat', 'skewer', 'fork', 'trapped', 'discovered', 'pin', 'promotion', 'material', 'king'}
+SAFE_MOTIFS = explain.SAFE_MOTIFS
 
 
 def thresholds():
@@ -118,13 +116,6 @@ def init_schema(con):
 
 def key(fen):
     return hashlib.sha256(' '.join(fen.split()[:4]).encode()).hexdigest()
-
-
-def expected(e):
-    """Expected score of the side to move, Lichess's logistic curve on centipawns."""
-    if e['mate'] is not None:
-        return 1.0 if e['mate'] > 0 else 0.0
-    return 1 / (1 + math.exp(-0.00368208 * e['cp']))
 
 
 def judge(best, line, t):

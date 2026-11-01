@@ -1,5 +1,6 @@
 import {useEffect,useState} from 'react'
 import Board from './Board'
+import {ShowLine} from './MistakeExplanation'
 import LichessAnalysis from './LichessAnalysis'
 import {api} from './api'
 import type {Color,Evaluation} from './types'
@@ -33,7 +34,7 @@ export default function PositionJudgment({onReview}:{onReview:(id:string,ply:num
       {position.falseAlarm&&<p className="notice">Ti sembrava già persa, ma questa analisi non lo conferma. Esamina le risorse prima di rinunciare.</p>}
       <p>{position.answer.assessment===position.expected?'La tua fascia coincide con quella del motore.':'Le due valutazioni differiscono: confronta la minaccia che temevi con la variante, senza attribuire subito la differenza a un difetto del tuo ragionamento.'}</p>
       {position.answer.threat&&<p>La tua riflessione: {position.answer.threat}</p>}
-      <p className="variation">Variante di riferimento: {position.evidence?.san.join(' ')||'Non disponibile'}</p>
+      <p className="variation">Variante di riferimento: {position.evidence?.san.join(' ')||'Non disponibile'}{!!position.evidence?.pv.length&&<> <ShowLine fen={position.fen} line={position.evidence.pv} title="Variante di riferimento"/></>}</p>
       <p className="footnote">Analisi salvata a budget limitato, profondità {position.evidence?.depth}. Equilibrio fra −1 e +1; forte vantaggio/svantaggio da ±3. Le fasce sono convenzioni didattiche; uno svantaggio non prova una sconfitta inevitabile.</p>
       <div className="actions"><button disabled={loading} onClick={next}>Prossima posizione</button><button onClick={()=>onReview(position.gameId!,position.ply)}>Rivedi la partita di origine</button></div>
       <LichessAnalysis fen={position.fen} orientation={position.color}/>

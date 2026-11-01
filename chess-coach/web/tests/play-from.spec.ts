@@ -22,7 +22,7 @@ test('A reviewed position can be flipped and played against Maia from the chosen
     const id=await page.evaluate(()=>localStorage.getItem('chess-coach-game'))
     const next=await(await request.get('/api/games/'+id)).json()
     return [next.id!==game.id,next.playerColor,next.initialFen.split(' ')[0],next.title]
-  }).toEqual([true,'b','rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR',expect.stringMatching(/^Da .* · 2\.$/)])
+  }).toEqual([true,'b','rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR',`Dalla partita #${game.number}, mossa 2 del Bianco`])
   // The chosen side is now the player's colour: the board is no longer flipped and Black is at the bottom.
   await expect(flip).toHaveAttribute('aria-pressed','false')
   expect((await page.locator('[data-square="a1"]').boundingBox())!.y).toBeLessThan(a1!.y)

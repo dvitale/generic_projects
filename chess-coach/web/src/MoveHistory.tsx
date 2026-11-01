@@ -25,17 +25,22 @@ export default function MoveHistory({game,ply,onPosition,onReview,reviewDisabled
     else if(item.bottom>box.bottom)container.scrollTop+=item.bottom-box.bottom
   },[ply,game.version])
   const last=game.moves.length
+  const book=game.opening?.bookPlies??0
+  // Like Review: the name of the deepest named position up to the one shown, and where the theory ends.
+  const named=game.opening?.positions?.filter(p=>p.ply<=ply).at(-1)
+  const bookRow=rows.find(r=>r.w?.ply===book||r.b?.ply===book),bookMove=bookRow&&`${bookRow.number}${bookRow.w?.ply===book?'.':'…'} ${(bookRow.w?.ply===book?bookRow.w:bookRow.b)!.san}`
   const classes=new Map((game.analysis?.moves??[]).filter(d=>game.moves[d.ply]===d.played).map(d=>[d.ply+1,classifyMove(d)]))
   return <section className="panel move-history" aria-label="Mosse della partita" onKeyDown={event=>{
     const target=event.key==='ArrowLeft'?Math.max(0,ply-1):event.key==='ArrowRight'?Math.min(last,ply+1):event.key==='Home'?0:event.key==='End'?last:null
     if(target!==null){event.preventDefault();onPosition(target)}
   }}>
     <div className="section-head move-history-head"><h2>Mosse della partita</h2>{last>0&&<a className="button-link" href={`/api/games/${encodeURIComponent(game.id)}/pgn`} download title="Salva il PGN della partita, tempi inclusi">↓ Salva PGN</a>}</div>
-    <p className="muted">Seleziona una mossa per tornare a quella posizione.</p>
+    {named?<p className="move-history-opening" title={`${named.eco} · ${named.name}${bookMove?` · teoria fino a ${bookMove}`:''}`}><span><b>{named.eco}</b> {named.name}</span><small>{ply>book?`Fuori teoria dopo ${bookMove}`:'In teoria'}</small></p>
+      :<p className="muted">Seleziona una mossa per tornare a quella posizione.</p>}
     <div className="move-history-list" ref={list}>
       {rows.length?rows.map(row=><div className="move-history-row" key={row.number}><span>{row.number}.</span>{(['w','b'] as const).map(color=>{
         const move=row[color]
-        return move?<button key={color} aria-label={`${row.number}${color==='w'?'.':'…'} ${move.san}`} aria-current={ply===move.ply?'step':undefined} onClick={()=>onPosition(move.ply)}>{move.san}{(()=>{const kind=classes.get(move.ply);return kind&&kind!=='good'?<MoveClassIcon kind={kind}/>:null})()}</button>:<span key={color}>—</span>
+        return move?<button key={color} aria-label={`${row.number}${color==='w'?'.':'…'} ${move.san}`} aria-current={ply===move.ply?'step':undefined} className={move.ply<=book?'in-book':undefined} onClick={()=>onPosition(move.ply)}>{move.san}{(()=>{const kind=classes.get(move.ply);return kind&&kind!=='good'?<MoveClassIcon kind={kind}/>:null})()}</button>:<span key={color}>—</span>
       })}</div>):<p className="empty-text">Le mosse appariranno qui.</p>}
     </div>
     <div className="review-controls" aria-label="Navigazione della partita">

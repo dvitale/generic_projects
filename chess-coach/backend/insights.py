@@ -1,7 +1,7 @@
 """Observable chess facts, separate from engine scores and causal hypotheses."""
 import chess
 
-VERSION = 6
+VERSION = 7
 VALUES = {chess.PAWN: 1, chess.KNIGHT: 3, chess.BISHOP: 3, chess.ROOK: 5, chess.QUEEN: 9, chess.KING: 0}
 LABELS = {'tactical': 'Evidenza tattica', 'positional': 'Indizi posizionali',
           'mixed': 'Tattica e posizione', 'unclear': 'Causa da approfondire', 'neutral': 'Confronto didattico'}
@@ -40,7 +40,7 @@ def features(board, color):
 def line(board, evaluation):
     cursor = board.copy(stack=False)
     steps = []
-    for uci in evaluation.get('pv', [])[:16]:
+    for uci in evaluation.get('pv', [])[:20]:
         move = chess.Move.from_uci(uci)
         if move not in cursor.legal_moves:
             raise ValueError('La variante contiene una mossa non legale')
@@ -54,7 +54,7 @@ def line(board, evaluation):
             'plies': len(steps), 'endsInCheck': cursor.is_check(), 'gameOver': cursor.is_game_over()}
 
 
-def compare(fen, played, best, actual):
+def compare(fen, played, best, actual, choices=None):
     board = chess.Board(fen)
     best_move = best.get('pv', [None])[0] if best.get('pv') else None
     if not best_move or not actual.get('pv') or actual['pv'][0] != played:
@@ -107,7 +107,7 @@ def compare(fen, played, best, actual):
     kind = ('mixed' if facts and structural_change else 'tactical' if facts else 'positional' if positional else 'unclear') if relevant else 'neutral'
     return {'version': VERSION, 'kind': kind, 'label': LABELS[kind], 'tacticalFacts': facts,
             'positionalFacts': positional[:10], 'plans': plans[:3], 'note': LIMIT,
-            'explanation': explain.explain(fen, played, best, actual),
+            'explanation': explain.explain(fen, played, best, actual, choices),
             'material': {'before': material(board,board.turn), 'immediate': material(after,board.turn),
                          'playedLine': paths['actual']['material'], 'bestLine': paths['best']['material']},
             'lines': paths, 'features': comparisons}
@@ -120,7 +120,7 @@ def enrich(analysis):
         for d in analysis.get(key,[]):
             if d['ply'] not in by_ply:
                 saved=d.get('insight')
-                by_ply[d['ply']]=saved if saved and saved.get('version')==VERSION else public(compare(d['fen'],d['played'],d['best'],d['actual']))
+                by_ply[d['ply']]=saved if saved and saved.get('version')==VERSION else public(compare(d['fen'],d['played'],d['best'],d['actual'],d.get('stockfishCandidates')))
             d['insight']=by_ply[d['ply']]
     return analysis
 

@@ -73,6 +73,10 @@ export default function ReviewSummary({game,cursor,onPosition}:{game:Game;cursor
   const accuracy=useMemo(()=>gameAccuracy(game,points.filter(p=>p.position>=start),new Set(game.assistedPlies??[])),[points,start,game.initialFen,game.assistedPlies])
   const marks=[...byPly.values()].filter(d=>d.ply>=start&&!assisted.has(d.ply)&&['inaccuracy','error','blunder'].includes(classifyMove(d)))
   const current=byPly.get(cursor)
+  const opening=game.opening,book=opening?.bookPlies??0
+  // The name follows the board: the deepest named position reached by the one shown.
+  const named=opening?.positions?.filter(p=>p.ply<=cursor).at(-1)
+  const sanAt=(ply:number)=>{const row=rows.find(r=>r.w?.ply===ply||r.b?.ply===ply);return row?`${row.number}${row.w?.ply===ply?'.':'…'} ${(row.w?.ply===ply?row.w:row.b)!.san}`:''}
   const lines=current?(current.stockfishCandidates??[current.best]).filter(e=>e.san.length):[]
   const mover:Color=current?.fen.split(' ')[1]==='b'?'b':'w'
   const percent=(v:number|null)=>v===null?'—':`${Math.round(v)}%`
@@ -100,12 +104,14 @@ export default function ReviewSummary({game,cursor,onPosition}:{game:Game;cursor
       return <li key={i}><span className={`score-chip score-chip-${s.side}`}>{s.text}</span><span className="line-moves" title={lineText(current!,e.san)}>{lineText(current!,e.san)}</span></li>
     }):<li className="muted">{cursor>=game.moves.length?'Posizione finale: nessuna scelta da confrontare.':'Nessuna analisi per questa posizione.'}</li>}</ol>}
     {current?.insight?.explanation&&<MistakeExplanation key={current.ply} explanation={current.insight.explanation}/>}
+    {opening&&<p className="review-opening"><span className="review-opening-name" title={named?`${named.eco} · ${named.name}`:undefined}>{named?<><b>{named.eco}</b> {named.name}</>:<span className="muted">Apertura non ancora riconosciuta</span>}</span>
+      {book>0&&<button className="quiet" onClick={()=>onPosition(book)} title="Ultima posizione della partita che ha un nome nel catalogo delle aperture di Lichess: da lì in poi le mosse sono tue">{cursor>book?'Fuori teoria dopo':'Teoria fino a'} {sanAt(book-1)}</button>}</p>}
     <ol className="review-moves" ref={list} aria-label="Elenco delle mosse">
       {rows.map(row=><li key={row.number}><span className="move-number">{row.number}.</span>{(['w','b'] as const).map(color=>{
         const move=row[color]
         if(!move)return <span key={color}/>
         const d=byPly.get(move.ply),kind=d?classifyMove(d):null
-        return <button key={color} className={kind?`move-cell has-${kind}`:'move-cell'} aria-current={cursor===move.ply?'step':undefined}
+        return <button key={color} className={`move-cell${kind?` has-${kind}`:''}${move.ply<book?' in-book':''}`} title={move.ply<book?'Mossa di teoria: la posizione che segue ha un nome nel catalogo delle aperture':undefined} aria-current={cursor===move.ply?'step':undefined}
           aria-label={`Vai a ${row.number}${color==='w'?'.':'…'} ${move.san}${kind?` · ${moveClassInfo[kind].label}`:''}${assisted.has(move.ply)?' · dopo un suggerimento':''}`} onClick={()=>onPosition(move.ply)}>
           <span>{move.san}{assisted.has(move.ply)&&<span className="assisted-mark" title="Giocata dopo un suggerimento: esclusa dalle statistiche"> 💡</span>}</span>{kind&&kind!=='good'&&<MoveClassIcon kind={kind}/>}
         </button>

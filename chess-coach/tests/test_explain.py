@@ -64,7 +64,7 @@ def test_small_losses_and_best_moves_have_no_explanation():
 def test_insights_carry_the_explanation():
     b = chess.Board('4r1k1/5ppp/8/4B3/8/8/5PPP/6K1 w - - 0 1')
     result = insights.public(insights.compare(b.fen(), 'h2h3', value(b, ['e5c3', 'e8e2'], 0), value(b, ['h2h3', 'e8e5'], -400)))
-    assert insights.VERSION == 6 and result['explanation']['motif'] == 'ignored_threat'
+    assert insights.VERSION == 7 and result['explanation']['motif'] == 'ignored_threat'
 
 
 def test_a_line_cut_in_the_middle_of_an_exchange_does_not_hide_a_lost_piece():
@@ -96,3 +96,27 @@ def test_traded_pieces_cancel_and_the_pending_recapture_is_shown():
     result = why(fen, ['d4e5', 'a7a6', 'c1f4', 'g8e7', 'e5d6', 'e7g6', 'd6c7', 'd8d1'], ['d4d5', 'e6d7'], best_cp=175, actual_cp=65)
     assert result['better'] == 'Con dxe5 vincevi tre pedoni: 4. dxe5 a6 5. Bf4 Ne7 6. exd6 Ng6 7. dxc7 Qxd1+ 8. Kxd1.'
     assert result['bestLine'][-1] == 'e1d1' and result['bestWins']
+
+
+def test_a_line_cut_before_a_forced_recapture_is_continued_until_the_exchange_ends():
+    from backend.engine import evaluator
+    board = chess.Board('r1bqkbnr/1ppp1ppp/p1n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 4')
+    settled = evaluator.settle(board, {'pv': ['b5c6'], 'san': ['Bxc6'], 'cp': 0, 'mate': None})
+    assert settled['pv'][1] in ('d7c6', 'b7c6') and len(settled['pv']) == 3 and len(settled['san']) == 3
+    # A line that ends on a quiet move stays as it is.
+    quiet = {'pv': ['g1f3'], 'san': ['Nf3'], 'cp': 20, 'mate': None}
+    assert evaluator.settle(chess.Board(), quiet) is quiet
+
+
+def test_the_better_move_is_the_point_only_when_no_other_move_comes_close():
+    fen = 'r3k3/8/8/8/3n4/8/7P/R3K3 w Q - 0 1'
+    b = chess.Board(fen)
+    best, actual = value(b, ['a1a8'], 900), value(b, ['h2h3', 'd4c2', 'e1d2', 'c2a1'], -400)
+    # A rook move that wins almost as much: Rxa8+ is no longer presented as the one winning blow.
+    close, far = value(b, ['a1a7'], 880), value(b, ['a1a7'], 300)
+    shared = explain.explain(fen, 'h2h3', best, actual, [best, close])
+    assert shared['motif'] == 'fork' and not shared['bestWins']
+    assert shared['better'] == 'Stockfish preferisce Rxa8+: 1. Rxa8+. Quasi altrettanto buona era Ra7: non c’era un solo colpo da trovare.'
+    assert explain.explain(fen, 'h2h3', best, actual, [best, far])['better'] == 'Con Rxa8+ vincevi una torre: 1. Rxa8+.'
+    # The move played is never its own rival.
+    assert explain.explain(fen, 'h2h3', best, actual, [best, actual])['better'] == 'Con Rxa8+ vincevi una torre: 1. Rxa8+.'

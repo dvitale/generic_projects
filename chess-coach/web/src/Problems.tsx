@@ -7,6 +7,7 @@ import {useBoardOrientation} from './boardFlip'
 import {maia} from './engine/maia'
 import {api} from './api'
 import {StudyPathPanel,pathStatus,closedNotice,type StudyPathView,type ClosedPath} from './StudyPath'
+import {ShowLine} from './MistakeExplanation'
 import type {Color,PuzzleHint} from './types'
 
 interface Band {id:number;label:string;min:number;max:number;count:number;attempts:number;solved:number}
@@ -257,7 +258,7 @@ export default function Problems({onPlayFrom}:{onPlayFrom?:(fen:string,color:Col
             :<>{problem.path&&path&&!onPath?<button className="primary" disabled={busy} onClick={()=>{token.current++;setProblem(null)}}>Torna al percorso →</button>:<button className="primary" disabled={busy} onClick={()=>void start()}>Prossimo problema →</button>}<button title="Riporta la scacchiera alla posizione iniziale per riprovare: non cambia il rating" onClick={restart}>↺ Riprova da capo</button>{onPlayFrom&&<button className="play-from" title="Nuova partita contro Maia dalla posizione in cui tocca a te" onClick={playFrom}>Gioca da qui col {problem.puzzle.turn==='w'?'Bianco':'Nero'}</button>}</>}
             <button className="quiet" disabled={busy&&phase!=='done'} onClick={()=>{token.current++;setProblem(null);setBusy(false)}}>Cambia fascia</button>
           </div>
-          {!!hints.length&&phase!=='done'&&<ol className="puzzle-hints" aria-label="Indizi">{hints.map(h=><li key={h.level} className="hint"><strong>{h.title}</strong> {h.themes?h.themes.map(themeLabel).join(', '):h.text}</li>)}</ol>}
+          {!!hints.length&&phase!=='done'&&<ol className="puzzle-hints" aria-label="Indizi">{hints.map(h=><li key={h.level} className="hint"><strong>{h.title}</strong> {h.themes?h.themes.map(themeLabel).join(', '):h.text}{h.line&&h.fen&&<> <ShowLine fen={h.fen} line={h.line} title={h.title}/></>}</li>)}</ol>}
           {problem.path&&path?.id===problem.path&&<p className="footnote study-path-status">Percorso · {pathStatus(path)}</p>}
           {problem.repeated&&phase!=='done'&&<p className="footnote">Hai già visto tutti i problemi di questa selezione: questo è una ripetizione.</p>}
         </section>

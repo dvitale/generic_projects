@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from backend import gaps, main
+from backend import diagnosis, gaps, main
 from test_problems import client, stocked, start, play  # noqa: F401
 
 
@@ -82,7 +82,9 @@ def test_problem_themes_are_compared_with_the_rating_expectation(stocked):
     assert 'theme:pin' not in found and 'theme:advantage' not in found and 'theme:short' not in found
 
 
-def test_problem_hints_go_from_the_kind_of_move_to_the_motif_and_cost_the_rating_once(stocked):
+def test_problem_hints_go_from_the_kind_of_move_to_the_motif_and_cost_the_rating_once(stocked, monkeypatch):
+    monkeypatch.setattr(diagnosis, 'tempting', lambda *a: None)  # Maia's tempting move is covered in test_diagnosis
+    monkeypatch.setattr(diagnosis, 'candidates', lambda *a: None)
     problem = start(stocked, band=6)
     assert problem['puzzle']['id'] == '001kG'
     path = f"/api/problems/sessions/{problem['sessionId']}/hint"

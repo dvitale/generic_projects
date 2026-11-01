@@ -1,6 +1,6 @@
 import chess
 
-from backend import diagnosis
+from backend import diagnosis, gaps, main
 from test_problems import client, stocked, start  # noqa: F401
 from test_coach import wait_analysis
 from test_prevention import attempt, seed, session
@@ -128,9 +128,10 @@ def describe(fen):
 def test_solution_kind_tells_forcing_moves_from_quiet_ones(client):
     mate = describe('6k1/5ppp/8/8/8/8/5PPP/3R2K1 w - - 0 1')
     assert (mate['kind'], mate['san'], mate['forcing']) == ('forcing', 'Rd8#', ['check'])
-    # Qd4 neither checks nor captures, but threatens Qxg7#.
+    # Qd4 and Qg4 neither check nor capture, but threaten Qxg7#. Both win by about +10 and Stockfish's pick between
+    # them changes with threads and hash contents, so either is accepted: the kind of move is what is tested.
     quiet = describe('r4rk1/5pp1/8/8/8/2B5/5PPP/3QR1K1 w - - 0 1')
-    assert quiet['kind'] == 'quiet_threat' and quiet['san'] == 'Qd4' and quiet['threat']['san'] == 'Qxg7#'
+    assert quiet['kind'] == 'quiet_threat' and quiet['san'] in ('Qd4', 'Qg4') and quiet['threat']['san'] == 'Qxg7#'
     # With a free tempo Black would mate with ...Ra1+: the luft takes that resource away.
     luft = describe('r5k1/5ppp/8/8/8/1Q6/5PPP/6K1 w - - 0 1')
     assert luft['kind'] == 'prophylaxis' and luft['stopped']['san'] == 'Ra1+'
@@ -154,3 +155,84 @@ def test_obstacle_is_stored_and_missed_solutions_are_counted_by_kind(stocked):
     assert saved['answer']['obstacle'] == 'inconclusive' and saved['ruleVersion'] == 2
     assert saved['search'] == 'missed_solution' and saved['evidence']['solution']['kind'] == 'forcing'
     assert stocked.get('/api/diagnoses/summary').json()['recent']['solutions']['forcing'] == 1
+
+
+def fake_maia(monkeypatch, moves):
+    asked = []
+    monkeypatch.setattr(diagnosis.maia, 'available', lambda: True)
+    monkeypatch.setattr(diagnosis.maia, 'predict', lambda fen, own, other: asked.append(own) or {'moves': [{'uci': u, 'probability': p} for u, p in moves]})
+    return asked
+
+
+def test_the_tempting_move_is_maias_likeliest_mistake_refuted_without_naming_the_solution(monkeypatch):
+    board = chess.Board('7k/8/5KQ1/8/8/8/8/8 w - - 0 1')
+    found = diagnosis.solution_of(board)
+    assert found['move'] == 'g6g7'
+    asked = fake_maia(monkeypatch, [('g6g7', 0.5), ('g6g8', 0.3), ('f6f7', 0.2)])
+    tempt = diagnosis.tempting(board, found, 3000)
+    assert asked == [2600] and tempt['san'] == 'Qg8+' and tempt['line'][:2] == ['g6g8', 'h8g8']
+    # A missed mate would name the solution: the outcomes are compared in words instead.
+    assert tempt['text'] == ('La mossa che viene più naturale è Qg8+: al tuo livello la sceglierebbe circa un giocatore su 3. '
+                             'Non funziona: con la mossa giusta sei in forte vantaggio, dopo Qg8+ la posizione è in equilibrio. '
+                             'La risposta più forte è 1… Kxg8.')
+    titles = [h['title'] for h in diagnosis.hints(board, found, tempt)]
+    assert titles == ['Mossa forzante', 'La mossa che tenta', 'Dove guardare']
+    # The king move stalemates: there is no reply to name.
+    fake_maia(monkeypatch, [('f6f7', 0.6), ('g6g7', 0.3)])
+    stalemate = diagnosis.tempting(board, found, 1500)
+    assert stalemate['text'].endswith('Non funziona: con la mossa giusta sei in forte vantaggio, dopo Kf7 la posizione è in equilibrio.')
+    # A rare move, or no Maia at all, gives no hint.
+    fake_maia(monkeypatch, [('g6g7', 0.95), ('g6g8', 0.05)])
+    assert diagnosis.tempting(board, found, 1500) is None
+    monkeypatch.setattr(diagnosis.maia, 'available', lambda: False)
+    assert diagnosis.tempting(board, found, 1500) is None
+
+
+def test_candidate_moves_hide_the_solution_among_wrong_moves_worth_considering(monkeypatch):
+    board = chess.Board('7k/8/5KQ1/8/8/8/8/8 w - - 0 1')
+    found = diagnosis.solution_of(board)
+    fake_maia(monkeypatch, [('g6g7', 0.5), ('g6g8', 0.3), ('f6f7', 0.2)])
+    tempt = diagnosis.tempting(board, found, 1500)
+    choices = diagnosis.candidates(board, found, 1500, tempt)
+    # The tempting move comes first, then a wrong move from the engine or Maia; alphabetical, so the order tells nothing.
+    assert 'g6g8' in choices['moves'] and 'g6g7' in choices['moves'] and len(choices['moves']) == 3
+    assert choices['sans'] == sorted(choices['sans'])
+    assert choices['text'].startswith(f"La soluzione è una di queste mosse: {choices['sans'][0]}, {choices['sans'][1]} o {choices['sans'][2]}.")
+    assert choices['text'].endswith('le altre 2 non reggono.')
+    titles = [h['title'] for h in diagnosis.hints(board, found, tempt, choices)]
+    assert titles == ['Mossa forzante', 'La mossa che tenta', 'Mosse candidate', 'Dove guardare']
+    # Without Maia only Stockfish's best moves are left, and here they all win too: no wrong move to offer.
+    monkeypatch.setattr(diagnosis.maia, 'available', lambda: False)
+    assert diagnosis.candidates(board, found, 1500) is None
+    assert [h['title'] for h in diagnosis.hints(board, found)] == ['Mossa forzante', 'Dove guardare']
+
+
+FORK = '4k2r/8/8/8/3n4/8/7P/R3K3 w Q - 0 1'  # After 1. h3 the black knight forks king and rook with Nc2+.
+
+
+def test_the_motif_of_an_own_puzzle_is_read_from_the_opponents_last_move():
+    board = chess.Board(FORK)
+    board.push_uci('h2h3')
+    assert diagnosis.motif(board, {'line': ['Nc2+', 'Kd2', 'Nxa1']}) == 'fork'
+    # A line that wins nothing, or a puzzle with no previous move, has no motif.
+    assert diagnosis.motif(board, {'line': ['Nc2+', 'Kd2', 'Nd4']}) is None
+    assert diagnosis.motif(chess.Board(FORK), {'line': ['h3']}) is None
+
+
+def test_own_puzzle_hints_name_the_motif_and_gaps_count_it(client, monkeypatch):
+    monkeypatch.setattr(diagnosis, 'tempting', lambda *a: None)
+    monkeypatch.setattr(diagnosis, 'candidates', lambda *a: None)
+    with main.database() as con:
+        con.execute('INSERT INTO games(id,initial_fen,moves,player_color,elo,title,created_at,analysis,analysis_version,source) VALUES(?,?,?,?,?,?,?,?,?,?)',
+                    ('forked', FORK, '["h2h3"]', 'b', 1500, 'Forchetta', main.now(), None, None, 'pgn'))
+        con.execute('INSERT INTO exercises(id,game_id,ply,initial_fen,history,theme,best_move,loss,due_at) VALUES(?,?,?,?,?,?,?,?,?)',
+                    ('fork-ex', 'forked', 1, FORK, '["h2h3"]', 'Calcolo e mosse candidate', 'd4c2', 500, main.now()))
+    path = '/api/exercises/fork-ex'
+    s = client.post(path + '/sessions').json()
+    client.post(path + '/hint', json={'session_id': s['id']})
+    hints = client.post(path + '/hint', json={'session_id': s['id']}).json()['hints']
+    assert hints[1] == {'level': 2, 'title': 'Motivo', 'text': '', 'themes': ['fork']}
+    client.post(path + '/reveal', json={'session_id': s['id']})
+    with main.database() as con:
+        records, missing = gaps.own_records(con)
+    assert records[0]['keys'][0] == 'kind:forcing' and 'theme:fork' in records[0]['keys'] and not missing

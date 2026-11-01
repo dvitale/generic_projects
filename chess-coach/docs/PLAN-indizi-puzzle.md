@@ -18,7 +18,7 @@ Vedi `docs/diagnosi-errori.md`, sezione «Indizi dei Puzzle». In breve:
 
 ## Fase 2 — riconoscere la lacuna (fatta, tranne un punto)
 
-Realizzata il 1° novembre 2026: vedi `docs/lacune-studio.md`. Resta da fare il riconoscimento del motivo tattico negli esercizi dalle tue partite (punto 1, secondo elenco).
+Realizzata il 1° novembre 2026: vedi `docs/lacune-studio.md`. Il motivo tattico negli esercizi dalle tue partite è arrivato dopo, per sei temi verificabili.
 
 1. **Registrare anche il motivo tattico**, oltre al tipo di mossa.
    - Problemi Lichess (`backend/problems.py`): il motivo c'è già nei temi (`fork`, `pin`, `deflection`, `overloading`,
@@ -51,8 +51,26 @@ Per una lacuna confermata, SparringMate propone un blocco mirato, dentro il Pian
 
 ## Da fare
 
-- Motivo tattico negli esercizi dalle tue partite (attacco doppio, inchiodatura, pezzo sovraccarico), con regole verificabili: permetterebbe lacune per motivo anche nei Puzzle e indizi di livello «motivo» come nei Problemi.
+- ~~Motivo tattico negli esercizi dalle tue partite~~ (fatto il 1° novembre 2026, vedi `docs/diagnosi-errori.md`: sei temi
+  verificabili, indizio «Motivo» e lacune per motivo nei Puzzle). Restano fuori deviazione, adescamento e pezzo sovraccarico.
 - Verificare sui dati reali, dopo qualche settimana d'uso, se le soglie (3/6 casi, 20 punti) producono lacune sensate.
+
+Idee dal paper «Language Models that Play Chess and Explain Their Moves» (Bhaskar, Cheng, Chen, arXiv 2610.03695;
+soprattutto l'appendice D, la versione Queen (HCE) con spiegazioni a modello costruite da Stockfish senza LLM):
+
+1. **La mossa che tenta** (fatta, vedi `docs/diagnosi-errori.md`): Maia al livello del giocatore propone la mossa
+   naturale, Stockfish la confuta. Diventa un livello d'indizio prima di «Dove guardare».
+2. **Linee che non si fermano a metà di uno scambio** (fatta, vedi `docs/diagnosi-errori.md`): se alla fine della
+   linea la mossa preferita da Stockfish è una cattura o uno scacco, la linea si allunga di due semimosse, fino a sei volte.
+3. **Allenamento alla visualizzazione** (fatta la prima versione, vedi `docs/visualizzazione.md`; manca il legame con le lacune): domande verificabili con python-chess (che pezzo c'è in una casa, chi attacca
+   e chi difende, scacchi e catture, come si esce dallo scacco, se è matto), sulla posizione e dopo 1–8 mosse giocate
+   solo a mente. Distinguerebbe la lacuna di calcolo («perdo il filo») da quella tattica: oggi i problemi
+   `long`/`veryLong` falliti finiscono nella famiglia «metodo».
+4. **Mosse candidate come indizio** (fatta, vedi `docs/diagnosi-errori.md`): «è una di queste tre», con la mossa che tenta
+   di Maia, una scelta di Stockfish e una di Maia, ciascuna sbagliata di almeno 10 punti di punteggio atteso.
+5. **Motivo solo quando conta** (fatta per la mossa migliore nelle spiegazioni di Rivedi, vedi `docs/spiegazione-errori.md`;
+   gli effetti posizionali erano già al più due per mossa): nominare un motivo tattico solo se la mossa migliore stacca la seconda di almeno
+   5 punti di punteggio atteso, e al più tre effetti posizionali per mossa, i più pesanti.
 
 ## Come riprenderlo
 

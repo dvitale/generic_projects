@@ -22,10 +22,12 @@ BATCH = 32  # Beyond 32 positions a run gains no speed and the memory arena keep
 MOVES = 4352
 CACHE = 4096  # Predictions kept for the interface: browsing a game asks the same positions again.
 REQUEST_LIMIT = 64
-# A low temperature replays the same opening every game: up to this move number, sharpened modes draw
-# with OPENING (temperature 1, rare moves still cut) so games diverge before their own rule applies.
-OPENING_MOVES = 8
-OPENING = (1, 0.9)
+# A low temperature replays the same opening every game: up to this move number, sharpened modes draw from
+# Maia's full distribution (OPENING) so games diverge before their own rule applies. Five moves and no cut follow
+# Mobile Maia's study; scripts/measure_opening_variety.py found that cutting the last 10% lost a fifth to a third of
+# the opening families (docs/aperture.md).
+OPENING_MOVES = 5
+OPENING = (1, 1)
 # Move selection modes for Play, fixed per game: (temperature, top-p, sharpened only after the opening).
 # Keys match MAIA_SELECTIONS in backend/opponents.py.
 SELECTIONS = {'sample-full-distribution': (1, 1, False), 'temperature-0.7-top-p-0.95': (0.7, 0.95, True),

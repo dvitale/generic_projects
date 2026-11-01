@@ -4,7 +4,7 @@ Quando non trovi una mossa, il problema raramente è quella posizione: di solito
 
 ## Da dove vengono i dati
 
-- **Puzzle (dalle tue partite):** ogni esercizio ha il tipo di soluzione classificato da Stockfish (`exercises.solution`: forzante, tranquilla con una minaccia, profilassi, miglioramento) e un indicatore di finale (al massimo 4 pezzi oltre a re e pedoni). La classificazione si calcola alla prima richiesta di indizio o di soluzione, in background dopo una soluzione trovata, e, per gli esercizi rimasti senza, in background all'apertura di Progressi: la scheda dice quanti ne mancano. Riuscita significa: risolto al primo tentativo, senza indizi né soluzione. L'atteso è la tua media di riuscita nei Puzzle.
+- **Puzzle (dalle tue partite):** ogni esercizio ha il tipo di soluzione classificato da Stockfish (`exercises.solution`: forzante, tranquilla con una minaccia, profilassi, miglioramento) un indicatore di finale (al massimo 4 pezzi oltre a re e pedoni) e, quando si riconosce, il motivo tattico come tema Lichess (`fork`, `pin`, `skewer`, `discoveredAttack`, `trappedPiece`, `hangingPiece`; regola in [`diagnosi-errori.md`](diagnosi-errori.md#indizi-dei-puzzle)): così anche i Puzzle danno lacune per motivo, `theme:<tema>`, con lo stesso percorso dei Problemi. Gli esercizi classificati prima del motivo lo ricevono nello stesso passaggio in background, senza interrogare di nuovo Stockfish. La classificazione si calcola alla prima richiesta di indizio o di soluzione, in background dopo una soluzione trovata, e, per gli esercizi rimasti senza, in background all'apertura di Progressi: la scheda dice quanti ne mancano. Riuscita significa: risolto al primo tentativo, senza indizi né soluzione. L'atteso è la tua media di riuscita nei Puzzle.
 - **Problemi (Lichess):** il gruppo è ciascun tema Lichess del problema, esclusi quelli che non dicono cosa bisognava vedere (lunghezza, esito, provenienza, fase di mediogioco o apertura, `mate` generico). Riuscita è il risultato valutato per il rating. L'atteso è la probabilità Elo di risolverlo dati il tuo rating di allora e quello del problema: un tema difficile non sembra una lacuna solo perché i suoi problemi hanno rating alto.
 
 Contano le ultime 300 sessioni di ciascuna fonte. I problemi giocati dentro un percorso non contano, perché nella serie a tema sai già cosa cercare.
@@ -49,7 +49,7 @@ Uno solo alla volta (`study_paths`). Il tema Lichess allenato è il tema stesso 
 
 - Pochi casi danno stime instabili: le soglie sono volutamente basse per dare un segnale presto, e la scheda mostra sempre i numeri grezzi.
 - L'atteso dei Puzzle è la tua media, non una difficoltà per posizione: i Puzzle non hanno un rating.
-- Il motivo tattico degli esercizi dalle tue partite non viene riconosciuto (solo il tipo di soluzione): resta da fare, vedi [PLAN-indizi-puzzle.md](PLAN-indizi-puzzle.md).
+- Il motivo tattico degli esercizi dalle tue partite si riconosce solo per i sei temi verificabili sulla scacchiera; deviazione, adescamento e pezzo sovraccarico non sono riconosciuti.
 - La mappatura dei tipi di soluzione sui temi Lichess è un'approssimazione, in particolare profilassi → mossa difensiva.
 
 ## Verifiche

@@ -274,7 +274,7 @@ def install(app, database, data_dir, now):
 
     @app.post('/api/problems/sessions/{session_id}/hint')
     def hint(session_id: str, body: StepBody):
-        """Graduated hints for the current step: kind of move, Lichess motif, piece. As on Lichess, a hint costs the rating."""
+        """Graduated hints for the current step: kind of move, Lichess motif, tempting move, candidate moves, piece. As on Lichess, a hint costs the rating."""
         with closing(require()) as store, database() as con:
             session = session_row(con, session_id)
             if session['status'] != 'active':
@@ -287,8 +287,14 @@ def install(app, database, data_dir, now):
         if stored is None or stored['step'] != body.step:
             move = chess.Move.from_uci(row['moves'].split()[body.step])
             stored = {'step': body.step, 'level': 0, 'solution': diagnosis.solution_of(board, move)}
+            if stored['solution']:
+                with database() as con:
+                    rating = current_rating(con)[0]
+                found = stored['solution']
+                found['tempting'] = diagnosis.tempting(board, found, rating)
+                found['candidates'] = diagnosis.candidates(board, found, rating, found['tempting'])
         found = stored['solution']
-        given = diagnosis.hints(board, found) if found else []
+        given = diagnosis.hints(board, found, found.get('tempting'), found.get('candidates')) if found else []
         themes = [t for t in gaps.motifs(row['themes'].split()) if t not in gaps.METHOD_THEMES]
         if themes:
             given.insert(1, {'level': 2, 'title': 'Motivo', 'text': '', 'themes': themes})

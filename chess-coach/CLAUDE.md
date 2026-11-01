@@ -18,6 +18,7 @@ make experimental                             # servizio del motore sperimentale
 - `tests/test_static_cache.py` viene saltato se l'interfaccia non è compilata.
 - Variabili d'ambiente: `CHESS_COACH_DATA` (cartella dei dati), `STOCKFISH_PATH`, `SPARRINGMATE_USER`/`SPARRINGMATE_PASSWORD` (login, anche da `.env`), `DEEPSEEK_API_KEY`/`DEEPSEEK_MODEL` (tutor), `SPARRINGMATE_EXPERIMENTAL_ENGINE` (URL del motore sperimentale, anche da `.env`; senza, il selettore in Gioca non compare), `SPARRINGMATE_ALTERNATIVE_THRESHOLDS` (JSON con le soglie di «Trova un’alternativa», vedi `docs/trova-alternativa.md`), `MAIA_MODEL_PATH`/`MAIA_THREADS` (Maia sul server, vedi `docs/maia-server.md`).
 - `scripts/calibrate_accuracy_rating.py` rigenera `web/src/data/accuracy-rating.json` (tabella della Prestazione stimata) da un archivio mensile Lichess, in streaming: circa 12 minuti per le 150.000 partite predefinite, poi `make build`. Vedi `docs/elo-partita.md`.
+- `scripts/build_openings.py` rigenera `backend/data/openings.tsv` (nomi e teoria delle aperture) dal catalogo Lichess, a un commit fissato. Vedi `docs/aperture.md`.
 - La suite Playwright avvia anche `tests/fixtures/fake_policy_service.py` sulla porta 8012, al posto del motore sperimentale.
 
 ## Produzione

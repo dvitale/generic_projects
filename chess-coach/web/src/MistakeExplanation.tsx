@@ -34,10 +34,10 @@ function LineReplay({explanation,autoplay=false}:{explanation:Explanation;autopl
   const choose=(line:'line'|'bestLine')=>{setWhich(line);setBack(false);setStep(autoplay?0:1);setPlaying(autoplay)}
   const toggle=()=>{if(playing){setPlaying(false);return}if(at>=last){setBack(false);setStep(0)}setPlaying(true)}
   return <div className="mistake-explanation-board">
-    <div className="row" role="group" aria-label="Variante da guardare">
+    {!!explanation.bestLine.length&&<div className="row" role="group" aria-label="Variante da guardare">
       <button aria-pressed={which==='line'} onClick={()=>choose('line')}>Dopo la tua mossa ({first(explanation.line)})</button>
       <button aria-pressed={which==='bestLine'} onClick={()=>choose('bestLine')}>Mossa migliore ({first(explanation.bestLine)})</button>
-    </div>
+    </div>}
     <Board fen={current.fen} orientation={explanation.fen.split(' ')[1] as Color} interactive={false} legalMoves={[]} onMove={()=>{}}
       lastMove={back?steps[at+1]?.move:current.move||undefined} animateMove={autoplay} reverseMove={back}/>
     <div className="review-step-controls">
@@ -48,6 +48,16 @@ function LineReplay({explanation,autoplay=false}:{explanation:Explanation;autopl
     </div>
     <p className="footnote">Variante di Stockfish a budget limitato: mostra la difesa più forte trovata, non l’unica possibile.</p>
   </div>
+}
+
+/** «Mostra» for a single refuting line, as in a puzzle hint: the better line stays hidden. */
+export function ShowLine({fen,line,title}:{fen:string;line:string[];title:string}){
+  const [open,setOpen]=useState(false)
+  const only=useMemo<Explanation>(()=>({motif:'engine',title,text:'',better:null,focus:[],fen,line,bestLine:[]}),[fen,line,title])
+  return <>
+    <button className="quiet" onClick={()=>setOpen(true)}>Mostra</button>
+    {open&&<FloatingPanel title={title} onClose={()=>setOpen(false)}><LineReplay explanation={only} autoplay/></FloatingPanel>}
+  </>
 }
 
 /** Plain-language reason for a mistake, with the refuting line replayable on a small board. */
