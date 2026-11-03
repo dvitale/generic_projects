@@ -108,7 +108,7 @@ make month-status MONTH=2026-09
 
 ### Ciclo mensile sequenziale
 
-Procedura completa e limiti: [CICLO-MENSILE.md](CICLO-MENSILE.md).
+Procedura completa e limiti: [CICLO-MENSILE.md](documentazione/CICLO-MENSILE.md).
 
 ```bash
 make cycle MONTHS=2026-09 CYCLE_STEPS=10000
@@ -191,7 +191,7 @@ ricostruisce le ripetizioni precedenti.
 
 ## Pilota e confronto riproducibile
 
-Risultati della prima prova: [RISULTATI-PILOTA.md](RISULTATI-PILOTA.md).
+Risultati della prima prova: [RISULTATI-PILOTA.md](documentazione/RISULTATI-PILOTA.md).
 Le metriche complete sono in [reports/pilot.json](reports/pilot.json).
 
 Eseguire dalla cartella del laboratorio; nessun comando avvia o modifica il servizio:
@@ -240,7 +240,7 @@ Per continuare da settembre su agosto, senza modificare il servizio di gioco:
 `.venv/bin/python monthly_cycle.py run --months 2026-08 --allow-earlier-month --min-elo 600 --max-elo 1500`.
 Pesi e ottimizzatore proseguono; replay 20%, verifica fissa, due versioni conservate.
 Il checkpoint accettato nel laboratorio non viene caricato automaticamente in Gioca.
-Dettagli, ordine dei cicli e limiti del confronto: [CICLO-MENSILE.md](CICLO-MENSILE.md).
+Dettagli, ordine dei cicli e limiti del confronto: [CICLO-MENSILE.md](documentazione/CICLO-MENSILE.md).
 
 
 Il secondo ciclo è specializzato su **600–1500 inclusi**: solo mosse del
@@ -256,10 +256,10 @@ bersagli e i limiti di utilizzo del candidato sono ristretti alla fascia scelta.
 `make tactical-pilot` avvia un confronto locale isolato fra prosecuzione normale,
 campionamento delle urgenze e apprendimento ausiliario degli attacchi.
 `make tactical-status` mostra il rapporto quando completo. Dettagli, criteri e limiti
-in [TATTICA.md](TATTICA.md). Nessuna promozione del checkpoint attivo.
+in [TATTICA.md](documentazione/TATTICA.md). Nessuna promozione del checkpoint attivo.
 
-Primo pilota completato: [risultati e limiti](RISULTATI-TATTICA.md).
+Primo pilota completato: [risultati e limiti](documentazione/RISULTATI-TATTICA.md).
 La corrispondenza con le mosse umane migliora, ma non la gestione della donna in
 presa; nessuna variante è stata attivata nel gioco.
 
-Guida ai risultati e al prossimo confronto: [SPERIMENTAZIONE-GUIDA.md](SPERIMENTAZIONE-GUIDA.md).
+Guida ai risultati e al prossimo confronto: [SPERIMENTAZIONE-GUIDA.md](documentazione/SPERIMENTAZIONE-GUIDA.md).

@@ -38,7 +38,7 @@ Il laboratorio ora dispone di `make cycle MONTHS=2026-09 CYCLE_STEPS=10000`
 e `make cycle-status`. Il ciclo concatena download verificato, campionamento
 distribuito sull'intero mese, training con replay, confronto e rimozione protetta
 dell'archivio. Dettagli e limiti in
-[`CICLO-MENSILE.md`](../experiments/human-policy/CICLO-MENSILE.md).
+[`CICLO-MENSILE.md`](../experiments/human-policy/documentazione/CICLO-MENSILE.md).
 
 Fino a un milione di posizioni per mese, memoria di 100.000 posizioni train,
 20% dei campionamenti dalla memoria quando disponibile, validation/test fissi,
@@ -67,12 +67,12 @@ restano invariati. Dettagli in [`motore-sperimentale.md`](motore-sperimentale.md
 Aggiunti audit della codifica sui dati reali, holdout tattico distinto dalle
 posizioni personali note e tre bracci di addestramento controllato. Le etichette
 Stockfish sono usate solo per valutazione; il target resta la mossa umana.
-Procedura, comandi, ripresa e criteri in [TATTICA.md](../experiments/human-policy/TATTICA.md).
+Procedura, comandi, ripresa e criteri in [TATTICA.md](../experiments/human-policy/documentazione/TATTICA.md).
 Il servizio di gioco e il registro dei checkpoint accettati non vengono aggiornati.
 
-Esito: [rapporto del primo pilota tattico](../experiments/human-policy/RISULTATI-TATTICA.md).
+Esito: [rapporto del primo pilota tattico](../experiments/human-policy/documentazione/RISULTATI-TATTICA.md).
 Tre bracci completati e quattro partite offline; nessun candidato promosso.
 
 ## Guida alla sperimentazione e distillazione
 
-Risultati, limiti e proposta delle tre varianti sono raccolti in [SPERIMENTAZIONE-GUIDA.md](../experiments/human-policy/SPERIMENTAZIONE-GUIDA.md). Il pilota resta nel laboratorio e non promuove automaticamente i pesi.
+Risultati, limiti e proposta delle tre varianti sono raccolti in [SPERIMENTAZIONE-GUIDA.md](../experiments/human-policy/documentazione/SPERIMENTAZIONE-GUIDA.md). Il pilota resta nel laboratorio e non promuove automaticamente i pesi.

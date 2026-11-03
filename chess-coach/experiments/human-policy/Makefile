@@ -54,3 +54,11 @@ tactical-pilot:
 	$(PY) tactical_report.py --directory runs/tactical-pilot-v1
 tactical-status:
 	@$(PY) -c "from pathlib import Path; p=Path('runs/tactical-pilot-v1/RAPPORTO.md'); print(p.read_text() if p.exists() else 'Esperimento non completato: controllare manifest.json, stockfish-labels.json e i log dei bracci in runs/tactical-pilot-v1')"
+
+.PHONY: test-distillation distillation-pilot distillation-status
+test-distillation:
+	$(PY) -m pytest -q test_distillation.py
+distillation-pilot:
+	$(PY) -u distillation.py
+distillation-status:
+	@$(PY) -c "from pathlib import Path; p=Path('runs/distillation-pilot-v1/RAPPORTO.md'); print(p.read_text() if p.exists() else 'Pilota non completato: controlla il log e runs/distillation-pilot-v1')"
