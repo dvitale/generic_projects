@@ -27,7 +27,7 @@ from . import prevention
 from . import mistakes
 from . import insights
 from . import training_schedule, pgn_import, learning
-from . import study, openings, visualization
+from . import study, openings, visualization, lessons
 from . import problems
 from . import diagnosis
 from . import piece_moves
@@ -138,6 +138,8 @@ def init_db():
         diagnosis.init_schema(con)
         alternatives.init_schema(con)
         visualization.init_schema(con)
+        lessons.init_schema(con)
+        lessons.init_walk_schema(con)
         for row in con.execute('SELECT * FROM games WHERE analysis IS NOT NULL').fetchall():
             if row['analysis_version'] == len(json.loads(row['moves'])):
                 # Startup stays fast: Maia judges unassessed positions afterwards, on the analysis worker.
@@ -1466,6 +1468,8 @@ problems.install(app, database, lambda: DB_PATH.parent, now)
 gaps.install(app, database, lambda: problems.open_store(DB_PATH.parent), solution_by_id, now)
 piece_moves.install(app)
 visualization.install(app, database, now)
+lessons.install(app, database, now)
+lessons.install_walks(app, database, now)
 diagnosis.install(app, database, now)
 # A move found in the guided path reaches the game only through the usual checks on version and revision.
 alternatives.install(app, database, now, find_game, PLAYABLE,

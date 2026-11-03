@@ -944,3 +944,33 @@ details.panel>summary{font-weight:650;font-size:var(--fs-lg)}
 .visualization-options .option-wrong{border-color:var(--error-border);background:var(--error-bg);opacity:1}
 .visualization-question .primary{margin-top:12px}
 .visualization .board-toolbar{margin-top:8px}
+/* Ragionamento mossa per mossa */
+.lesson-list{list-style:none;margin:14px 0 0;max-height:none}
+.lesson-new{background:var(--accent-soft);color:var(--accent-ink)}
+.lesson-due{background:var(--error-bg);color:var(--error)}
+.lesson-waiting{background:var(--surface-2);color:var(--muted)}
+.lesson-line{font-family:var(--font-mono,ui-monospace,monospace);font-size:var(--fs-sm);line-height:1.6;margin:8px 0 12px;padding:8px 12px;background:var(--surface-2);border-radius:var(--r-md);overflow-wrap:anywhere}
+.lesson-question h3,.lesson-book h3{margin:0 0 10px}
+.lesson-hints{margin:0 0 10px;padding-left:20px;display:grid;gap:4px}
+.lesson-disagree{padding:8px 12px;border-left:3px solid var(--mc-inaccuracy,#e6a100);background:var(--surface-2);border-radius:var(--r-md)}
+.lesson-moves{width:100%;border-collapse:collapse;font-size:var(--fs-sm)}
+.lesson-moves th,.lesson-moves td{text-align:left;padding:5px 6px;border-bottom:1px solid var(--border);vertical-align:top}
+.lesson-moves td:first-child,.lesson-moves td:last-child{white-space:nowrap;font-weight:600}
+.lesson-moves tr.chosen td{background:var(--accent-soft)}
+.lesson-verdict-game,.lesson-verdict-good{background:var(--success-bg);color:var(--success)}
+.lesson-verdict-partial{background:var(--surface-2);color:var(--muted)}
+.lesson-verdict-weak,.lesson-verdict-other{background:var(--error-bg);color:var(--error)}
+.lesson-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.lesson-actions .footnote{flex-basis:100%;margin:0}
+.lesson-citation{margin-top:8px}
+
+/* Segui la partita */
+.walk-list{display:grid;gap:10px;margin:18px 0}
+.walk-list h3{margin:0}
+.walk-card{display:flex;gap:14px;justify-content:space-between;align-items:center;flex-wrap:wrap;border:1px solid var(--border);border-radius:10px;padding:12px 14px}
+.walk-card>div:first-child{display:grid;gap:4px;flex:1 1 260px}
+.walk-card p{margin:2px 0}
+.walk-actions{display:flex;gap:8px;flex-wrap:wrap}
+.walk-reply{border-left:3px solid var(--accent);padding:4px 10px;margin:8px 0}
+.walk-reply small{display:block;color:var(--muted);margin-top:2px}
+.walk-score{font-size:.9rem;color:var(--muted)}

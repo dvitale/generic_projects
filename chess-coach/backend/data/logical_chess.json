@@ -1,0 +1,3722 @@
+{
+  "source": {
+    "title": "Logical Chess: Move by Move",
+    "author": "Irving Chernev",
+    "edition": "Batsford, edizione in notazione algebrica",
+    "note": "Posizioni ricostruite dalle partite del libro e confrontate con i suoi diagrammi. Domande, indizi e spiegazioni sono originali; il libro è citato solo come riferimento (partita e pagina). Uso personale di prova."
+  },
+  "path": {
+    "id": "logical-chess",
+    "title": "Ragionamento mossa per mossa",
+    "summary": "Dieci posizioni da partite commentate in «Logical Chess: Move by Move»: sviluppo, minacce, difesa e ricerca di un piano. Per ciascuna scegli la mossa, poi confronta l’idea del libro con il giudizio di Stockfish."
+  },
+  "games": {
+    "1": {
+      "white": "von Scheve",
+      "black": "Teichmann",
+      "event": "Berlino 1907",
+      "opening": "Giuoco Piano"
+    },
+    "2": {
+      "white": "Liubarski",
+      "black": "Soultanbeieff",
+      "event": "Liegi 1928",
+      "opening": "Giuoco Piano"
+    },
+    "10": {
+      "white": "Tarrasch",
+      "black": "Eckart",
+      "event": "Norimberga 1889",
+      "opening": "Difesa francese"
+    },
+    "14": {
+      "white": "Tarrasch",
+      "black": "Mieses",
+      "event": "Berlino 1916",
+      "opening": "Difesa francese"
+    },
+    "24": {
+      "white": "Capablanca",
+      "black": "Mattison",
+      "event": "Karlsbad 1929",
+      "opening": "Difesa Nimzo-indiana"
+    }
+  },
+  "lessons": [
+    {
+      "id": "lc-01-nf3",
+      "game": "1",
+      "page": 12,
+      "theme": "Sviluppo con minaccia",
+      "history": [
+        "e4",
+        "e5"
+      ],
+      "fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
+      "question": "Il Bianco vuole portare fuori un pezzo. Quale sviluppo crea anche una minaccia, così che il Nero non sia libero di fare ciò che vuole?",
+      "hints": [
+        "Cerca un pezzo del Nero che oggi è difeso da nessuno.",
+        "Il pedone e5 non è protetto: quale pezzo minore può attaccarlo già alla seconda mossa?",
+        "Il cavallo di re ha una casa naturale da cui guarda e5 e d4."
+      ],
+      "played": "Nf3",
+      "moves": {
+        "Nf3": {
+          "verdict": "game",
+          "note": "Sviluppa verso il centro e attacca e5: il Nero deve usare la prossima mossa per difenderlo."
+        },
+        "Nc3": {
+          "verdict": "partial",
+          "note": "Buono sviluppo, ma non minaccia nulla: il Nero resta libero di scegliere."
+        },
+        "Bc4": {
+          "verdict": "partial",
+          "note": "Alfiere attivo verso f7, ma senza una minaccia immediata."
+        },
+        "Qh5": {
+          "verdict": "weak",
+          "note": "Attacca e5, ma la donna uscita così presto diventa un bersaglio: il Nero la caccerà sviluppando i pezzi con tempo."
+        },
+        "Qf3": {
+          "verdict": "weak",
+          "note": "La donna occupa la casa migliore del cavallo e non minaccia nulla di concreto."
+        }
+      },
+      "explanation": "Un buon sviluppo fa due cose insieme: mette in gioco un pezzo e obbliga l’avversario a rispondere. Nf3 tocca le due case centrali e5 e d4 e attacca un pedone indifeso; il Nero dovrà spendere la mossa per proteggerlo. Il cavallo, poi, esce prima dell’alfiere perché per lui la casa giusta è già chiara.",
+      "bookIdea": "Il libro la presenta come la migliore mossa sulla scacchiera: sviluppo verso il centro, guadagno di tempo con la minaccia su e5 e il principio «i cavalli prima degli alfieri».",
+      "engine": {
+        "depth": 22,
+        "lines": [
+          {
+            "san": "Nf3",
+            "cp": 21,
+            "mate": null,
+            "pv": [
+              "g1f3",
+              "b8c6",
+              "f1b5",
+              "g8f6",
+              "e1g1",
+              "f6e4"
+            ]
+          },
+          {
+            "san": "Nc3",
+            "cp": 2,
+            "mate": null,
+            "pv": [
+              "b1c3",
+              "b8c6",
+              "g1f3",
+              "g8f6",
+              "a2a3",
+              "d7d5"
+            ]
+          },
+          {
+            "san": "Bc4",
+            "cp": -3,
+            "mate": null,
+            "pv": [
+              "f1c4",
+              "g8f6",
+              "d2d3",
+              "c7c6",
+              "g1f3",
+              "d7d5"
+            ]
+          },
+          {
+            "san": "a3",
+            "cp": -6,
+            "mate": null,
+            "pv": [
+              "a2a3",
+              "g8f6",
+              "b1c3",
+              "f8c5",
+              "g1f3",
+              "d7d6"
+            ]
+          },
+          {
+            "san": "Ne2",
+            "cp": -10,
+            "mate": null,
+            "pv": [
+              "g1e2",
+              "g8f6",
+              "d2d4",
+              "f6e4",
+              "f2f3",
+              "e4g5"
+            ]
+          }
+        ],
+        "moves": {
+          "Nf3": {
+            "cp": 21,
+            "mate": null
+          },
+          "Nc3": {
+            "cp": 2,
+            "mate": null
+          },
+          "Bc4": {
+            "cp": -3,
+            "mate": null
+          },
+          "Qh5": {
+            "cp": -27,
+            "mate": null
+          },
+          "Qf3": {
+            "cp": -20,
+            "mate": null
+          }
+        }
+      }
+    },
+    {
+      "id": "lc-02-nc6",
+      "game": "1",
+      "page": 13,
+      "theme": "Difendere sviluppando",
+      "history": [
+        "e4",
+        "e5",
+        "Nf3"
+      ],
+      "fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2",
+      "question": "Il cavallo bianco attacca e5. Come lo difende il Nero senza perdere tempo nello sviluppo?",
+      "hints": [
+        "Elimina le difese che bloccano altri pezzi o indeboliscono il re.",
+        "La mossa migliore difende e5 e intanto porta fuori un pezzo nuovo.",
+        "Il cavallo di donna ha una casa da cui protegge e5 e guarda d4."
+      ],
+      "played": "Nc6",
+      "moves": {
+        "Nc6": {
+          "verdict": "game",
+          "note": "Difende e5 e sviluppa un pezzo nello stesso tempo: nessuna mossa sprecata."
+        },
+        "d6": {
+          "verdict": "partial",
+          "note": "Difende e apre l’alfiere c8, ma chiude l’alfiere f8 dietro il pedone: più passiva."
+        },
+        "Nf6": {
+          "verdict": "partial",
+          "note": "Contrattacco legittimo (Difesa Petrov) e per Stockfish una buona mossa, ma non difende e5: risponde a un’altra domanda."
+        },
+        "f6": {
+          "verdict": "weak",
+          "note": "Toglie al cavallo g8 la casa migliore e indebolisce la diagonale verso il re."
+        },
+        "Qe7": {
+          "verdict": "weak",
+          "note": "Difende, ma la donna chiude l’alfiere f8."
+        },
+        "Qf6": {
+          "verdict": "weak",
+          "note": "La donna ruba la casa f6 al cavallo e si espone ad attacchi."
+        },
+        "Bd6": {
+          "verdict": "weak",
+          "note": "L’alfiere blocca il pedone d7 e quindi anche l’alfiere c8."
+        }
+      },
+      "explanation": "Fra le mosse che difendono e5, conviene quella che fa anche un altro lavoro. Nc6 protegge il pedone, sviluppa un pezzo minore verso il centro e non ostacola nessun altro pezzo. Le alternative difendono anch’esse, ma ciascuna ha un costo: una casa tolta a un pezzo, una diagonale chiusa, un re indebolito.",
+      "bookIdea": "Il libro esamina una a una le difese possibili e scarta quelle che bloccano pezzi o indeboliscono il re: resta Nc6, che sviluppa senza perdere tempo.",
+      "engine": {
+        "depth": 22,
+        "lines": [
+          {
+            "san": "Nc6",
+            "cp": -19,
+            "mate": null,
+            "pv": [
+              "b8c6",
+              "f1b5",
+              "g8f6",
+              "e1g1",
+              "f6e4",
+              "f1e1"
+            ]
+          },
+          {
+            "san": "Nf6",
+            "cp": -29,
+            "mate": null,
+            "pv": [
+              "g8f6",
+              "f3e5",
+              "d7d6",
+              "e5f3",
+              "f6e4",
+              "d2d4"
+            ]
+          },
+          {
+            "san": "d6",
+            "cp": -71,
+            "mate": null,
+            "pv": [
+              "d7d6",
+              "d2d4",
+              "e5d4",
+              "f3d4",
+              "b8c6",
+              "b1c3"
+            ]
+          },
+          {
+            "san": "Qe7",
+            "cp": -104,
+            "mate": null,
+            "pv": [
+              "d8e7",
+              "d2d4",
+              "d7d6",
+              "b1c3",
+              "c7c6",
+              "f1c4"
+            ]
+          },
+          {
+            "san": "d5",
+            "cp": -106,
+            "mate": null,
+            "pv": [
+              "d7d5",
+              "e4d5",
+              "e5e4",
+              "d1e2",
+              "g8f6",
+              "d2d3"
+            ]
+          }
+        ],
+        "moves": {
+          "Nc6": {
+            "cp": -19,
+            "mate": null
+          },
+          "d6": {
+            "cp": -71,
+            "mate": null
+          },
+          "Nf6": {
+            "cp": -29,
+            "mate": null
+          },
+          "f6": {
+            "cp": -222,
+            "mate": null
+          },
+          "Qe7": {
+            "cp": -104,
+            "mate": null
+          },
+          "Qf6": {
+            "cp": -141,
+            "mate": null
+          },
+          "Bd6": {
+            "cp": -109,
+            "mate": null
+          }
+        }
+      }
+    },
+    {
+      "id": "lc-03-bc4",
+      "game": "1",
+      "page": 13,
+      "theme": "Sviluppo dell’alfiere",
+      "history": [
+        "e4",
+        "e5",
+        "Nf3",
+        "Nc6"
+      ],
+      "fen": "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3",
+      "question": "Il Bianco vuole arroccare presto. Su quale casa l’alfiere f1 lavora meglio?",
+      "hints": [
+        "Per arroccare corto devono liberarsi f1 e g1: manca un pezzo.",
+        "Il punto più debole del Nero è un pedone difeso soltanto dal re.",
+        "Da una casa della diagonale a2–g8 l’alfiere guarda f7."
+      ],
+      "played": "Bc4",
+      "moves": {
+        "Bc4": {
+          "verdict": "game",
+          "note": "Libera l’arrocco, occupa una diagonale centrale e mira a f7."
+        },
+        "Bb5": {
+          "verdict": "good",
+          "note": "Anch’essa prepara l’arrocco e mette pressione sul cavallo che difende e5 (la Spagnola): per Stockfish le due mosse si equivalgono."
+        },
+        "Be2": {
+          "verdict": "partial",
+          "note": "Prepara l’arrocco, ma l’alfiere resta passivo."
+        },
+        "Bd3": {
+          "verdict": "weak",
+          "note": "Blocca il pedone d2 e con lui l’alfiere c1."
+        },
+        "Nc3": {
+          "verdict": "partial",
+          "note": "Buono sviluppo, ma non libera ancora l’arrocco."
+        },
+        "d4": {
+          "verdict": "partial",
+          "note": "Mossa sana che apre il centro, ma non risponde alla domanda sull’alfiere."
+        }
+      },
+      "explanation": "Per arroccare corto serve togliere l’alfiere da f1, e conviene metterlo dove lavora. In c4 controlla d5 e punta su f7, il pedone del Nero protetto soltanto dal re: un bersaglio che in apertura torna spesso. Anche b5 è una casa attiva, con un’idea diversa: indebolire la difesa di e5.",
+      "bookIdea": "Il libro la sceglie perché sgombra la strada all’arrocco e prende una diagonale centrale contro f7, il punto più debole nella posizione iniziale del Nero.",
+      "engine": {
+        "depth": 22,
+        "lines": [
+          {
+            "san": "Bc4",
+            "cp": 23,
+            "mate": null,
+            "pv": [
+              "f1c4",
+              "f8c5",
+              "e1g1",
+              "g8f6",
+              "d2d3",
+              "d7d6"
+            ]
+          },
+          {
+            "san": "Bb5",
+            "cp": 15,
+            "mate": null,
+            "pv": [
+              "f1b5",
+              "g8f6",
+              "e1g1",
+              "f6e4",
+              "f1e1",
+              "e4d6"
+            ]
+          },
+          {
+            "san": "Nc3",
+            "cp": 13,
+            "mate": null,
+            "pv": [
+              "b1c3",
+              "g8f6",
+              "d2d4",
+              "e5d4",
+              "f3d4",
+              "f8b4"
+            ]
+          },
+          {
+            "san": "d4",
+            "cp": 10,
+            "mate": null,
+            "pv": [
+              "d2d4",
+              "e5d4",
+              "f3d4",
+              "g8f6",
+              "d4c6",
+              "b7c6"
+            ]
+          },
+          {
+            "san": "h3",
+            "cp": 9,
+            "mate": null,
+            "pv": [
+              "h2h3",
+              "g8f6",
+              "b1c3",
+              "f8b4",
+              "c3d5",
+              "f6d5"
+            ]
+          }
+        ],
+        "moves": {
+          "Bc4": {
+            "cp": 23,
+            "mate": null
+          },
+          "Bb5": {
+            "cp": 15,
+            "mate": null
+          },
+          "Be2": {
+            "cp": -5,
+            "mate": null
+          },
+          "Bd3": {
+            "cp": -12,
+            "mate": null
+          },
+          "Nc3": {
+            "cp": 13,
+            "mate": null
+          },
+          "d4": {
+            "cp": 10,
+            "mate": null
+          }
+        }
+      }
+    },
+    {
+      "id": "lc-04-bc5",
+      "game": "1",
+      "page": 13,
+      "theme": "La casa più efficace",
+      "history": [
+        "e4",
+        "e5",
+        "Nf3",
+        "Nc6",
+        "Bc4"
+      ],
+      "fen": "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3",
+      "question": "Il Nero continua lo sviluppo. Quale pezzo, e su quale casa, lavora meglio verso il centro?",
+      "hints": [
+        "Ogni pezzo va messo subito sulla casa dove rende di più, per non doverlo muovere due volte.",
+        "Confronta le case dell’alfiere f8: in quale guarda il centro e un pedone debole del Bianco?",
+        "La risposta più naturale copia l’idea del Bianco: una diagonale verso f2."
+      ],
+      "played": "Bc5",
+      "moves": {
+        "Bc5": {
+          "verdict": "game",
+          "note": "L’alfiere prende la diagonale verso f2, controlla d4 e prepara l’arrocco."
+        },
+        "Nf6": {
+          "verdict": "good",
+          "note": "Non è una mossa d’alfiere, ma segue lo stesso principio: sviluppa verso il centro e attacca e4. Per Stockfish vale quanto Bc5."
+        },
+        "Be7": {
+          "verdict": "partial",
+          "note": "Sviluppa e protegge, ma l’alfiere guarda poco il centro: accettabile, non la più attiva."
+        },
+        "d6": {
+          "verdict": "partial",
+          "note": "Solida, ma chiude l’alfiere f8 prima che sia uscito."
+        },
+        "Bd6": {
+          "verdict": "weak",
+          "note": "Blocca il pedone d7 e quindi l’alfiere c8."
+        },
+        "Bb4": {
+          "verdict": "weak",
+          "note": "Da b4 l’alfiere non partecipa alla lotta per il centro e dopo c3 dovrà muoversi ancora."
+        }
+      },
+      "explanation": "Ogni pezzo deve andare il prima possibile sulla casa in cui è più efficace. In c5 l’alfiere controlla d4, punta su f2 (il pedone protetto solo dal re bianco) e libera l’arrocco. Nf6 è altrettanto buona: sviluppa e attacca e4. Le altre case funzionano peggio: chiudono un pezzo o lasciano l’alfiere fuori dal gioco.",
+      "bookIdea": "Il libro confronta b4, d6, e7 e c5 e sceglie c5 per la diagonale e la pressione sul centro, ricordando due regole: ogni pezzo sulla casa migliore, una sola mossa per pezzo in apertura.",
+      "engine": {
+        "depth": 22,
+        "lines": [
+          {
+            "san": "Nf6",
+            "cp": -17,
+            "mate": null,
+            "pv": [
+              "g8f6",
+              "d2d3",
+              "f8c5",
+              "e1g1",
+              "a7a6",
+              "c2c3"
+            ]
+          },
+          {
+            "san": "Bc5",
+            "cp": -19,
+            "mate": null,
+            "pv": [
+              "f8c5",
+              "e1g1",
+              "g8f6",
+              "d2d3",
+              "a7a6",
+              "f1e1"
+            ]
+          },
+          {
+            "san": "Be7",
+            "cp": -40,
+            "mate": null,
+            "pv": [
+              "f8e7",
+              "d2d4",
+              "e5d4",
+              "f3d4",
+              "g8f6",
+              "b1c3"
+            ]
+          },
+          {
+            "san": "d6",
+            "cp": -42,
+            "mate": null,
+            "pv": [
+              "d7d6",
+              "b1c3",
+              "f8e7",
+              "d2d4",
+              "e5d4",
+              "f3d4"
+            ]
+          },
+          {
+            "san": "a5",
+            "cp": -53,
+            "mate": null,
+            "pv": [
+              "a7a5",
+              "c2c3",
+              "d7d6",
+              "a2a4",
+              "c8e6",
+              "c4e6"
+            ]
+          }
+        ],
+        "moves": {
+          "Bc5": {
+            "cp": -19,
+            "mate": null
+          },
+          "Nf6": {
+            "cp": -17,
+            "mate": null
+          },
+          "Be7": {
+            "cp": -40,
+            "mate": null
+          },
+          "d6": {
+            "cp": -42,
+            "mate": null
+          },
+          "Bd6": {
+            "cp": -83,
+            "mate": null
+          },
+          "Bb4": {
+            "cp": -145,
+            "mate": null
+          }
+        }
+      }
+    },
+    {
+      "id": "lc-05-qe7",
+      "game": "1",
+      "page": 14,
+      "theme": "Prevenire la minaccia",
+      "history": [
+        "e4",
+        "e5",
+        "Nf3",
+        "Nc6",
+        "Bc4",
+        "Bc5",
+        "c3"
+      ],
+      "fen": "r1bqk1nr/pppp1ppp/2n5/2b1p3/2B1P3/2P2N2/PP1P1PPP/RNBQK2R b KQkq - 0 4",
+      "question": "Con c3 il Bianco prepara qualcosa. Che cosa minaccia, e come si prepara il Nero?",
+      "hints": [
+        "Chiediti che cosa vuole fare il Bianco alla prossima mossa.",
+        "Il Bianco prepara d4: attaccherebbe alfiere e pedone e, dopo exd4 cxd4, avrebbe due pedoni al centro.",
+        "Una buona risposta rende d4 meno efficace: un contrattacco su e4, un sostegno a e5 o un pezzo già pronto in e7."
+      ],
+      "played": "Qe7",
+      "moves": {
+        "Qe7": {
+          "verdict": "game",
+          "note": "Se ora 5.d4 exd4 6.cxd4, la donna prende in e4 con scacco: il Bianco non può più avanzare liberamente."
+        },
+        "Nf6": {
+          "verdict": "good",
+          "note": "Sviluppa e attacca e4: se 5.d4 exd4 6.cxd4 Bb4+ il Nero ha un gioco attivo. È la scelta di Stockfish."
+        },
+        "d6": {
+          "verdict": "good",
+          "note": "Sostiene e5, così d4 non scioglie il centro; apre anche l’alfiere c8."
+        },
+        "Bb6": {
+          "verdict": "good",
+          "note": "Toglie in anticipo l’alfiere dal tiro di d4: il pedone non arriverà con tempo."
+        },
+        "a6": {
+          "verdict": "weak",
+          "note": "Ignora la minaccia: dopo d4 il Bianco occupa il centro guadagnando tempo sull’alfiere."
+        },
+        "h6": {
+          "verdict": "weak",
+          "note": "Ignora la minaccia: dopo d4 il Bianco occupa il centro guadagnando tempo sull’alfiere."
+        }
+      },
+      "explanation": "Prima di sviluppare, chiediti che cosa vuole l’avversario. c3 prepara d4, che attaccherebbe alfiere e pedone e darebbe al Bianco due pedoni centrali. Qe7 lo rende rischioso: dopo d4 exd4 cxd4 la donna prende e4 con scacco. Stockfish però preferisce Nf6, che sviluppa un pezzo minore e attacca e4 senza impegnare la donna così presto: lo stesso scopo, raggiunto meglio.",
+      "bookIdea": "Il libro loda Qe7 perché sviluppa e insieme para la minaccia: se il Bianco insiste con d4, il Nero vince un pedone prendendo in e4 con scacco.",
+      "engineNote": "Qui libro e motore non coincidono: per Stockfish Qe7 è corretta ma inferiore a Nf6, d6 e Bb6.",
+      "engine": {
+        "depth": 22,
+        "lines": [
+          {
+            "san": "Nf6",
+            "cp": -18,
+            "mate": null,
+            "pv": [
+              "g8f6",
+              "d2d3",
+              "a7a5",
+              "e1g1",
+              "d7d6",
+              "f1e1"
+            ]
+          },
+          {
+            "san": "d6",
+            "cp": -41,
+            "mate": null,
+            "pv": [
+              "d7d6",
+              "d2d4",
+              "e5d4",
+              "c3d4",
+              "c5b6",
+              "h2h3"
+            ]
+          },
+          {
+            "san": "Bb6",
+            "cp": -41,
+            "mate": null,
+            "pv": [
+              "c5b6",
+              "d2d4",
+              "e5d4",
+              "c3d4",
+              "d7d6",
+              "h2h3"
+            ]
+          },
+          {
+            "san": "Qf6",
+            "cp": -85,
+            "mate": null,
+            "pv": [
+              "d8f6",
+              "d2d4",
+              "e5d4",
+              "e4e5",
+              "f6g6",
+              "c3d4"
+            ]
+          },
+          {
+            "san": "Qe7",
+            "cp": -100,
+            "mate": null,
+            "pv": [
+              "d8e7",
+              "b2b4",
+              "c5b6",
+              "e1g1",
+              "a7a6",
+              "a2a4"
+            ]
+          }
+        ],
+        "moves": {
+          "Qe7": {
+            "cp": -100,
+            "mate": null
+          },
+          "Nf6": {
+            "cp": -18,
+            "mate": null
+          },
+          "d6": {
+            "cp": -41,
+            "mate": null
+          },
+          "Bb6": {
+            "cp": -41,
+            "mate": null
+          },
+          "a6": {
+            "cp": -129,
+            "mate": null
+          },
+          "h6": {
+            "cp": -169,
+            "mate": null
+          }
+        }
+      }
+    },
+    {
+      "id": "lc-06-nb8",
+      "game": "2",
+      "page": 21,
+      "theme": "Ritirata del cavallo",
+      "history": [
+        "e4",
+        "e5",
+        "Nf3",
+        "Nc6",
+        "Bc4",
+        "Bc5",
+        "c3",
+        "Bb6",
+        "d4",
+        "Qe7",
+        "O-O",
+        "Nf6",
+        "d5"
+      ],
+      "fen": "r1b1k2r/ppppqppp/1bn2n2/3Pp3/2B1P3/2P2N2/PP3PPP/RNBQ1RK1 b kq - 0 7",
+      "question": "Il pedone d5 attacca il cavallo c6. Dove deve andare il cavallo?",
+      "hints": [
+        "Il cavallo deve spostarsi: conta le sue case libere e chiediti dove sarà al sicuro.",
+        "Una casa sul bordo sembra attiva, ma da lì il cavallo ha poche vie di fuga.",
+        "Tornare indietro non è una vergogna: dalla casa di partenza il cavallo potrà rientrare in d7."
+      ],
+      "played": "Nb8",
+      "moves": {
+        "Nb8": {
+          "verdict": "game",
+          "note": "Ritirata sicura: il cavallo potrà rientrare da d7 dopo …d6."
+        },
+        "Nd8": {
+          "verdict": "good",
+          "note": "Anche questa è sicura e il cavallo potrà rientrare da e6; per Stockfish vale quanto Nb8."
+        },
+        "Na5": {
+          "verdict": "weak",
+          "note": "Sul bordo il cavallo ha poche uscite: dopo Bd3 il Bianco minaccia b4 e lo intrappola."
+        },
+        "Nxe4": {
+          "verdict": "weak",
+          "note": "Restituisce il pezzo per due pedoni: non regge."
+        }
+      },
+      "explanation": "Un pezzo attaccato da un pedone va spostato, e la casa conta. In a5 il cavallo sembra attivo ma ha pochissime uscite: il Bianco può intrappolarlo con Bd3 e b4. In b8 o d8 è al sicuro e può tornare in gioco poco dopo. In apertura un cavallo sul bordo, senza un motivo concreto, controlla la metà delle case.",
+      "bookIdea": "Il libro preferisce la ritirata in b8 alla sortita sul bordo: dopo …Na5 il Bianco giocherebbe Bd3 minacciando b4, con il cavallo senza vie di fuga.",
+      "engine": {
+        "depth": 22,
+        "lines": [
+          {
+            "san": "Nb8",
+            "cp": -88,
+            "mate": null,
+            "pv": [
+              "c6b8",
+              "a2a4",
+              "a7a5",
+              "c4d3",
+              "e8g8",
+              "b1a3"
+            ]
+          },
+          {
+            "san": "Nd8",
+            "cp": -89,
+            "mate": null,
+            "pv": [
+              "c6d8",
+              "c4d3",
+              "a7a6",
+              "b2b4",
+              "b6a7",
+              "b1d2"
+            ]
+          },
+          {
+            "san": "Nxe4",
+            "cp": -303,
+            "mate": null,
+            "pv": [
+              "f6e4",
+              "d5c6",
+              "b7c6",
+              "b1d2",
+              "e4d2",
+              "d1d2"
+            ]
+          },
+          {
+            "san": "Qd6",
+            "cp": -452,
+            "mate": null,
+            "pv": [
+              "e7d6",
+              "d5c6",
+              "b6f2",
+              "g1h1",
+              "d6d1",
+              "f1d1"
+            ]
+          },
+          {
+            "san": "h6",
+            "cp": -452,
+            "mate": null,
+            "pv": [
+              "h7h6",
+              "d5c6",
+              "b7c6",
+              "c4d3",
+              "d7d5",
+              "d1c2"
+            ]
+          }
+        ],
+        "moves": {
+          "Nb8": {
+            "cp": -88,
+            "mate": null
+          },
+          "Nd8": {
+            "cp": -89,
+            "mate": null
+          },
+          "Na5": {
+            "cp": -614,
+            "mate": null
+          },
+          "Nxe4": {
+            "cp": -303,
+            "mate": null
+          }
+        }
+      }
+    },
+    {
+      "id": "lc-07-rg8",
+      "game": "2",
+      "page": 22,
+      "theme": "Attacco sulla colonna aperta",
+      "history": [
+        "e4",
+        "e5",
+        "Nf3",
+        "Nc6",
+        "Bc4",
+        "Bc5",
+        "c3",
+        "Bb6",
+        "d4",
+        "Qe7",
+        "O-O",
+        "Nf6",
+        "d5",
+        "Nb8",
+        "Bd3",
+        "d6",
+        "h3",
+        "h6",
+        "Qe2",
+        "g5",
+        "Nh2",
+        "g4",
+        "hxg4"
+      ],
+      "fen": "rnb1k2r/ppp1qp2/1b1p1n1p/3Pp3/4P1P1/2PB4/PP2QPPN/RNB2RK1 b kq - 0 12",
+      "question": "Il Nero non ha arroccato e la colonna g è semiaperta. Come prosegue l’attacco al re bianco?",
+      "hints": [
+        "Conta quanti pezzi attaccano il pedone g4 e quanti lo difendono.",
+        "Un pezzo pesante sulla colonna g aggiungerebbe un attaccante senza costare nulla.",
+        "La torre h8 è ancora sulla casa iniziale: c’è una casa della colonna g a un passo."
+      ],
+      "played": "Rg8",
+      "moves": {
+        "Rg8": {
+          "verdict": "game",
+          "note": "Terzo attaccante sul pedone g4, che ha solo due difensori; la torre si piazza sulla colonna che porta al re."
+        },
+        "Nxg4": {
+          "verdict": "weak",
+          "note": "Prende troppo presto: due attaccanti contro due difensori. Dopo Nxg4 Nxg4 Bxg4 Qxg4 il Nero ha dato due pezzi per un cavallo e un pedone."
+        },
+        "Bd7": {
+          "verdict": "weak",
+          "note": "Mossa di sviluppo che lascia respirare il Bianco."
+        }
+      },
+      "explanation": "L’attacco ha bisogno di pezzi, non solo di pedoni. Dopo l’avanzata g5–g4 la colonna g è aperta verso il re bianco: la torre in g8 aggiunge il terzo attaccante sul pedone g4, difeso soltanto dal cavallo h2 e dalla donna, e non può essere rinforzato con f3 perché il pedone è inchiodato dalla diagonale dell’alfiere b6 verso il re.",
+      "bookIdea": "Il libro mostra come h3 abbia dato un bersaglio al Nero: con la spinta dei pedoni prima e la torre in g8 poi, tre pezzi attaccano g4 e il Bianco non può difenderlo con f3.",
+      "engine": {
+        "depth": 22,
+        "lines": [
+          {
+            "san": "Rg8",
+            "cp": 100,
+            "mate": null,
+            "pv": [
+              "h8g8",
+              "b1d2",
+              "f6g4",
+              "h2f3",
+              "g4f6",
+              "d2c4"
+            ]
+          },
+          {
+            "san": "Nbd7",
+            "cp": -75,
+            "mate": null,
+            "pv": [
+              "b8d7",
+              "b1d2",
+              "h8g8",
+              "d2c4",
+              "d7c5",
+              "c4b6"
+            ]
+          },
+          {
+            "san": "a6",
+            "cp": -79,
+            "mate": null,
+            "pv": [
+              "a7a6",
+              "g1h1",
+              "h8g8",
+              "f2f3",
+              "h6h5",
+              "g4g5"
+            ]
+          },
+          {
+            "san": "c6",
+            "cp": -81,
+            "mate": null,
+            "pv": [
+              "c7c6",
+              "a2a4",
+              "a7a6",
+              "b1d2",
+              "h8g8",
+              "d2c4"
+            ]
+          },
+          {
+            "san": "Kd8",
+            "cp": -86,
+            "mate": null,
+            "pv": [
+              "e8d8",
+              "g2g3",
+              "e7f8",
+              "b1a3",
+              "f8g7",
+              "g1g2"
+            ]
+          }
+        ],
+        "moves": {
+          "Rg8": {
+            "cp": 100,
+            "mate": null
+          },
+          "Nxg4": {
+            "cp": -555,
+            "mate": null
+          },
+          "Bd7": {
+            "cp": -138,
+            "mate": null
+          }
+        }
+      }
+    },
+    {
+      "id": "lc-08-c3",
+      "game": "10",
+      "page": 62,
+      "theme": "Sostenere la catena di pedoni",
+      "history": [
+        "e4",
+        "e6",
+        "d4",
+        "d5",
+        "Nd2",
+        "Nf6",
+        "e5",
+        "Nfd7",
+        "Bd3",
+        "c5"
+      ],
+      "fen": "rnbqkb1r/pp1n1ppp/4p3/2ppP3/3P4/3B4/PPPN1PPP/R1BQK1NR w KQkq - 0 6",
+      "question": "Il Nero attacca d4, la base della catena d4–e5. Come la mantiene il Bianco?",
+      "hints": [
+        "Se il pedone d4 cade o viene cambiato male, anche e5 resta senza appoggio.",
+        "Il modo più solido è prepararsi a riprendere in d4 con un pedone.",
+        "Un pedone della colonna c può fare da sostegno."
+      ],
+      "played": "c3",
+      "moves": {
+        "c3": {
+          "verdict": "game",
+          "note": "Dopo …cxd4 il Bianco riprende cxd4 e la catena resta intatta."
+        },
+        "Ngf3": {
+          "verdict": "partial",
+          "note": "Sviluppa e difende d4 con un pezzo, ma dopo un cambio in d4 la catena non si ricompone con un pedone."
+        },
+        "f4": {
+          "verdict": "partial",
+          "note": "Sostiene e5, ma non risponde all’attacco su d4."
+        },
+        "dxc5": {
+          "verdict": "weak",
+          "note": "Rinuncia alla base della catena: e5 resta isolato e il Nero ricupera con comodo."
+        }
+      },
+      "explanation": "Una catena di pedoni si attacca alla base, e qui la base è d4. c3 prepara la ripresa con un pedone: dopo …cxd4 cxd4 il Bianco conserva la coppia d4–e5, che toglie spazio ai pezzi neri. Difendere d4 solo con i pezzi è più fragile, perché i pezzi si possono attaccare o cambiare.",
+      "bookIdea": "Il libro sottolinea che c3 permette di riprendere con il pedone in d4 e di conservare la catena che soffoca il gioco del Nero.",
+      "engine": {
+        "depth": 22,
+        "lines": [
+          {
+            "san": "c3",
+            "cp": 47,
+            "mate": null,
+            "pv": [
+              "c2c3",
+              "b8c6",
+              "g1f3",
+              "f7f6",
+              "e5f6",
+              "d7f6"
+            ]
+          },
+          {
+            "san": "f4",
+            "cp": 0,
+            "mate": null,
+            "pv": [
+              "f2f4",
+              "b8c6",
+              "g1f3",
+              "d8b6",
+              "d4c5",
+              "d7c5"
+            ]
+          },
+          {
+            "san": "Ngf3",
+            "cp": -10,
+            "mate": null,
+            "pv": [
+              "g1f3",
+              "c5d4",
+              "e1g1",
+              "b8c6",
+              "f1e1",
+              "d8c7"
+            ]
+          },
+          {
+            "san": "b3",
+            "cp": -77,
+            "mate": null,
+            "pv": [
+              "b2b3",
+              "b8c6",
+              "f2f4",
+              "c6d4",
+              "g1f3",
+              "d4c6"
+            ]
+          },
+          {
+            "san": "a4",
+            "cp": -83,
+            "mate": null,
+            "pv": [
+              "a2a4",
+              "b8c6",
+              "f2f4",
+              "c6d4",
+              "g1f3",
+              "d4f3"
+            ]
+          }
+        ],
+        "moves": {
+          "c3": {
+            "cp": 47,
+            "mate": null
+          },
+          "Ngf3": {
+            "cp": -10,
+            "mate": null
+          },
+          "f4": {
+            "cp": 0,
+            "mate": null
+          },
+          "dxc5": {
+            "cp": -128,
+            "mate": null
+          }
+        }
+      }
+    },
+    {
+      "id": "lc-09-nc6",
+      "game": "14",
+      "page": 83,
+      "theme": "Sfruttare una casa debole",
+      "history": [
+        "e4",
+        "e6",
+        "d4",
+        "d5",
+        "Nc3",
+        "dxe4",
+        "Nxe4",
+        "Nd7",
+        "Nf3",
+        "Ngf6",
+        "Bd3",
+        "Be7",
+        "O-O",
+        "Nxe4",
+        "Bxe4",
+        "Nf6",
+        "Bd3",
+        "b6",
+        "Ne5",
+        "O-O"
+      ],
+      "fen": "r1bq1rk1/p1p1bppp/1p2pn2/4N3/3P4/3B4/PPP2PPP/R1BQ1RK1 w - - 2 11",
+      "question": "Con …b6 il Nero ha indebolito una casa. Come la sfrutta il cavallo e5?",
+      "hints": [
+        "Quale casa non può più essere controllata da un pedone nero dopo …b6?",
+        "Da c6 il cavallo attaccherebbe due pezzi neri insieme.",
+        "Il cavallo salta in c6: attacca la donna d8 e l’alfiere e7, e il cambio ti lascia la coppia degli alfieri."
+      ],
+      "played": "Nc6",
+      "moves": {
+        "Nc6": {
+          "verdict": "game",
+          "note": "Attacca donna e alfiere e7: il Nero deve cedere l’alfiere e il Bianco ottiene la coppia degli alfieri."
+        },
+        "Qf3": {
+          "verdict": "partial",
+          "note": "Anche questa crea una minaccia, sulla torre a8 lungo la grande diagonale, ma il guadagno è minore."
+        },
+        "Re1": {
+          "verdict": "partial",
+          "note": "Utile sviluppo, ma lascia passare l’occasione."
+        },
+        "Bb5": {
+          "verdict": "partial",
+          "note": "Sviluppo attivo ma senza un obiettivo concreto."
+        }
+      },
+      "explanation": "Dopo …b6 la casa c6 non è più difesa da un pedone nero, e un cavallo che ci arriva attacca donna e alfiere e7. Il Nero deve cedere l’alfiere scuro: il Bianco ottiene la coppia degli alfieri, che diventa più forte man mano che la scacchiera si svuota. In più, sparito l’alfiere e7, il cavallo f6 che protegge il re nero perde un difensore.",
+      "bookIdea": "Il libro spiega perché vale la pena cambiare un cavallo ben piazzato per un alfiere modesto: coppia degli alfieri, più spazio per i pezzi del Bianco e un difensore in meno per il cavallo che protegge il re nero.",
+      "engine": {
+        "depth": 22,
+        "lines": [
+          {
+            "san": "Nc6",
+            "cp": 216,
+            "mate": null,
+            "pv": [
+              "e5c6",
+              "d8d6",
+              "d1f3",
+              "c8d7",
+              "c6e7",
+              "d6e7"
+            ]
+          },
+          {
+            "san": "Qf3",
+            "cp": 115,
+            "mate": null,
+            "pv": [
+              "d1f3",
+              "d8d5",
+              "f3h3",
+              "d5d4",
+              "f1e1",
+              "e7c5"
+            ]
+          },
+          {
+            "san": "Bb5",
+            "cp": 18,
+            "mate": null,
+            "pv": [
+              "d3b5",
+              "c8b7",
+              "e5c6",
+              "d8e8",
+              "c6e7",
+              "e8e7"
+            ]
+          },
+          {
+            "san": "Be3",
+            "cp": 17,
+            "mate": null,
+            "pv": [
+              "c1e3",
+              "c8b7",
+              "d1e2",
+              "c7c5",
+              "d4c5",
+              "e7c5"
+            ]
+          },
+          {
+            "san": "Qe2",
+            "cp": 8,
+            "mate": null,
+            "pv": [
+              "d1e2",
+              "d8d4",
+              "c2c3",
+              "d4h4",
+              "e2f3",
+              "c8d7"
+            ]
+          }
+        ],
+        "moves": {
+          "Nc6": {
+            "cp": 216,
+            "mate": null
+          },
+          "Qf3": {
+            "cp": 115,
+            "mate": null
+          },
+          "Re1": {
+            "cp": 5,
+            "mate": null
+          },
+          "Bb5": {
+            "cp": 18,
+            "mate": null
+          }
+        }
+      }
+    },
+    {
+      "id": "lc-10-rab1",
+      "game": "24",
+      "page": 163,
+      "theme": "Un piano con le torri",
+      "history": [
+        "d4",
+        "Nf6",
+        "c4",
+        "e6",
+        "Nc3",
+        "Bb4",
+        "Qc2",
+        "c5",
+        "dxc5",
+        "Nc6",
+        "Nf3",
+        "Bxc5",
+        "Bf4",
+        "d5",
+        "e3",
+        "Qa5",
+        "Be2",
+        "Bb4",
+        "O-O",
+        "Bxc3",
+        "bxc3",
+        "O-O"
+      ],
+      "fen": "r1b2rk1/pp3ppp/2n1pn2/q2p4/2P2B2/2P1PN2/P1Q1BPPP/R4RK1 w - - 1 12",
+      "question": "Nessun pezzo è in pericolo. Dove lavorerebbe meglio una torre del Bianco?",
+      "hints": [
+        "Cerca una colonna senza pedoni bianchi.",
+        "La colonna b è semiaperta e il pedone b7 è difeso soltanto dall’alfiere c8.",
+        "Se l’alfiere c8 resta legato alla difesa di b7, il Nero non riesce a completare lo sviluppo."
+      ],
+      "played": "Rab1",
+      "moves": {
+        "Rab1": {
+          "verdict": "game",
+          "note": "La torre occupa la colonna semiaperta e lega l’alfiere c8 alla difesa di b7."
+        },
+        "Rfb1": {
+          "verdict": "good",
+          "note": "Stessa idea con l’altra torre: per Stockfish quasi equivalente."
+        },
+        "Nd2": {
+          "verdict": "partial",
+          "note": "Per Stockfish di poco la migliore: prepara Nb3 contro la donna. È un’idea diversa da quella della lezione."
+        },
+        "Nd4": {
+          "verdict": "partial",
+          "note": "Centralizza il cavallo, buona per il motore, ma non mette in gioco le torri."
+        },
+        "Rfd1": {
+          "verdict": "partial",
+          "note": "Una colonna centrale, ma chiusa dal pedone d5."
+        }
+      },
+      "explanation": "Quando non ci sono minacce immediate, si cerca il lavoro per i pezzi ancora inattivi. La colonna b è semiaperta e b7 è difeso solo dall’alfiere c8: la torre in b1 lo lega alla difesa del pedone. Se il Nero gioca …b6 per liberarlo, la donna in a5 perde la strada di ritorno e il cavallo c6 perde il suo appoggio. Una mossa tranquilla che crea debolezze durature.",
+      "bookIdea": "Il libro la definisce una mossa sottile: il pedone b7 sembra ben difeso, ma l’alfiere che lo protegge non può svilupparsi senza abbandonarlo, e la spinta …b6 crea nuovi problemi.",
+      "engine": {
+        "depth": 22,
+        "lines": [
+          {
+            "san": "Nd2",
+            "cp": 46,
+            "mate": null,
+            "pv": [
+              "f3d2",
+              "h7h6",
+              "f1d1",
+              "f8d8",
+              "f4g3",
+              "a5c5"
+            ]
+          },
+          {
+            "san": "Rab1",
+            "cp": 37,
+            "mate": null,
+            "pv": [
+              "a1b1",
+              "d5c4",
+              "e2c4",
+              "a5c5",
+              "c4b5",
+              "h7h6"
+            ]
+          },
+          {
+            "san": "Rfb1",
+            "cp": 36,
+            "mate": null,
+            "pv": [
+              "f1b1",
+              "d5c4",
+              "e2c4",
+              "a5c5",
+              "c4d3",
+              "h7h6"
+            ]
+          },
+          {
+            "san": "Rfd1",
+            "cp": 32,
+            "mate": null,
+            "pv": [
+              "f1d1",
+              "d5c4",
+              "e2c4",
+              "h7h6",
+              "h2h3",
+              "a5c5"
+            ]
+          },
+          {
+            "san": "a4",
+            "cp": 31,
+            "mate": null,
+            "pv": [
+              "a2a4",
+              "d5c4",
+              "e2c4",
+              "f8d8",
+              "f3d4",
+              "f6h5"
+            ]
+          }
+        ],
+        "moves": {
+          "Rab1": {
+            "cp": 37,
+            "mate": null
+          },
+          "Rfb1": {
+            "cp": 36,
+            "mate": null
+          },
+          "Nd2": {
+            "cp": 46,
+            "mate": null
+          },
+          "Nd4": {
+            "cp": 32,
+            "mate": null
+          },
+          "Rfd1": {
+            "cp": 32,
+            "mate": null
+          }
+        }
+      }
+    }
+  ],
+  "walks": [
+    {
+      "id": "partita-1",
+      "game": "1",
+      "side": "b",
+      "result": "0-1",
+      "summary": "Tutta la partita di Teichmann, giocata dalla parte del Nero: sviluppo, pazienza contro le trappole del Bianco, poi l’attacco contro un arrocco indebolito.",
+      "moves": [
+        {
+          "san": "e4",
+          "page": 11,
+          "note": "Occupa il centro e apre la strada alla donna e all’alfiere f1: due pezzi liberi con una sola mossa.",
+          "engine": {
+            "depth": 20,
+            "lines": [
+              {
+                "san": "Nf3",
+                "cp": 22,
+                "mate": null,
+                "pv": [
+                  "g1f3",
+                  "g8f6",
+                  "c2c4",
+                  "e7e6",
+                  "g2g3",
+                  "d7d5"
+                ]
+              },
+              {
+                "san": "e4",
+                "cp": 19,
+                "mate": null,
+                "pv": [
+                  "e2e4",
+                  "e7e5",
+                  "g1f3",
+                  "b8c6",
+                  "f1b5",
+                  "g8f6"
+                ]
+              },
+              {
+                "san": "d4",
+                "cp": 19,
+                "mate": null,
+                "pv": [
+                  "d2d4",
+                  "g8f6",
+                  "c2c4",
+                  "e7e6",
+                  "b1c3",
+                  "d7d5"
+                ]
+              }
+            ],
+            "moves": {
+              "e4": {
+                "cp": 19,
+                "mate": null
+              }
+            }
+          }
+        },
+        {
+          "san": "e5",
+          "page": 12,
+          "note": "Anche il Nero mette un pedone al centro e libera donna e alfiere: il Bianco non resta solo in e4 e d4 è contrastata.",
+          "question": "Prima mossa del Nero: come risponde all’occupazione del centro?",
+          "hints": [
+            "Il pedone e4 controlla d5 e f5: il Nero vuole la sua parte di centro.",
+            "Una mossa di pedone centrale che liberi anche un alfiere e la donna."
+          ],
+          "moves": {
+            "c5": {
+              "verdict": "good",
+              "note": "La Siciliana: contrasta d4 dal lato, un’altra idea valida per il centro."
+            },
+            "e6": {
+              "verdict": "partial",
+              "note": "Prepara d5, ma per ora chiude l’alfiere c8."
+            },
+            "Nf6": {
+              "verdict": "partial",
+              "note": "Sviluppa e attacca e4, ma lascia al Bianco il centro con e5."
+            },
+            "a6": {
+              "verdict": "weak",
+              "note": "Una mossa di bordo: non fa nulla per il centro né per lo sviluppo."
+            }
+          },
+          "book": "Il libro la presenta come la risposta più naturale: pressione sul centro pari a quella del Bianco e due pezzi liberati.",
+          "engine": {
+            "depth": 20,
+            "lines": [
+              {
+                "san": "e5",
+                "cp": -18,
+                "mate": null,
+                "pv": [
+                  "e7e5",
+                  "g1f3",
+                  "b8c6",
+                  "f1b5",
+                  "g8f6",
+                  "e1g1"
+                ]
+              },
+              {
+                "san": "c5",
+                "cp": -22,
+                "mate": null,
+                "pv": [
+                  "c7c5",
+                  "g1f3",
+                  "b8c6",
+                  "f1b5",
+                  "e7e6",
+                  "e1g1"
+                ]
+              },
+              {
+                "san": "c6",
+                "cp": -39,
+                "mate": null,
+                "pv": [
+                  "c7c6",
+                  "d2d4",
+                  "d7d5",
+                  "e4e5",
+                  "c8f5",
+                  "g1f3"
+                ]
+              }
+            ],
+            "moves": {
+              "e5": {
+                "cp": -18,
+                "mate": null
+              },
+              "c5": {
+                "cp": -22,
+                "mate": null
+              },
+              "e6": {
+                "cp": -31,
+                "mate": null
+              },
+              "Nf6": {
+                "cp": -63,
+                "mate": null
+              },
+              "a6": {
+                "cp": -56,
+                "mate": null
+              }
+            }
+          }
+        },
+        {
+          "san": "Nf3",
+          "page": 12,
+          "note": "Sviluppa il cavallo verso il centro e attacca subito e5: il Nero deve rispondere alla minaccia.",
+          "engine": {
+            "depth": 20,
+            "lines": [
+              {
+                "san": "Nf3",
+                "cp": 19,
+                "mate": null,
+                "pv": [
+                  "g1f3",
+                  "b8c6",
+                  "f1b5",
+                  "g8f6",
+                  "e1g1",
+                  "f6e4"
+                ]
+              },
+              {
+                "san": "Nc3",
+                "cp": 11,
+                "mate": null,
+                "pv": [
+                  "b1c3",
+                  "g8f6",
+                  "g1f3",
+                  "b8c6",
+                  "f1b5",
+                  "f8b4"
+                ]
+              },
+              {
+                "san": "Bc4",
+                "cp": 0,
+                "mate": null,
+                "pv": [
+                  "f1c4",
+                  "g8f6",
+                  "d2d3",
+                  "c7c6",
+                  "g1f3",
+                  "d7d5"
+                ]
+              }
+            ],
+            "moves": {
+              "Nf3": {
+                "cp": 19,
+                "mate": null
+              }
+            }
+          }
+        },
+        {
+          "san": "Nc6",
+          "page": 13,
+          "note": "Difende e5 sviluppando il cavallo sulla sua casa migliore.",
+          "lesson": "lc-02-nc6",
+          "engine": {
+            "depth": 20,
+            "lines": [
+              {
+                "san": "Nc6",
+                "cp": -21,
+                "mate": null,
+                "pv": [
+                  "b8c6",
+                  "f1b5",
+                  "g8f6",
+                  "e1g1",
+                  "f6e4",
+                  "f1e1"
+                ]
+              },
+              {
+                "san": "Nf6",
+                "cp": -30,
+                "mate": null,
+                "pv": [
+                  "g8f6",
+                  "f3e5",
+                  "d7d6",
+                  "e5f3",
+                  "f6e4",
+                  "d2d4"
+                ]
+              },
+              {
+                "san": "d6",
+                "cp": -65,
+                "mate": null,
+                "pv": [
+                  "d7d6",
+                  "d2d4",
+                  "e5d4",
+                  "f3d4",
+                  "c7c5",
+                  "d4e2"
+                ]
+              }
+            ],
+            "moves": {
+              "Nc6": {
+                "cp": -21,
+                "mate": null
+              },
+              "d6": {
+                "cp": -65,
+                "mate": null
+              },
+              "Nf6": {
+                "cp": -30,
+                "mate": null
+              },
+              "f6": {
+                "cp": -194,
+                "mate": null
+              },
+              "Qe7": {
+                "cp": -104,
+                "mate": null
+              },
+              "Qf6": {
+                "cp": -130,
+                "mate": null
+              },
+              "Bd6": {
+                "cp": -90,
+                "mate": null
+              }
+            }
+          }
+        },
+        {
+          "san": "Bc4",
+          "page": 13,
+          "note": "L’alfiere prende la diagonale verso f7, il punto debole del Nero, difeso solo dal re.",
+          "engine": {
+            "depth": 20,
+            "lines": [
+              {
+                "san": "Bc4",
+                "cp": 17,
+                "mate": null,
+                "pv": [
+                  "f1c4",
+                  "f8c5",
+                  "e1g1",
+                  "g8f6",
+                  "d2d3",
+                  "d7d6"
+                ]
+              },
+              {
+                "san": "Bb5",
+                "cp": 16,
+                "mate": null,
+                "pv": [
+                  "f1b5",
+                  "g8f6",
+                  "e1g1",
+                  "f6e4",
+                  "f1e1",
+                  "e4d6"
+                ]
+              },
+              {
+                "san": "Nc3",
+                "cp": 7,
+                "mate": null,
+                "pv": [
+                  "b1c3",
+                  "g8f6",
+                  "f1b5",
+                  "f8b4",
+                  "e1g1",
+                  "e8g8"
+                ]
+              }
+            ],
+            "moves": {
+              "Bc4": {
+                "cp": 17,
+                "mate": null
+              }
+            }
+          }
+        },
+        {
+          "san": "Bc5",
+          "page": 13,
+          "note": "L’alfiere sceglie la casa più attiva: guarda il centro e punta f2.",
+          "lesson": "lc-04-bc5",
+          "engine": {
+            "depth": 20,
+            "lines": [
+              {
+                "san": "Nf6",
+                "cp": -22,
+                "mate": null,
+                "pv": [
+                  "g8f6",
+                  "d2d3",
+                  "f8c5",
+                  "e1g1",
+                  "d7d6",
+                  "c2c3"
+                ]
+              },
+              {
+                "san": "Bc5",
+                "cp": -24,
+                "mate": null,
+                "pv": [
+                  "f8c5",
+                  "e1g1",
+                  "g8f6",
+                  "d2d3",
+                  "d7d6",
+                  "c2c3"
+                ]
+              },
+              {
+                "san": "Be7",
+                "cp": -41,
+                "mate": null,
+                "pv": [
+                  "f8e7",
+                  "d2d4",
+                  "e5d4",
+                  "f3d4",
+                  "g8f6",
+                  "d4c6"
+                ]
+              }
+            ],
+            "moves": {
+              "Bc5": {
+                "cp": -24,
+                "mate": null
+              },
+              "Nf6": {
+                "cp": -22,
+                "mate": null
+              },
+              "Be7": {
+                "cp": -41,
+                "mate": null
+              },
+              "d6": {
+                "cp": -43,
+                "mate": null
+              },
+              "Bd6": {
+                "cp": -83,
+                "mate": null
+              },
+              "Bb4": {
+                "cp": -154,
+                "mate": null
+              }
+            }
+          }
+        },
+        {
+          "san": "c3",
+          "page": 14,
+          "note": "Prepara d4 per avere due pedoni al centro; il prezzo è togliere c3 al cavallo b1.",
+          "engine": {
+            "depth": 20,
+            "lines": [
+              {
+                "san": "c3",
+                "cp": 22,
+                "mate": null,
+                "pv": [
+                  "c2c3",
+                  "g8f6",
+                  "d2d3",
+                  "d7d6",
+                  "e1g1",
+                  "a7a6"
+                ]
+              },
+              {
+                "san": "O-O",
+                "cp": 19,
+                "mate": null,
+                "pv": [
+                  "e1g1",
+                  "d7d6",
+                  "c2c3",
+                  "g8f6",
+                  "d2d3",
+                  "a7a6"
+                ]
+              },
+              {
+                "san": "d3",
+                "cp": 19,
+                "mate": null,
+                "pv": [
+                  "d2d3",
+                  "g8f6",
+                  "c2c3",
+                  "e8g8",
+                  "e1g1",
+                  "d7d6"
+                ]
+              }
+            ],
+            "moves": {
+              "c3": {
+                "cp": 22,
+                "mate": null
+              }
+            }
+          }
+        },
+        {
+          "san": "Qe7",
+          "page": 14,
+          "note": "Prepara una risposta a d4: dopo exd4 cxd4 la donna prenderebbe e4 con scacco.",
+          "lesson": "lc-05-qe7",
+          "engine": {
+            "depth": 20,
+            "lines": [
+              {
+                "san": "Nf6",
+                "cp": -19,
+                "mate": null,
+                "pv": [
+                  "g8f6",
+                  "d2d3",
+                  "d7d6",
+                  "e1g1",
+                  "e8g8",
+                  "h2h3"
+                ]
+              },
+              {
+                "san": "d6",
+                "cp": -47,
+                "mate": null,
+                "pv": [
+                  "d7d6",
+                  "d2d4",
+                  "e5d4",
+                  "c3d4",
+                  "c5b6",
+                  "e1g1"
+                ]
+              },
+              {
+                "san": "Bb6",
+                "cp": -49,
+                "mate": null,
+                "pv": [
+                  "c5b6",
+                  "d2d4",
+                  "e5d4",
+                  "c3d4",
+                  "d7d6",
+                  "e1g1"
+                ]
+              }
+            ],
+            "moves": {
+              "Qe7": {
+                "cp": -91,
+                "mate": null
+              },
+              "Nf6": {
+                "cp": -19,
+                "mate": null
+              },
+              "d6": {
+                "cp": -47,
+                "mate": null
+              },
+              "Bb6": {
+                "cp": -49,
+                "mate": null
+              },
+              "a6": {
+                "cp": -131,
+                "mate": null
+              },
+              "h6": {
+                "cp": -169,
+                "mate": null
+              }
+            }
+          }
+        },
+        {
+          "san": "O-O",
+          "page": 14,
+          "note": "Il Bianco rinvia d4 e mette al sicuro il re. Così difende anche e4 in modo indiretto: con la torre in e1, Qxe4 diventerebbe un’inchiodatura.",
+          "engine": {
+            "depth": 20,
+            "lines": [
+              {
+                "san": "b4",
+                "cp": 106,
+                "mate": null,
+                "pv": [
+                  "b2b4",
+                  "c5b6",
+                  "e1g1",
+                  "d7d6",
+                  "a2a4",
+                  "a7a6"
+                ]
+              },
+              {
+                "san": "d4",
+                "cp": 102,
+                "mate": null,
+                "pv": [
+                  "d2d4",
+                  "c5b6",
+                  "e1g1",
+                  "g8f6",
+                  "b2b4",
+                  "e8g8"
+                ]
+              },
+              {
+                "san": "O-O",
+                "cp": 100,
+                "mate": null,
+                "pv": [
+                  "e1g1",
+                  "c5b6",
+                  "b2b4",
+                  "d7d6",
+                  "a2a4",
+                  "a7a5"
+                ]
+              }
+            ],
+            "moves": {
+              "O-O": {
+                "cp": 100,
+                "mate": null
+              }
+            }
+          }
+        },
+        {
+          "san": "d6",
+          "page": 14,
+          "note": "Rinforza e5 e apre la diagonale dell’alfiere c8: se ora il Bianco gioca d4, il Nero non è obbligato a cambiare.",
+          "question": "Il Bianco ha arroccato e prepara ancora d4. Come rafforza il Nero la sua posizione?",
+          "hints": [
+            "Dopo d4 il Nero vorrebbe poter mantenere il pedone e5 senza cambiarlo.",
+            "Una mossa di pedone che sostiene e5 e libera l’alfiere c8."
+          ],
+          "moves": {
+            "Nf6": {
+              "verdict": "good",
+              "note": "Sviluppa con attacco a e4: per Stockfish vale quanto d6."
+            },
+            "Bb6": {
+              "verdict": "good",
+              "note": "Toglie l’alfiere dal tiro di d4 in anticipo: per Stockfish vale quanto d6."
+            }
+          },
+          "book": "Il libro la apprezza perché sostiene il centro e apre la strada all’altro alfiere.",
+          "engine": {
+            "depth": 20,
+            "lines": [
+              {
+                "san": "d6",
+                "cp": -97,
+                "mate": null,
+                "pv": [
+                  "d7d6",
+                  "b2b4",
+                  "c5b6",
+                  "a2a4",
+                  "a7a6",
+                  "d2d4"
+                ]
+              },
+              {
+                "san": "Bb6",
+                "cp": -98,
+                "mate": null,
+                "pv": [
+                  "c5b6",
+                  "d2d4",
+                  "g8f6",
+                  "f1e1",
+                  "d7d6",
+                  "h2h3"
+                ]
+              },
+              {
+                "san": "Nf6",
+                "cp": -104,
+                "mate": null,
+                "pv": [
+                  "g8f6",
+                  "d2d4",
+                  "c5b6",
+                  "h2h3",
+                  "e8g8",
+                  "f1e1"
+                ]
+              }
+            ],
+            "moves": {
+              "d6": {
+                "cp": -97,
+                "mate": null
+              },
+              "Nf6": {
+                "cp": -104,
+                "mate": null
+              },
+              "Bb6": {
+                "cp": -98,
+                "mate": null
+              }
+            }
+          }
+        },
+        {
+          "san": "d4",
+          "page": 14,
+          "note": "Ora d4 attacca e5 e l’alfiere c5. Il Bianco spera nel cambio exd4 cxd4, che gli darebbe un bel centro. E se Qxe4, c’è Re1.",
+          "engine": {
+            "depth": 20,
+            "lines": [
+              {
+                "san": "b4",
+                "cp": 97,
+                "mate": null,
+                "pv": [
+                  "b2b4",
+                  "c5b6",
+                  "a2a4",
+                  "a7a6",
+                  "d2d4",
+                  "g8f6"
+                ]
+              },
+              {
+                "san": "d4",
+                "cp": 97,
+                "mate": null,
+                "pv": [
+                  "d2d4",
+                  "c5b6",
+                  "a2a4",
+                  "a7a6",
+                  "b2b4",
+                  "g8f6"
+                ]
+              },
+              {
+                "san": "h3",
+                "cp": 79,
+                "mate": null,
+                "pv": [
+                  "h2h3",
+                  "a7a6",
+                  "d2d4",
+                  "c5a7",
+                  "c1e3",
+                  "h7h6"
+                ]
+              }
+            ],
+            "moves": {
+              "d4": {
+                "cp": 97,
+                "mate": null
+              }
+            }
+          }
+        },
+        {
+          "san": "Bb6",
+          "page": 15,
+          "note": "L’alfiere si ritira, ma resta sulla diagonale verso d4 e f2: il Nero non cambia e il centro bianco resta sotto pressione.",
+          "question": "Il pedone d4 attacca alfiere e pedone. Il Nero deve per forza cambiare in d4?",
+          "hints": [
+            "e5 è difeso due volte: il pezzo che corre un pericolo è l’alfiere.",
+            "Cerca una ritirata che non rinunci alla diagonale a7–g1."
+          ],
+          "moves": {
+            "exd4": {
+              "verdict": "weak",
+              "note": "Fa proprio quello che il Bianco voleva: dopo cxd4 l’alfiere è di nuovo attaccato e il Bianco ha due pedoni al centro."
+            },
+            "Bg4": {
+              "verdict": "weak",
+              "note": "Inchioda il cavallo, ma lascia l’alfiere in presa: dxc5 vince un pezzo."
+            },
+            "Bd7": {
+              "verdict": "weak",
+              "note": "Sviluppa, ma lascia l’alfiere c5 in presa: dxc5 vince un pezzo."
+            }
+          },
+          "book": "Per il libro il Nero non deve cambiare: con e5 al sicuro, l’alfiere si ritira e continua a premere sul centro.",
+          "engine": {
+            "depth": 20,
+            "lines": [
+              {
+                "san": "Bb6",
+                "cp": -97,
+                "mate": null,
+                "pv": [
+                  "c5b6",
+                  "a2a4",
+                  "a7a6",
+                  "b2b4",
+                  "g8f6",
+                  "f1e1"
+                ]
+              },
+              {
+                "san": "exd4",
+                "cp": -206,
+                "mate": null,
+                "pv": [
+                  "e5d4",
+                  "c3d4",
+                  "c5b6",
+                  "b1c3",
+                  "c8g4",
+                  "c3d5"
+                ]
+              },
+              {
+                "san": "Nf6",
+                "cp": -621,
+                "mate": null,
+                "pv": [
+                  "g8f6",
+                  "d4c5",
+                  "f6e4",
+                  "b2b4",
+                  "c8e6",
+                  "c4e6"
+                ]
+              }
+            ],
+            "moves": {
+              "Bb6": {
+                "cp": -97,
+                "mate": null
+              },
+              "exd4": {
+                "cp": -206,
+                "mate": null
+              },
+              "Bg4": {
+                "cp": -684,
+                "mate": null
+              },
+              "Bd7": {
+                "cp": -670,
+                "mate": null
+              }
+            }
+          }
+        },
+        {
+          "san": "a4",
+          "page": 15,
+          "note": "Una piccola trappola: minaccia a5 contro l’alfiere. Il libro la giudica illogica, perché il Bianco attacca prima di aver sviluppato i pezzi dell’ala di donna. Stockfish non la considera un errore.",
+          "engine": {
+            "depth": 20,
+            "lines": [
+              {
+                "san": "h3",
+                "cp": 106,
+                "mate": null,
+                "pv": [
+                  "h2h3",
+                  "a7a6",
+                  "a2a4",
+                  "g8f6",
+                  "f1e1",
+                  "e8g8"
+                ]
+              },
+              {
+                "san": "a4",
+                "cp": 105,
+                "mate": null,
+                "pv": [
+                  "a2a4",
+                  "a7a6",
+                  "h2h3",
+                  "g8f6",
+                  "f1e1",
+                  "e8g8"
+                ]
+              },
+              {
+                "san": "Re1",
+                "cp": 104,
+                "mate": null,
+                "pv": [
+                  "f1e1",
+                  "g8f6",
+                  "h2h3",
+                  "e8g8",
+                  "b2b4",
+                  "e5d4"
+                ]
+              }
+            ],
+            "moves": {
+              "a4": {
+                "cp": 105,
+                "mate": null
+              }
+            }
+          }
+        },
+        {
+          "san": "a6",
+          "page": 15,
+          "note": "Prepara una casa di ritirata in a7: così a5 non intrappolerà l’alfiere.",
+          "question": "Il Bianco minaccia a5. Che cosa deve preparare il Nero?",
+          "hints": [
+            "Dopo a5 l’alfiere b6 deve potersi ritirare.",
+            "Ora l’alfiere non ha case libere sulla sua diagonale: serve un pedone che gliene apra una."
+          ],
+          "moves": {
+            "a5": {
+              "verdict": "partial",
+              "note": "Blocca il pedone, ma indebolisce b5: il Bianco può giocare Bb5 e Na3."
+            },
+            "exd4": {
+              "verdict": "weak",
+              "note": "Lascia scattare la trappola: dopo 8.a5 l’alfiere è in difficoltà."
+            }
+          },
+          "book": "Per il libro non è una perdita di tempo: le minacce vanno parate prima di continuare lo sviluppo, e a4 del Bianco non ha portato nulla.",
+          "engine": {
+            "depth": 20,
+            "lines": [
+              {
+                "san": "a6",
+                "cp": -107,
+                "mate": null,
+                "pv": [
+                  "a7a6",
+                  "b2b4",
+                  "g8f6",
+                  "f1e1",
+                  "e8g8",
+                  "h2h3"
+                ]
+              },
+              {
+                "san": "a5",
+                "cp": -157,
+                "mate": null,
+                "pv": [
+                  "a7a5",
+                  "c4b5",
+                  "c8d7",
+                  "b1d2",
+                  "b6a7",
+                  "d2c4"
+                ]
+              },
+              {
+                "san": "exd4",
+                "cp": -310,
+                "mate": null,
+                "pv": [
+                  "e5d4",
+                  "a4a5",
+                  "c6a5",
+                  "a1a5",
+                  "b6a5",
+                  "d1a4"
+                ]
+              }
+            ],
+            "moves": {
+              "a6": {
+                "cp": -107,
+                "mate": null
+              },
+              "a5": {
+                "cp": -157,
+                "mate": null
+              },
+              "exd4": {
+                "cp": -310,
+                "mate": null
+              }
+            }
+          }
+        },
+        {
+          "san": "a5",
+          "page": 15,
+          "note": "Attacca l’alfiere, sperando che il Nero lo prenda. Secondo Stockfish però con a5 il Bianco cede il pedone: il Nero può giocare 8…Nxa5.",
+          "engine": {
+            "depth": 20,
+            "lines": [
+              {
+                "san": "h3",
+                "cp": 94,
+                "mate": null,
+                "pv": [
+                  "h2h3",
+                  "g8f6",
+                  "f1e1",
+                  "e8g8",
+                  "b2b4",
+                  "h7h6"
+                ]
+              },
+              {
+                "san": "b4",
+                "cp": 94,
+                "mate": null,
+                "pv": [
+                  "b2b4",
+                  "g8f6",
+                  "f1e1",
+                  "e8g8",
+                  "h2h3",
+                  "h7h6"
+                ]
+              },
+              {
+                "san": "Re1",
+                "cp": 91,
+                "mate": null,
+                "pv": [
+                  "f1e1",
+                  "g8f6",
+                  "b2b4",
+                  "e8g8",
+                  "h2h3",
+                  "h7h6"
+                ]
+              }
+            ],
+            "moves": {
+              "a5": {
+                "cp": 3,
+                "mate": null
+              }
+            }
+          }
+        },
+        {
+          "san": "Ba7",
+          "page": 15,
+          "note": "L’alfiere si ritira in a7 e resta sulla diagonale verso f2.",
+          "question": "L’alfiere è attaccato. Il Nero lo ritira, o prende il pedone a5?",
+          "hints": [
+            "Prima di prendere un pedone avanzato, controlla che cosa succede al pezzo che lo cattura.",
+            "La casa preparata con la mossa precedente serve proprio adesso."
+          ],
+          "moves": {
+            "Nxa5": {
+              "verdict": "good",
+              "note": "Il libro la teme per 9.Rxa5 Bxa5 10.Qa4+; Stockfish risponde 10…b5! 11.Qxa5 bxc4 e il Nero sta bene. Per il motore è la mossa migliore."
+            },
+            "Bxa5": {
+              "verdict": "weak",
+              "note": "9.d5 attacca il cavallo che difende l’alfiere: dopo il cavallo si sposta e 10.Rxa5 il Bianco vince un pezzo."
+            }
+          },
+          "book": "Il libro loda il Nero che «non abbocca»: con Bxa5 o Nxa5 si cadrebbe nelle combinazioni preparate da a4.",
+          "engineNote": "Qui libro e motore non coincidono: per Stockfish 8…Nxa5 vinceva un pedone senza rischi (10…b5! contro Qa4+). Il libro ha ragione su 8…Bxa5, che perde un pezzo.",
+          "engine": {
+            "depth": 20,
+            "lines": [
+              {
+                "san": "Nxa5",
+                "cp": -4,
+                "mate": null,
+                "pv": [
+                  "c6a5",
+                  "c4d5",
+                  "g8f6",
+                  "d4e5",
+                  "d6e5",
+                  "b2b4"
+                ]
+              },
+              {
+                "san": "Ba7",
+                "cp": -118,
+                "mate": null,
+                "pv": [
+                  "b6a7",
+                  "f1e1",
+                  "g8f6",
+                  "h2h3",
+                  "h7h6",
+                  "c1e3"
+                ]
+              },
+              {
+                "san": "Bxa5",
+                "cp": -510,
+                "mate": null,
+                "pv": [
+                  "b6a5",
+                  "d4d5",
+                  "a5b6",
+                  "d5c6",
+                  "b7c6",
+                  "c4d3"
+                ]
+              }
+            ],
+            "moves": {
+              "Ba7": {
+                "cp": -118,
+                "mate": null
+              },
+              "Nxa5": {
+                "cp": -4,
+                "mate": null
+              },
+              "Bxa5": {
+                "cp": -510,
+                "mate": null
+              }
+            }
+          }
+        },
+        {
+          "san": "h3",
+          "page": 15,
+          "note": "Impedisce Bg4, ma indebolisce l’arrocco: il pedone h3 diventa un bersaglio e la casa g3 non è più difesa da un pedone. Stockfish la considera giocabile; il seguito della partita mostra il prezzo.",
+          "engine": {
+            "depth": 20,
+            "lines": [
+              {
+                "san": "Re1",
+                "cp": 110,
+                "mate": null,
+                "pv": [
+                  "f1e1",
+                  "h7h6",
+                  "c1e3",
+                  "g8f6",
+                  "h2h3",
+                  "g7g5"
+                ]
+              },
+              {
+                "san": "h3",
+                "cp": 106,
+                "mate": null,
+                "pv": [
+                  "h2h3",
+                  "g8f6",
+                  "f1e1",
+                  "h7h6",
+                  "c1e3",
+                  "g7g5"
+                ]
+              },
+              {
+                "san": "Be3",
+                "cp": 105,
+                "mate": null,
+                "pv": [
+                  "c1e3",
+                  "g8f6",
+                  "f1e1",
+                  "f6g4",
+                  "e3g5",
+                  "g4f6"
+                ]
+              }
+            ],
+            "moves": {
+              "h3": {
+                "cp": 106,
+                "mate": null
+              }
+            }
+          }
+        },
+        {
+          "san": "Nf6",
+          "page": 16,
+          "note": "Sviluppa con una minaccia: il cavallo attacca e4, e il Bianco deve pensarci prima di fare altro.",
+          "question": "Il Bianco ha speso una mossa per h3. Come sviluppa il Nero guadagnando tempo?",
+          "hints": [
+            "Conta i difensori del pedone e4: nessun pezzo bianco lo protegge.",
+            "Un pezzo che esce e attacca subito qualcosa."
+          ],
+          "moves": {
+            "h6": {
+              "verdict": "partial",
+              "note": "Per Stockfish è appena migliore, ma non sviluppa nulla: è una mossa d’attesa."
+            },
+            "Qf6": {
+              "verdict": "partial",
+              "note": "Sviluppa con pressione su f2, ma la donna esce di nuovo e toglie f6 al cavallo."
+            },
+            "Bxh3": {
+              "verdict": "weak",
+              "note": "Troppo presto: dopo gxh3 non ci sono abbastanza pezzi pronti per l’attacco."
+            }
+          },
+          "book": "Il libro sottolinea il principio: sviluppa con una minaccia ogni volta che puoi, perché l’avversario deve interrompere i suoi piani.",
+          "engine": {
+            "depth": 20,
+            "lines": [
+              {
+                "san": "h6",
+                "cp": -111,
+                "mate": null,
+                "pv": [
+                  "h7h6",
+                  "f1e1",
+                  "g8f6",
+                  "c1e3",
+                  "g7g5",
+                  "f3h2"
+                ]
+              },
+              {
+                "san": "Qf6",
+                "cp": -113,
+                "mate": null,
+                "pv": [
+                  "e7f6",
+                  "f1e1",
+                  "g8e7",
+                  "c1e3",
+                  "h7h6",
+                  "d4d5"
+                ]
+              },
+              {
+                "san": "Nf6",
+                "cp": -113,
+                "mate": null,
+                "pv": [
+                  "g8f6",
+                  "f1e1",
+                  "h7h6",
+                  "c1e3",
+                  "g7g5",
+                  "f3h2"
+                ]
+              }
+            ],
+            "moves": {
+              "Nf6": {
+                "cp": -113,
+                "mate": null
+              },
+              "h6": {
+                "cp": -111,
+                "mate": null
+              },
+              "Qf6": {
+                "cp": -113,
+                "mate": null
+              },
+              "Bxh3": {
+                "cp": -531,
+                "mate": null
+              }
+            }
+          }
+        },
+        {
+          "san": "dxe5",
+          "page": 16,
+          "note": "Cambia e apre le linee. Ma le linee aperte favoriscono chi è più sviluppato, e ora l’alfiere a7 guarda direttamente f2 e il re. Stockfish preferisce Re1.",
+          "engine": {
+            "depth": 20,
+            "lines": [
+              {
+                "san": "Re1",
+                "cp": 112,
+                "mate": null,
+                "pv": [
+                  "f1e1",
+                  "h7h6",
+                  "c1e3",
+                  "g7g5",
+                  "f3h2",
+                  "g5g4"
+                ]
+              },
+              {
+                "san": "Be3",
+                "cp": 112,
+                "mate": null,
+                "pv": [
+                  "c1e3",
+                  "h7h6",
+                  "f1e1",
+                  "g7g5",
+                  "f3h2",
+                  "g5g4"
+                ]
+              },
+              {
+                "san": "d5",
+                "cp": 77,
+                "mate": null,
+                "pv": [
+                  "d4d5",
+                  "c6d8",
+                  "f1e1",
+                  "f6h5",
+                  "c4e2",
+                  "h5g3"
+                ]
+              }
+            ],
+            "moves": {
+              "dxe5": {
+                "cp": -29,
+                "mate": null
+              }
+            }
+          }
+        },
+        {
+          "san": "Nxe5",
+          "page": 16,
+          "note": "Riprende con il cavallo, che si piazza al centro e attacca l’alfiere c4; l’alfiere a7 ha ora la diagonale libera fino a f2.",
+          "question": "Il Bianco ha preso in e5. Con che cosa riprende il Nero?",
+          "hints": [
+            "Un pedone in e5 controlla due case; un pezzo al centro ne controlla molte di più.",
+            "Riprendi in modo da attaccare subito qualcosa."
+          ],
+          "moves": {
+            "dxe5": {
+              "verdict": "partial",
+              "note": "Riprende con un pedone: è solido, ma il cavallo in e5 sarebbe molto più attivo."
+            },
+            "Nxe4": {
+              "verdict": "weak",
+              "note": "Il pedone sembra gratis, ma 11.Bd5 attacca il cavallo e il Nero perde il vantaggio."
+            }
+          },
+          "book": "Il libro preferisce nettamente il cavallo: centralizzato, irradia forza in ogni direzione, cosa che un pedone non può fare.",
+          "engine": {
+            "depth": 20,
+            "lines": [
+              {
+                "san": "Nxe5",
+                "cp": 26,
+                "mate": null,
+                "pv": [
+                  "c6e5",
+                  "b1d2",
+                  "e5c4",
+                  "d2c4",
+                  "f6e4",
+                  "c1e3"
+                ]
+              },
+              {
+                "san": "dxe5",
+                "cp": -15,
+                "mate": null,
+                "pv": [
+                  "d6e5",
+                  "c4d5",
+                  "e8g8",
+                  "b1d2",
+                  "f6d5",
+                  "e4d5"
+                ]
+              },
+              {
+                "san": "Nxe4",
+                "cp": -118,
+                "mate": null,
+                "pv": [
+                  "f6e4",
+                  "c4d5",
+                  "e4f2",
+                  "f1f2",
+                  "a7f2",
+                  "g1f2"
+                ]
+              }
+            ],
+            "moves": {
+              "Nxe5": {
+                "cp": 26,
+                "mate": null
+              },
+              "dxe5": {
+                "cp": -15,
+                "mate": null
+              },
+              "Nxe4": {
+                "cp": -118,
+                "mate": null
+              }
+            }
+          }
+        },
+        {
+          "san": "Nxe5",
+          "page": 17,
+          "note": "Elimina il cavallo centrale, ma così sparisce il cavallo f3, il miglior difensore dell’arrocco. Per Stockfish era meglio Nbd2.",
+          "engine": {
+            "depth": 20,
+            "lines": [
+              {
+                "san": "Nbd2",
+                "cp": -35,
+                "mate": null,
+                "pv": [
+                  "b1d2",
+                  "e8g8",
+                  "c4b3",
+                  "c8d7",
+                  "f3d4",
+                  "f8e8"
+                ]
+              },
+              {
+                "san": "Na3",
+                "cp": -49,
+                "mate": null,
+                "pv": [
+                  "b1a3",
+                  "e5f3",
+                  "d1f3",
+                  "e7e4",
+                  "f3e4",
+                  "f6e4"
+                ]
+              },
+              {
+                "san": "Re1",
+                "cp": -56,
+                "mate": null,
+                "pv": [
+                  "f1e1",
+                  "e5c4",
+                  "d1a4",
+                  "c8d7",
+                  "a4c4",
+                  "e8c8"
+                ]
+              }
+            ],
+            "moves": {
+              "Nxe5": {
+                "cp": -112,
+                "mate": null
+              }
+            }
+          }
+        },
+        {
+          "san": "Qxe5",
+          "page": 17,
+          "note": "Riprende con la donna, che domina il centro, attacca e4 ed è pronta a spostarsi sull’ala di re.",
+          "question": "Il cavallo bianco è in e5. Come riprende il Nero?",
+          "hints": [
+            "Una ripresa porta un pezzo al centro, l’altra apre una colonna.",
+            "Il pezzo che riprende attaccherà anche il pedone e4."
+          ],
+          "moves": {
+            "dxe5": {
+              "verdict": "partial",
+              "note": "Riprende, ma la donna resta in e7 e il Nero perde l’iniziativa: Stockfish la giudica un’imprecisione."
+            },
+            "Bxh3": {
+              "verdict": "weak",
+              "note": "Senza riprendere il cavallo, 12.Nxf7 vince materiale."
+            }
+          },
+          "book": "Il libro fa notare che il cavallo bianco è sparito dalla scacchiera, mentre al posto del cavallo nero ora c’è la donna.",
+          "engine": {
+            "depth": 20,
+            "lines": [
+              {
+                "san": "Qxe5",
+                "cp": 108,
+                "mate": null,
+                "pv": [
+                  "e7e5",
+                  "d1f3",
+                  "e5e4",
+                  "f3e4",
+                  "f6e4",
+                  "b1d2"
+                ]
+              },
+              {
+                "san": "dxe5",
+                "cp": -6,
+                "mate": null,
+                "pv": [
+                  "d6e5",
+                  "d1e2",
+                  "e8g8",
+                  "b1d2",
+                  "f8d8",
+                  "d2f3"
+                ]
+              },
+              {
+                "san": "Bxh3",
+                "cp": -502,
+                "mate": null,
+                "pv": [
+                  "c8h3",
+                  "e5f7",
+                  "h3g4",
+                  "d1b3",
+                  "e8g8",
+                  "c1g5"
+                ]
+              }
+            ],
+            "moves": {
+              "Qxe5": {
+                "cp": 108,
+                "mate": null
+              },
+              "dxe5": {
+                "cp": -6,
+                "mate": null
+              },
+              "Bxh3": {
+                "cp": -502,
+                "mate": null
+              }
+            }
+          }
+        },
+        {
+          "san": "Nd2",
+          "page": 17,
+          "note": "Difende e4 in modo indiretto: se 12…Nxe4 13.Nxe4 Qxe4 14.Re1, la torre inchioda e vince la donna. È però una mossa passiva, e il Nero ha i pezzi pronti contro l’arrocco: Stockfish la giudica un errore, meglio Qd3 o Qf3.",
+          "engine": {
+            "depth": 20,
+            "lines": [
+              {
+                "san": "Qd3",
+                "cp": -108,
+                "mate": null,
+                "pv": [
+                  "d1d3",
+                  "e5e4",
+                  "d3e4",
+                  "f6e4",
+                  "c4d5",
+                  "e4c5"
+                ]
+              },
+              {
+                "san": "Qf3",
+                "cp": -109,
+                "mate": null,
+                "pv": [
+                  "d1f3",
+                  "e5e4",
+                  "b1d2",
+                  "e4f3",
+                  "d2f3",
+                  "e8g8"
+                ]
+              },
+              {
+                "san": "Re1",
+                "cp": -167,
+                "mate": null,
+                "pv": [
+                  "f1e1",
+                  "c8h3",
+                  "d1f3",
+                  "h3g4",
+                  "f3f4",
+                  "e5f4"
+                ]
+              }
+            ],
+            "moves": {
+              "Nd2": {
+                "cp": -315,
+                "mate": null
+              }
+            }
+          }
+        },
+        {
+          "san": "Bxh3",
+          "page": 17,
+          "note": "Il sacrificio: l’alfiere prende h3, e dopo gxh3 il re bianco resta scoperto, con g3 libera per la donna.",
+          "question": "I pezzi del Nero sono pronti. Dove si può colpire l’arrocco bianco?",
+          "hints": [
+            "Guarda i pedoni davanti al re bianco: uno è avanzato.",
+            "Un sacrificio di pezzo che strappa via la copertura del re."
+          ],
+          "moves": {
+            "O-O": {
+              "verdict": "partial",
+              "note": "Solida, ma lascia al Bianco il tempo di difendersi: il vantaggio si riduce molto."
+            },
+            "Nxe4": {
+              "verdict": "weak",
+              "note": "La trappola del Bianco: 13.Nxe4 Qxe4 14.Re1 inchioda e vince la donna."
+            },
+            "Be6": {
+              "verdict": "partial",
+              "note": "Sviluppa, ma dopo Bxe6 l’attacco sparisce."
+            }
+          },
+          "book": "Per il libro il Nero ha diritto a una combinazione decisiva: alfieri, donna e cavallo puntano contro l’arrocco, e il bersaglio è proprio il pedone h3.",
+          "engine": {
+            "depth": 20,
+            "lines": [
+              {
+                "san": "Bxh3",
+                "cp": 355,
+                "mate": null,
+                "pv": [
+                  "c8h3",
+                  "c4f7",
+                  "e8e7",
+                  "g1h1",
+                  "h3g2",
+                  "h1g2"
+                ]
+              },
+              {
+                "san": "O-O",
+                "cp": 64,
+                "mate": null,
+                "pv": [
+                  "e8g8",
+                  "d2f3",
+                  "e5g3",
+                  "f3d4",
+                  "g3g6",
+                  "d1f3"
+                ]
+              },
+              {
+                "san": "Be6",
+                "cp": 20,
+                "mate": null,
+                "pv": [
+                  "c8e6",
+                  "c4e6",
+                  "e5e6",
+                  "d1a4",
+                  "f6d7",
+                  "d2f3"
+                ]
+              }
+            ],
+            "moves": {
+              "Bxh3": {
+                "cp": 355,
+                "mate": null
+              },
+              "O-O": {
+                "cp": 64,
+                "mate": null
+              },
+              "Nxe4": {
+                "cp": -648,
+                "mate": null
+              },
+              "Be6": {
+                "cp": 20,
+                "mate": null
+              }
+            }
+          }
+        },
+        {
+          "san": "gxh3",
+          "page": 18,
+          "note": "Il libro la considera obbligata, per non restare con un pedone in meno e senza compensi. Stockfish preferisce 13.Qf3, che perde comunque un pedone ma tiene chiusa l’ala di re.",
+          "engine": {
+            "depth": 18,
+            "lines": [
+              {
+                "san": "Qf3",
+                "cp": -343,
+                "mate": null,
+                "pv": [
+                  "d1f3",
+                  "h3g4",
+                  "f3d3",
+                  "e8g8",
+                  "d2f3",
+                  "e5e4"
+                ]
+              },
+              {
+                "san": "Bxf7+",
+                "cp": -347,
+                "mate": null,
+                "pv": [
+                  "c4f7",
+                  "e8e7",
+                  "g1h1",
+                  "h3g2",
+                  "h1g2",
+                  "e5g5"
+                ]
+              },
+              {
+                "san": "Kh1",
+                "cp": -508,
+                "mate": null,
+                "pv": [
+                  "g1h1",
+                  "h3g4",
+                  "d2f3",
+                  "e5h5",
+                  "h1g1",
+                  "e8g8"
+                ]
+              }
+            ],
+            "moves": {
+              "gxh3": {
+                "cp": -584,
+                "mate": null
+              }
+            }
+          }
+        },
+        {
+          "san": "Qg3+",
+          "page": 18,
+          "note": "La donna entra in g3, la casa indebolita da h3. Il pedone f2 non può prenderla perché è inchiodato dall’alfiere a7.",
+          "question": "L’arrocco bianco è aperto. Qual è la casa d’ingresso per la donna?",
+          "hints": [
+            "La casa che il pedone h2 difendeva prima di avanzare.",
+            "Perché il pedone f2 non può catturare? Guarda la diagonale a7–g1."
+          ],
+          "moves": {
+            "d5": {
+              "verdict": "weak",
+              "note": "Una mossa lenta: il Bianco ha il tempo di difendersi e il pezzo sacrificato non torna."
+            },
+            "g5": {
+              "verdict": "weak",
+              "note": "Troppo lenta: dopo Nf3 il Bianco ha un pezzo in più e il re al riparo."
+            }
+          },
+          "book": "Il libro mostra come il Nero sfrutti entrambi i difetti di h3: ha preso il pedone e usa la casa g3, rimasta senza difesa.",
+          "engine": {
+            "depth": 17,
+            "lines": [
+              {
+                "san": "Qg3+",
+                "cp": 587,
+                "mate": null,
+                "pv": [
+                  "e5g3",
+                  "g1h1",
+                  "g3h3",
+                  "h1g1",
+                  "f6g4",
+                  "d2f3"
+                ]
+              },
+              {
+                "san": "d5",
+                "cp": 17,
+                "mate": null,
+                "pv": [
+                  "d6d5",
+                  "c4d5",
+                  "e5g3",
+                  "g1h1",
+                  "g3h3",
+                  "h1g1"
+                ]
+              },
+              {
+                "san": "g5",
+                "cp": -286,
+                "mate": null,
+                "pv": [
+                  "g7g5",
+                  "d2f3",
+                  "e5g3",
+                  "g1h1",
+                  "g3h3",
+                  "f3h2"
+                ]
+              }
+            ],
+            "moves": {
+              "Qg3+": {
+                "cp": 587,
+                "mate": null
+              },
+              "d5": {
+                "cp": 17,
+                "mate": null
+              },
+              "g5": {
+                "cp": -286,
+                "mate": null
+              }
+            }
+          }
+        },
+        {
+          "san": "Kh1",
+          "page": 18,
+          "note": "L’unica mossa: il pedone f2 è inchiodato e non può prendere la donna.",
+          "engine": {
+            "depth": 15,
+            "lines": [
+              {
+                "san": "Kh1",
+                "cp": -592,
+                "mate": null,
+                "pv": [
+                  "g1h1",
+                  "g3h3",
+                  "h1g1",
+                  "f6g4",
+                  "d2f3",
+                  "e8c8"
+                ]
+              }
+            ],
+            "moves": {
+              "Kh1": {
+                "cp": -592,
+                "mate": null
+              }
+            }
+          }
+        },
+        {
+          "san": "Qxh3+",
+          "page": 18,
+          "note": "Prende un secondo pedone con scacco e scopre ancora di più il re.",
+          "question": "Il re bianco è in h1. Come continua il Nero mantenendo l’iniziativa?",
+          "hints": [
+            "Uno scacco che guadagna anche materiale.",
+            "Dopo h3 sono rimasti pochi pedoni davanti al re: uno di loro è indifeso."
+          ],
+          "moves": {
+            "Qh4": {
+              "verdict": "weak",
+              "note": "Rinuncia allo scacco e al pedone: il Bianco gioca Qf3 e respira."
+            },
+            "Qg5": {
+              "verdict": "weak",
+              "note": "Rinuncia allo scacco e al pedone: il Bianco gioca Qf3 e respira."
+            }
+          },
+          "book": "Per il libro il Nero distrugge un altro pedone di difesa e lascia il re sempre più esposto.",
+          "engine": {
+            "depth": 17,
+            "lines": [
+              {
+                "san": "Qxh3+",
+                "cp": 609,
+                "mate": null,
+                "pv": [
+                  "g3h3",
+                  "h1g1",
+                  "f6g4",
+                  "d2f3",
+                  "e8c8",
+                  "c1f4"
+                ]
+              },
+              {
+                "san": "Qh4",
+                "cp": -520,
+                "mate": null,
+                "pv": [
+                  "g3h4",
+                  "d1f3",
+                  "e8c8",
+                  "c4f7",
+                  "c8b8",
+                  "f3g3"
+                ]
+              },
+              {
+                "san": "Bxf2",
+                "cp": -551,
+                "mate": null,
+                "pv": [
+                  "a7f2",
+                  "d1f3"
+                ]
+              }
+            ],
+            "moves": {
+              "Qxh3+": {
+                "cp": 609,
+                "mate": null
+              },
+              "Qh4": {
+                "cp": -520,
+                "mate": null
+              },
+              "Qg5": {
+                "cp": -575,
+                "mate": null
+              }
+            }
+          }
+        },
+        {
+          "san": "Kg1",
+          "page": 18,
+          "note": "Ancora l’unica mossa. Per l’alfiere sacrificato il Nero ha già due pedoni e l’attacco.",
+          "engine": {
+            "depth": 20,
+            "lines": [
+              {
+                "san": "Kg1",
+                "cp": -608,
+                "mate": null,
+                "pv": [
+                  "h1g1",
+                  "f6g4",
+                  "d2f3",
+                  "e8c8",
+                  "c1f4",
+                  "g4e5"
+                ]
+              }
+            ],
+            "moves": {
+              "Kg1": {
+                "cp": -608,
+                "mate": null
+              }
+            }
+          }
+        },
+        {
+          "san": "Ng4",
+          "page": 18,
+          "note": "Il cavallo entra in g4 e minaccia matto in h2.",
+          "question": "Il Nero ha due pedoni per il pezzo. Quale pezzo si unisce all’attacco?",
+          "hints": [
+            "C’è un pezzo nero che non partecipa ancora all’attacco contro il re.",
+            "Cerca una mossa che minacci matto alla prossima mossa."
+          ],
+          "moves": {
+            "Qg3+": {
+              "verdict": "good",
+              "note": "Ripete lo scacco: per Stockfish vale quanto Ng4, perché il Nero può riprendere l’attacco quando vuole."
+            },
+            "d5": {
+              "verdict": "weak",
+              "note": "Libera l’alfiere, ma non aggiunge forza all’attacco: il Bianco ha il tempo di difendersi."
+            }
+          },
+          "book": "Il libro nota che la minaccia è matto in h2. Se il Bianco prova a dare spazio al re con Re1, segue Bxf2 matto.",
+          "engine": {
+            "depth": 14,
+            "lines": [
+              {
+                "san": "Ng4",
+                "cp": 607,
+                "mate": null,
+                "pv": [
+                  "f6g4",
+                  "d2f3",
+                  "e8c8",
+                  "c1f4",
+                  "g4e5",
+                  "f3d2"
+                ]
+              },
+              {
+                "san": "Qg3+",
+                "cp": 606,
+                "mate": null,
+                "pv": [
+                  "h3g3",
+                  "g1h1",
+                  "g3h3",
+                  "h1g1",
+                  "f6g4",
+                  "d2f3"
+                ]
+              },
+              {
+                "san": "d5",
+                "cp": 18,
+                "mate": null,
+                "pv": [
+                  "d6d5",
+                  "c4d5",
+                  "c7c6",
+                  "d1f3",
+                  "h3f3",
+                  "d5c6"
+                ]
+              }
+            ],
+            "moves": {
+              "Ng4": {
+                "cp": 607,
+                "mate": null
+              },
+              "Qg3+": {
+                "cp": 606,
+                "mate": null
+              },
+              "d5": {
+                "cp": 18,
+                "mate": null
+              }
+            }
+          }
+        },
+        {
+          "san": "Nf3",
+          "page": 18,
+          "note": "Il cavallo torna in f3 a difendere h2: è l’unico modo di parare il matto.",
+          "engine": {
+            "depth": 15,
+            "lines": [
+              {
+                "san": "Nf3",
+                "cp": -614,
+                "mate": null,
+                "pv": [
+                  "d2f3",
+                  "e8c8",
+                  "c1f4",
+                  "g4e5",
+                  "f3d2",
+                  "e5c4"
+                ]
+              },
+              {
+                "san": "Bxf7+",
+                "cp": -654,
+                "mate": null,
+                "pv": [
+                  "c4f7",
+                  "e8e7",
+                  "d2f3",
+                  "h8f8",
+                  "c1g5",
+                  "e7f7"
+                ]
+              },
+              {
+                "san": "Qxg4",
+                "cp": -969,
+                "mate": null,
+                "pv": [
+                  "d1g4",
+                  "h3g4",
+                  "g1h2",
+                  "e8c8",
+                  "c4d5",
+                  "c7c6"
+                ]
+              }
+            ],
+            "moves": {
+              "Nf3": {
+                "cp": -614,
+                "mate": null
+              }
+            }
+          }
+        },
+        {
+          "san": "Qg3+",
+          "page": 18,
+          "note": "La donna dà scacco e attacca f2 per la terza volta: il re deve andare in h1 e abbandonare la difesa del pedone.",
+          "question": "Il cavallo f3 difende h2. Come può il Nero togliere di mezzo l’ultimo pedone davanti al re, f2?",
+          "hints": [
+            "Ora f2 è attaccato da cavallo e alfiere, e difeso da re e torre.",
+            "Uno scacco che aggiunge un terzo attaccante e allontana il re."
+          ],
+          "moves": {
+            "O-O-O": {
+              "verdict": "good",
+              "note": "Per Stockfish vale quanto Qg3+: porta anche la torre nell’attacco prima di decidere."
+            },
+            "g5": {
+              "verdict": "partial",
+              "note": "Prepara g4 contro il cavallo, ma è più lenta."
+            }
+          },
+          "book": "Il libro ricostruisce il ragionamento del Nero: f2 è l’ultimo difensore, attaccato da cavallo e alfiere. Bisogna allontanare un difensore o attaccarlo una terza volta: Qg3+ fa entrambe le cose.",
+          "engine": {
+            "depth": 20,
+            "lines": [
+              {
+                "san": "Qg3+",
+                "cp": 624,
+                "mate": null,
+                "pv": [
+                  "h3g3",
+                  "g1h1",
+                  "g3h3",
+                  "h1g1",
+                  "e8c8",
+                  "c1f4"
+                ]
+              },
+              {
+                "san": "O-O-O",
+                "cp": 624,
+                "mate": null,
+                "pv": [
+                  "e8c8",
+                  "c1f4",
+                  "g4e5",
+                  "f3d4",
+                  "e5c4",
+                  "d1e2"
+                ]
+              },
+              {
+                "san": "g5",
+                "cp": 491,
+                "mate": null,
+                "pv": [
+                  "g7g5",
+                  "c4f7",
+                  "e8e7",
+                  "d1d3",
+                  "h3g3",
+                  "g1h1"
+                ]
+              }
+            ],
+            "moves": {
+              "Qg3+": {
+                "cp": 624,
+                "mate": null
+              },
+              "O-O-O": {
+                "cp": 624,
+                "mate": null
+              },
+              "g5": {
+                "cp": 491,
+                "mate": null
+              }
+            }
+          }
+        },
+        {
+          "san": "Kh1",
+          "page": 18,
+          "note": "L’unica mossa: il re va nell’angolo e lascia il pedone f2 difeso solo dalla torre.",
+          "engine": {
+            "depth": 19,
+            "lines": [
+              {
+                "san": "Kh1",
+                "cp": -632,
+                "mate": null,
+                "pv": [
+                  "g1h1",
+                  "g3h3",
+                  "h1g1",
+                  "e8c8",
+                  "c1f4",
+                  "g4e5"
+                ]
+              }
+            ],
+            "moves": {
+              "Kh1": {
+                "cp": -632,
+                "mate": null
+              }
+            }
+          }
+        },
+        {
+          "san": "Bxf2",
+          "page": 18,
+          "note": "Prende f2 e toglie al re la casa g1. La minaccia è 18…Qh3+ 19.Nh2 Qxh2 matto; e se 18.Rxf2, Nxf2 è matto.",
+          "question": "Il pedone f2 è difeso soltanto dalla torre. Come conclude il Nero?",
+          "hints": [
+            "Tre pezzi attaccano f2, uno solo lo difende.",
+            "Dopo la cattura il re non deve poter tornare in g1."
+          ],
+          "moves": {
+            "Qh3+": {
+              "verdict": "good",
+              "note": "Per Stockfish è la più forte: ripete lo scacco, poi arrocca lungo e porta un’altra torre all’attacco, con un vantaggio decisivo."
+            },
+            "Nxf2+": {
+              "verdict": "partial",
+              "note": "Prende con scacco, ma dopo Rxf2 Bxf2 il Bianco si difende con Bxf7+."
+            }
+          },
+          "book": "Per il libro la caduta di f2 decide la partita: il Bianco non ha più difese.",
+          "engineNote": "Qui libro e motore non coincidono: dopo 17…Bxf2 il Bianco aveva 18.Bxf7+! Ke7 19.Bg5+ Kf8 20.Bf4!, che allontana la donna nera e porta la posizione all’incirca in parità. Il Bianco non la vide e abbandonò. Per Stockfish era decisiva 17…Qh3+.",
+          "engine": {
+            "depth": 14,
+            "lines": [
+              {
+                "san": "Qh3+",
+                "cp": 637,
+                "mate": null,
+                "pv": [
+                  "g3h3",
+                  "h1g1",
+                  "e8c8",
+                  "c1f4",
+                  "g4e5",
+                  "f3d2"
+                ]
+              },
+              {
+                "san": "Nxf2+",
+                "cp": 68,
+                "mate": null,
+                "pv": [
+                  "g4f2",
+                  "f1f2",
+                  "a7f2",
+                  "c4f7",
+                  "e8f8",
+                  "f7d5"
+                ]
+              },
+              {
+                "san": "Bxf2",
+                "cp": 66,
+                "mate": null,
+                "pv": [
+                  "a7f2",
+                  "c4f7",
+                  "e8f8",
+                  "c1f4",
+                  "g3f4",
+                  "f7h5"
+                ]
+              }
+            ],
+            "moves": {
+              "Bxf2": {
+                "cp": 66,
+                "mate": null
+              },
+              "Qh3+": {
+                "cp": 637,
+                "mate": null
+              },
+              "Nxf2+": {
+                "cp": 68,
+                "mate": null
+              }
+            }
+          }
+        }
+      ],
+      "ending": "Il Bianco abbandona. Il libro dice che non c’era scampo: dopo Rxf2 arriva Nxf2 matto, altrimenti Qh3+ e Qxh2 matto. Stockfish trova invece una difesa: 18.Bxf7+! Ke7 19.Bg5+ Kf8 20.Bf4! allontana la donna, e la partita resta aperta. La lezione resta valida: il Nero ha vinto sviluppandosi in fretta e punendo le mosse di pedone inutili del Bianco."
+    }
+  ]
+}

@@ -1,0 +1,148 @@
+# Ragionamento mossa per mossa
+
+La sezione **Mossa per mossa** è una raccolta di lezioni guidate tratte da partite commentate in un libro:
+*Logical Chess: Move by Move* di Irving Chernev (Batsford, edizione in notazione algebrica). È un campione di prova di
+10 posizioni, **separato** dagli esercizi generati dalle tue partite: non entra nella coda di Allenamento di oggi e
+ha un suo ripasso. Va valutato con l'uso prima di estendere la raccolta.
+
+## Come funziona una lezione
+
+- Vedi la posizione, la sequenza di mosse che la precede (`1.e4 e5 2.Nf3 …`), chi muove e una domanda in italiano
+  sull'obiettivo: sviluppare con una minaccia, difendere sviluppando, prevenire una minaccia, ritirare un pezzo
+  attaccato, attaccare su una colonna, sostenere una catena di pedoni, sfruttare una casa debole, trovare un piano.
+- Tre **indizi** progressivi, uno alla volta su richiesta.
+- Giochi la mossa sulla scacchiera. L'esito dipende dalla **lezione**, non dal motore:
+  - **Partita**: la mossa giocata nella partita del libro;
+  - **Valida**: un'alternativa coerente con l'obiettivo della lezione (per esempio 3.Bb5 accanto a 3.Bc4);
+  - **Sensata**: una mossa ragionevole che però risponde a un'altra domanda (2…Nf6 non difende e5);
+  - **Debole**: una mossa che il libro o l'analisi sconsigliano, con il motivo;
+  - **Fuori lista**: qualsiasi altra mossa legale, giudicata soltanto dal motore.
+
+  Solo *Partita* e *Valida* contano come risposta giusta.
+- Dopo la mossa compaiono due pannelli **distinti**:
+  - **L'idea**: la mossa della partita, una spiegazione originale e, in breve, il ragionamento che il libro propone,
+    con partita e pagina;
+  - **Stockfish**: la valutazione della tua mossa (dal punto di vista di chi muove), la migliore per il motore, le
+    prime linee e una tabella con tutte le mosse previste dalla lezione, ciascuna con giudizio, nota e valutazione.
+    Il giudizio del motore usa le regole comuni del progetto (`review_loss`, franchigia di ±600, «Matto mancato»; vedi
+    [giudizio-mosse.md](giudizio-mosse.md)). Quando libro e motore non coincidono la lezione lo dice: in
+    von Scheve–Teichmann il libro loda 4…Qe7, Stockfish preferisce 4…Nf6 (circa 0,8 pedoni di differenza).
+- Sulla scacchiera, frecce per la tua mossa, la mossa della partita e la prima scelta del motore.
+
+## Segui la partita
+
+Il libro commenta ogni mossa di partite intere: questa modalità la ripercorre dall'inizio alla fine. Per ora c'è la
+**partita 1**, von Scheve–Teichmann (Berlino 1907), giocata col **Nero**: il Nero vince con mosse logiche, mentre
+molte mosse del Bianco sono proprio quelle che il libro critica (7.a4, 9.h3, 11.Nxe5), e indovinarle non insegnerebbe
+nulla.
+
+- Indovini ogni mossa del Nero (17 in tutto). Le mosse del Bianco si giocano da sole, ciascuna con una nota e il
+  giudizio di Stockfish (per esempio 12.Nd2: errore, meglio Qd3 o Qf3).
+- Per ogni mossa: una domanda e due indizi; alternative previste con lo stesso giudizio delle lezioni (*Partita*,
+  *Valida*, *Sensata*, *Debole*, *Fuori lista*). Le mosse 2…Nc6, 3…Bc5 e 4…Qe7 sono le lezioni lc-02, lc-04 e lc-05,
+  con le loro domande e i loro tre indizi.
+- Dopo la risposta la scacchiera mostra la mossa della partita, che si gioca comunque: la partita prosegue sempre.
+  Gli stessi due pannelli delle lezioni: l'idea (nota originale e, in breve, l'argomento del libro) e Stockfish
+  (la tua mossa, quella della partita, la migliore).
+- **Punteggio**: conta solo la prima risposta a ogni mossa; *trovata* se è la mossa della partita o un'alternativa
+  valida, *senza indizi* se non ne hai chiesti. **Riprova questa mossa** è pratica. Un percorso interrotto si
+  riprende dall'elenco; **Ricomincia** ne apre uno nuovo. I percorsi non toccano il ripasso delle lezioni.
+
+Dove libro e motore non coincidono, la mossa lo dice (analisi verificata anche a profondità 30 circa):
+
+- **8…Ba7**: il libro loda il Nero che non prende a5, temendo 9.Rxa5 Bxa5 10.Qa4+. Per Stockfish 8…Nxa5 vinceva un
+  pedone: dopo 10.Qa4+ b5! 11.Qxa5 bxc4 il Nero sta meglio. Ha ragione il libro su 8…Bxa5, che perde un pezzo (9.d5).
+- **13.gxh3**: per il libro è obbligata; Stockfish preferisce 13.Qf3, che perde comunque un pedone.
+- **17…Bxf2**, l'ultima mossa: il libro dice che non c'era scampo, ma 18.Bxf7+! Ke7 19.Bg5+ Kf8 20.Bf4! porta la
+  posizione all'incirca in parità. Il Bianco abbandonò senza vederla. Per Stockfish era decisiva 17…Qh3+, accettata
+  come *Valida*.
+
+Tutte le posizioni della partita sono state confrontate con i sei diagrammi del libro (dopo 7.a4, 9.h3, 10…Nxe5,
+11…Qxe5, 15…Ng4, 17.Kh1).
+
+## Ripasso
+
+Stessi intervalli del piano di allenamento (`training_schedule.INTERVAL_HOURS`: 4 ore, 1, 3, 7, 14 giorni…). Conta
+solo la risposta data quando la lezione è **nuova** o **in scadenza**:
+
+- giusta e **senza indizi**: la lezione passa al passo successivo;
+- sbagliata, o giusta con almeno un indizio: torna al passo 0 e si ripresenta dopo 4 ore.
+
+Le risposte date prima della scadenza (anche con **Riprova**) sono pratica e non cambiano il calendario. L'elenco
+mostra per ogni lezione *Nuova*, *Da ripassare*, *Da rifare* o *Ripasso N* con la data; **Inizia** propone prima i
+ripassi in scadenza, poi le lezioni nuove nell'ordine del libro, che parte dalle idee più semplici.
+
+## Il campione
+
+| Lezione | Partita (n. nel libro) | Pagina | Mossa | Tema |
+|---|---|---|---|---|
+| lc-01 | von Scheve–Teichmann (1) | 12 | 2.Nf3 | Sviluppo con minaccia |
+| lc-02 | von Scheve–Teichmann (1) | 13 | 2…Nc6 | Difendere sviluppando |
+| lc-03 | von Scheve–Teichmann (1) | 13 | 3.Bc4 | Sviluppo dell'alfiere |
+| lc-04 | von Scheve–Teichmann (1) | 13 | 3…Bc5 | La casa più efficace |
+| lc-05 | von Scheve–Teichmann (1) | 14 | 4…Qe7 | Prevenire la minaccia (libro ≠ motore) |
+| lc-06 | Liubarski–Soultanbeieff (2) | 21 | 7…Nb8 | Ritirata del cavallo |
+| lc-07 | Liubarski–Soultanbeieff (2) | 22 | 12…Rg8 | Attacco sulla colonna aperta |
+| lc-08 | Tarrasch–Eckart (10) | 62 | 6.c3 | Sostenere la catena di pedoni |
+| lc-09 | Tarrasch–Mieses (14) | 83 | 11.Nc6 | Sfruttare una casa debole |
+| lc-10 | Capablanca–Mattison (24) | 163 | 12.Rab1 | Un piano con le torri |
+
+## Dati e verifiche
+
+- `backend/data/logical_chess.json`: fonte, partite, lezioni (mosse dalla posizione iniziale in SAN, FEN, domanda,
+  indizi, mosse previste con giudizio e nota, spiegazione, idea del libro, nota sul disaccordo) e il blocco `engine`.
+  Testi originali: il libro è citato solo con partita e pagina.
+- `scripts/build_lessons.py [--depth 22]`: rigioca ogni lezione e controlla FEN, legalità e SAN canonica delle mosse
+  previste e che la mossa della partita sia una sola; poi Stockfish, a profondità fissa, scrive le prime 5 linee e la
+  valutazione di ogni mossa prevista. Va rieseguito dopo ogni modifica alle lezioni (circa un minuto).
+- `backend/lessons.py`, `validate`: gli stessi controlli, eseguiti anche da `tests/test_lessons.py`.
+- Una mossa fuori lista viene valutata dal vivo (`LIVE_NODES`, segnata come «analisi rapida»).
+- `walks` nello stesso file: le partite di «Segui la partita», con colore, risultato, nota finale e, per ogni mossa,
+  SAN, pagina, nota; per le mosse da indovinare domanda, due indizi, alternative, idea del libro, nota sul disaccordo,
+  oppure il riferimento a una lezione (`lesson`), che deve avere la stessa posizione e la stessa mossa.
+  `scripts/build_lessons.py` vi scrive l'analisi di ogni mossa: profondità 20, al massimo 8 secondi per ricerca
+  (vicino a un matto Stockfish può non raggiungere la profondità). `validate_walks` controlla legalità, SAN canonica,
+  coerenza con le lezioni e analisi.
+
+## Come sono state ricostruite le posizioni
+
+Il PDF è una scansione con testo OCR in cui le figurine dei pezzi sono lette male (`lDf3`, `tt:Jf3`, `'ii'e7`).
+`scripts/extract_book_games.py book.pdf cartella` (richiede PyMuPDF, fuori dai requisiti del progetto) estrae il
+testo per pagina e ricostruisce la linea principale di ogni partita: per ogni riga che inizia con il numero di mossa
+atteso, python-chess sceglie l'unica mossa legale compatibile con casa d'arrivo, tipo di pezzo e cattura; le forme
+OCR delle figurine si imparano dalle mosse non ambigue. La partita si ferma alla prima mossa che resta ambigua.
+
+Il risultato è una bozza. Ogni posizione del campione è stata confrontata con un diagramma del libro (pezzi, turno,
+arrocchi) e il commento è stato riletto: in Tarrasch–Eckart lo script aveva scelto 10…Rd8 dove il testo («protegge il
+pedone e6») indica 10…Nd8, e le mosse successive di quella partita non sono state usate.
+
+## Limiti e prossimi passi
+
+- Per ora una sola partita da seguire; le altre richiedono la ricostruzione completa e il confronto con tutti i
+  diagrammi.
+- Da valutare con l'uso: se domande, indizi e spiegazioni aiutano davvero, e se le lezioni più avanzate (lc-09,
+  lc-10) sono alla portata. Solo dopo, estendere la raccolta.
+- Le alternative accettate sono scelte a mano: una mossa buona per il motore ma estranea all'idea resta «Sensata».
+- Diritti: la prova è per uso personale con riferimenti al libro e testi originali. Per un rilascio pubblico vanno
+  verificati i diritti su testo e diagrammi.
+
+## API
+
+- `GET /api/lessons`: percorso, fonte, lezioni con stato (`new`, `due`, `waiting`), passo e scadenza, `next`,
+  conteggi e `intervalHours`.
+- `GET /api/lessons/{id}`: posizione, mosse precedenti, domanda, indizi, mosse legali, partita con citazione e se la
+  risposta conterà per il ripasso (`counts`). Non contiene la soluzione.
+- `POST /api/lessons/{id}/answer` con `{"move": "d8e7", "hints": 1}`: esito, giudizio e nota, mossa della partita,
+  spiegazione, idea del libro, mosse previste con valutazioni, analisi del motore e nuovo stato del ripasso. 422 per
+  una mossa illegale, 404 per una lezione sconosciuta.
+- `GET /api/lesson-walks`: partite da seguire, con percorso in corso, ultimo e migliore.
+- `POST /api/lesson-walks/{id}/start`: nuovo percorso; risponde con la prima mossa da indovinare: posizione, mosse
+  precedenti, mosse dell'avversario appena giocate (nota e giudizio del motore), domanda, indizi. Senza soluzione.
+- `GET /api/lesson-walks/{id}/runs/{run}[?ply=N]`: la mossa successiva del percorso, o quella indicata. 409 se il
+  percorso è concluso e non si indica la mossa.
+- `POST /api/lesson-walks/{id}/answer` con `{"run": …, "ply": 1, "move": "e7e5", "hints": 0}`: esito, mossa della
+  partita, nota, analisi, posizione dopo la mossa, punteggio; all'ultima mossa anche risultato e nota finale. 422 per
+  una mossa illegale o che non tocca al giocatore.
+- Tabelle: `lesson_walk_runs` (percorsi: prossima mossa, risposte, trovate, senza indizi) e `lesson_walk_answers`.
+- Tabelle: `lesson_progress` (passo, scadenza, tentativi) e `lesson_attempts` (ogni risposta, con indizi e se è
+  contata).
