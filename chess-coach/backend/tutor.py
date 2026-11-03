@@ -215,7 +215,7 @@ Spiega la notazione scacchistica quando serve a un principiante. Usa le SAN forn
 Confronta la scelta con best senza dire che sia l'unica soluzione. Distingui il
 criterio del puzzle da quello della prevenzione: una scelta rifiutata in un puzzle
 può essere ancora vincente. Le valutazioni sono dal punto di vista turn, in
-centesimi di pedone; lossCp è la differenza rispetto alla migliore alternativa,
+centesimi di pedone; lossCp è la differenza rispetto alla migliore alternativa (con franchigia: le valutazioni oltre ±600 contano come ±600, perché la partita è già decisa),
 non la valutazione assoluta. Se è null, spiega il matto senza inventare perdite in
 pedoni. Le varianti sono esempi con risposte forti, non mosse obbligatorie per
 l'avversario. Se la linea breve non chiarisce il motivo, dichiaralo esplicitamente.

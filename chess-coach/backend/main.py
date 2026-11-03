@@ -20,7 +20,7 @@ from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, FiniteFloat
 
-from .engine import ROOT, SHORT_MATE, evaluator, load_analysis
+from .engine import ROOT, SHORT_MATE, critical, evaluator, flagged, load_analysis, missed_mate, rescore, severity
 from .drills import CATALOG, materialize, decisions_played
 from . import tutor, final_review
 from . import prevention
@@ -972,15 +972,15 @@ def analyze_game(job_id, snapshot):
                 if loss >= 80:
                     best, actual, loss, choices = evaluator.compare_candidates(board, move, nodes=60000)
                 theme = "Calcolo e mosse candidate"
-                if best["mate"] is not None and 0 < best["mate"] <= SHORT_MATE and (actual["mate"] is None or actual["mate"] < 0):
+                if missed_mate(best, actual):
                     theme = "Riconoscere il matto"
                 elif actual["mate"] is not None and -SHORT_MATE <= actual["mate"] < 0 and (best["mate"] is None or best["mate"] > 0):
                     theme = "Difesa dalle minacce di matto"
                 item = {"ply": ply, "fen": board.fen(), "played": uci, "playedSan": board.san(move),
                                   "best": best, "actual": actual, "loss": loss, "theme": theme,
                                   "stockfishCandidates": choices,
-                                  "isPlayer": is_player, "forced": forced,
-                                  "label": "Mossa obbligata" if forced else "Errore" if loss >= 180 else "Imprecisione" if loss >= 80 else "Buona scelta"}
+                                  "isPlayer": is_player, "forced": forced}
+                rescore(item)
                 item['insight'] = insights.public(insights.compare(board.fen(), uci, best, actual, choices))
                 if theme == 'Calcolo e mosse candidate':
                     item['theme'] = {'tactical':'Conseguenze tattiche', 'mixed':'Tattica e posizione',
@@ -991,8 +991,7 @@ def analyze_game(job_id, snapshot):
                     decisions.append(item)
             board.push(move)
             update_job(job_id, progress=round((ply + 1) / len(moves) * 100))
-        critical = sorted([d for d in decisions if d["loss"] >= 80], key=lambda d: -d["loss"])[:3]
-        analysis = {"decisions": decisions, "moves": reviewed_moves, "reviewVersion": 3, "critical": critical, "engine": evaluator.name,
+        analysis = {"decisions": decisions, "moves": reviewed_moves, "reviewVersion": 3, "critical": critical(decisions), "engine": evaluator.name,
                     "createdAt": now(), "version": len(moves), "source": snapshot["source"], "note": "Analisi a budget limitato. Temi indicativi, non diagnosi definitive."}
         with database() as con:
             con.execute('BEGIN IMMEDIATE')
@@ -1004,7 +1003,7 @@ def analyze_game(job_id, snapshot):
             # Refutation games start from a position already lost on purpose: review only, no new exercises.
             if snapshot['source'] != 'stockfish':
                 prevention.seed_game(con, snapshot, analysis, now())
-            for item in critical if snapshot['source'] != 'stockfish' else []:
+            for item in analysis['critical'] if snapshot['source'] != 'stockfish' else []:
                 if not item["best"]["pv"]:
                     continue
                 ex_id = f"{snapshot['id']}:{snapshot['revision']}:{item['ply']}"
@@ -1195,7 +1194,7 @@ def attempt(exercise_id: str, body: AttemptInput):
     if move not in board.legal_moves:
         raise HTTPException(422, "Mossa non legale")
     best, actual, loss = evaluator.compare(board, move, nodes=80000)
-    success = loss < mistakes.PUZZLE_TOLERANCE_CP
+    success = mistakes.accepted(best, actual)
     with database() as con:
         con.execute("BEGIN IMMEDIATE")
         session = active_session(con, exercise_id, body.session_id, body.version)
@@ -1254,16 +1253,16 @@ def practice(exercise_id: str, body: PracticeInput):
     if move not in board.legal_moves:
         raise HTTPException(422, "Mossa non legale")
     best, actual, loss = evaluator.compare(board, move, nodes=80000)
-    return {"success": loss < mistakes.PUZZLE_TOLERANCE_CP, "san": board.san(move), "actual": actual}
+    return {"success": mistakes.accepted(best, actual), "san": board.san(move), "actual": actual}
 
 
 def puzzle_diagnosis_position(con, exercise_id, session_id):
     row = find_exercise(con, exercise_id)
     active_session(con, exercise_id, session_id)
 
-    # Same criterion as an attempt: scores already include the engine's mate convention.
+    # Same criterion as an attempt.
     def accepts(board, move, evaluation, best):
-        return best['cp'] - evaluation['cp'] < mistakes.PUZZLE_TOLERANCE_CP
+        return mistakes.accepted(best, evaluation)
     tried = [r[0] for r in con.execute("SELECT move FROM attempts WHERE session_id=? AND success=0 AND move!='reveal' ORDER BY id", (session_id,))]
     return {'board': reconstruct(row["initial_fen"], json.loads(row["history"])), 'accepts': accepts, 'tried': tried}
 
@@ -1369,7 +1368,7 @@ def profile():
         for row in con.execute("SELECT analysis FROM games WHERE analysis IS NOT NULL AND source NOT IN ('snapshot','stockfish')"):
             for d in load_analysis(row['analysis']).get('decisions',[]):
                 identity=(d['fen'],d['played'])
-                if d['loss']<80 or identity in seen:continue
+                if not flagged(d) or identity in seen:continue
                 seen.add(identity)
                 saved=d.get('insight')
                 kind=(saved if saved and saved.get('version')==insights.VERSION else insights.compare(d['fen'],d['played'],d['best'],d['actual'],d.get('stockfishCandidates')))['kind']
@@ -1414,7 +1413,7 @@ def request_tutor(game_id: str, body: TutorInput):
             if body.version != len(json.loads(row['moves'])) or row['analysis_version'] != body.version or not row['analysis']:
                 raise HTTPException(409, 'Completa l’analisi Stockfish della versione attuale prima di chiedere al tutor.')
             analysis = load_analysis(row['analysis'])
-            decisions = sorted(analysis['decisions'], key=lambda d: -d['loss'])[:3]
+            decisions = sorted(analysis['decisions'], key=lambda d: -severity(d))[:3]
             for d in decisions:
                 d['insight'] = insights.compare(d['fen'],d['played'],d['best'],d['actual'],d.get('stockfishCandidates'))
             if not decisions:

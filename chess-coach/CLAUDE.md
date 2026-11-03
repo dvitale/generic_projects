@@ -39,6 +39,7 @@ make experimental                             # servizio del motore sperimentale
 - Maia sul server (`backend/maia.py`): onnxruntime 1.23+ va in crash su questo modello con `ORT_ENABLE_ALL`. Resta `ORT_ENABLE_EXTENDED` e `onnxruntime==1.22.1` in `requirements.lock`; prima di aggiornarlo esegui `tests/test_maia.py`.
 - I problemi Lichess importati sono un campione ordinato per ID: gli ID iniziano tutti per "0".
 - Le valutazioni e le classificazioni didattiche (diagnosi, Blunder prevention, Puzzle) le decide Stockfish con regole fisse; il tutor DeepSeek interpreta soltanto.
+- Per giudicare una mossa contro la migliore usa sempre `review_loss`/`missed_mate` (`backend/engine.py`) e `mistakes.accepted`, mai la differenza grezza dei centesimi: c'è la franchigia di ±600 e il «Matto mancato». Vedi `docs/giudizio-mosse.md`.
 
 ## Convenzioni
 

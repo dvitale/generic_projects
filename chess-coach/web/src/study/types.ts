@@ -12,7 +12,7 @@ export interface Exam {id:string;createdAt:string;deadline:string;finishedAt:str
 export interface ExamHistory {history:{id:string;createdAt:string;size:number;score:number}[];active:Exam|null;nextRecommended:string|null;cadenceDays:number}
 
 export interface Moment {ply:number;fen:string;turn:Color;moveNumber:number;played:string;playedSan:string;best:string[];bestSan:string[];line:string[];refutation?:string[];loss:number;lossCp?:number|null;label:string;theme?:string;insight?:string|null;exerciseId?:string|null;preventionId?:string|null;cards?:number}
-export interface Pack {gameId:string;title:string;createdAt:string;playerColor:Color;quality:{decisions:number;sound:number;inaccuracies:number;errors:number};moments:Moment[];quiz:{answered:number;score:number;total:number}|null}
+export interface Pack {gameId:string;title:string;createdAt:string;playerColor:Color;quality:{decisions:number;sound:number;inaccuracies:number;errors:number;missedMates?:number};moments:Moment[];quiz:{answered:number;score:number;total:number}|null}
 
 export interface Answer {answer:string;lesson:string;provider:string;notice?:string;best:{cp:number;mate:number|null;pv:string[];san:string[]};moves:{san:string;uci:string;cp:number;mate:number|null;lossCp:number|null;line:string[]}[];perspective:Color}
 

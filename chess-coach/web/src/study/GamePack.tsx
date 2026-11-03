@@ -47,7 +47,7 @@ export default function GamePack({games,gameId,onGame,actions}:{games:Saved[];ga
   if(moment){if(moment.best[0])arrows.push({move:moment.best[0],source:'stockfish',rank:1});arrows.push({move:moment.played,source:'played',rank:1})}
   return <>
     <section className="panel study-toolbar"><GamePicker games={games} value={gameId} onChange={onGame}/>
-      {pack&&<div className="pack-summary"><span><strong>{pack.quality.errors}</strong> errori</span><span><strong>{pack.quality.inaccuracies}</strong> imprecisioni</span><span><strong>{pack.quality.sound} / {pack.quality.decisions}</strong> decisioni solide</span>
+      {pack&&<div className="pack-summary"><span><strong>{pack.quality.errors}</strong> errori</span>{!!pack.quality.missedMates&&<span><strong>{pack.quality.missedMates}</strong> {pack.quality.missedMates===1?'matto mancato':'matti mancati'}</span>}<span><strong>{pack.quality.inaccuracies}</strong> imprecisioni</span><span><strong>{pack.quality.sound} / {pack.quality.decisions}</strong> decisioni solide</span>
         <button className="primary" onClick={actions.onQuiz}>{pack.quiz?`Quiz della partita · ${pack.quiz.score}/${pack.quiz.total}`:'Quiz della partita'} →</button></div>}
     </section>
     {error&&<div className="alert" role="alert">{error}<button onClick={()=>setReload(n=>n+1)}>Riprova</button></div>}

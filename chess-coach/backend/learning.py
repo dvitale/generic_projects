@@ -7,7 +7,7 @@ import uuid
 import chess
 from fastapi import HTTPException
 
-from .engine import load_analysis
+from .engine import ERROR_CP, INACCURACY_CP, flagged, load_analysis, severity
 
 
 def init_schema(con):
@@ -37,9 +37,12 @@ def value(e):
 
 def quality(items):
     opportunities = [d for d in items if value(d['best']) >= 150]
-    return {'decisions': len(items), 'sound': sum(d['loss'] < 80 for d in items),
-            'inaccuracies': sum(80 <= d['loss'] < 180 for d in items),
-            'errors': sum(d['loss'] >= 180 for d in items),
+    # Missed mates are their own category, never counted as sound, inaccuracies or errors.
+    plain = [d for d in items if not d.get('missedMate')]
+    return {'decisions': len(items), 'sound': sum(d['loss'] < INACCURACY_CP for d in plain),
+            'inaccuracies': sum(INACCURACY_CP <= d['loss'] < ERROR_CP for d in plain),
+            'errors': sum(d['loss'] >= ERROR_CP for d in plain),
+            'missedMates': len(items) - len(plain),
             'advantages': len(opportunities),
             'maintained': sum(value(d['actual']) >= 150 for d in opportunities)}
 
@@ -47,17 +50,17 @@ def quality(items):
 def game_quality(con, row):
     drill = con.execute('SELECT start_ply FROM drill_sessions WHERE game_id=?', (row['id'],)).fetchone()
     items = decisions(row, drill['start_ply'] if drill else 0)
-    flagged = []
+    marked = []
     for d in sorted(items, key=lambda d: d['ply']):
-        if d['loss'] < 80:
+        if not flagged(d):
             continue
         board = chess.Board(d['fen'])
-        flagged.append({'ply': d['ply'], 'san': d['playedSan'], 'moveNumber': board.fullmove_number,
+        marked.append({'ply': d['ply'], 'san': d['playedSan'], 'moveNumber': board.fullmove_number,
                         'color': 'w' if board.turn else 'b',
-                        'kind': 'error' if d['loss'] >= 180 else 'inaccuracy',
+                        'kind': 'missed-mate' if d.get('missedMate') else 'error' if d['loss'] >= ERROR_CP else 'inaccuracy',
                         'lossCp': d['loss'] if d['best'].get('mate') is None and d['actual'].get('mate') is None else None})
-    return {**quality(items), 'flagged': flagged, 'ready': bool(row['analysis']) and row['analysis_version'] == len(json.loads(row['moves'])),
-            'moments': [{'ply':d['ply'],'san':d['playedSan'],'loss':d['loss']} for d in sorted(items,key=lambda d:-d['loss'])[:3] if d['loss']>=80]}
+    return {**quality(items), 'flagged': marked, 'ready': bool(row['analysis']) and row['analysis_version'] == len(json.loads(row['moves'])),
+            'moments': [{'ply':d['ply'],'san':d['playedSan'],'loss':d['loss'],'label':d['label']} for d in sorted(items,key=lambda d:-severity(d))[:3] if flagged(d)]}
 
 
 def records(con):

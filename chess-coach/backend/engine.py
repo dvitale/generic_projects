@@ -142,7 +142,8 @@ class Evaluator:
             if actual["cp"] > best["cp"] + 30:
                 best = self.evaluate(board, nodes=nodes * 2)
             settled = self.settle(board, best)
-            return settled, settled if actual is best else self.settle(board, actual), max(0, best["cp"] - actual["cp"])
+            actual = settled if actual is best else self.settle(board, actual)
+            return settled, actual, review_loss(settled, actual)
 
 
 def expected(e):
@@ -152,32 +153,72 @@ def expected(e):
     return 1 / (1 + math.exp(-0.00368208 * e['cp']))
 
 
-# Review severity: a missed or allowed mate longer than SHORT_MATE moves is not something to demand at
-# club level, so it counts as a decisive edge (DECISIVE_CP) instead of the 100000 mate sentinel.
+# Outcome cap ("franchigia"): beyond +OUTCOME_CAP_CP the game is won and below -OUTCOME_CAP_CP it is lost; a bigger
+# margin changes nothing (+12 or +18, 3 or 1200 metres of water). Every mate counts as the cap, so a loss only measures
+# how far a move moves the game towards a different outcome, and engine noise in decided positions is ignored.
+OUTCOME_CAP_CP = 600
+# Mates in 1-2 are judged apart: missing one is a "Matto mancato" even when the position stays won.
 SHORT_MATE = 2
-DECISIVE_CP = 500
+INACCURACY_CP, ERROR_CP = 80, 180
+
+
+def capped(e):
+    if e['mate'] is not None:
+        return OUTCOME_CAP_CP if e['mate'] > 0 else -OUTCOME_CAP_CP
+    return max(-OUTCOME_CAP_CP, min(OUTCOME_CAP_CP, e['cp']))
 
 
 def review_loss(best, actual):
-    """Centipawn loss used to classify a reviewed move; short mates keep their full weight."""
-    if best['mate'] is not None and actual['mate'] is not None:
-        return max(0, best['cp'] - actual['cp'])
-    def value(e):
-        mate = e['mate']
-        if mate is None or abs(mate) <= SHORT_MATE:
-            return e['cp']
-        return DECISIVE_CP if mate > 0 else -DECISIVE_CP
-    return max(0, value(best) - value(actual))
+    """Loss of a move against the best one, on the capped outcome scale: the one rule for reviews, puzzles and exams."""
+    return max(0, capped(best) - capped(actual))
+
+
+def short_mate(e):
+    return e['mate'] is not None and 0 < e['mate'] <= SHORT_MATE
+
+
+def missed_mate(best, actual):
+    """A mate in 1-2 was there and the move played does not mate as quickly."""
+    return short_mate(best) and not short_mate(actual)
+
+
+def review_label(d):
+    if d.get('forced'):
+        return 'Mossa obbligata'
+    if d.get('missedMate'):
+        return 'Matto mancato'
+    return 'Errore' if d['loss'] >= ERROR_CP else 'Imprecisione' if d['loss'] >= INACCURACY_CP else 'Buona scelta'
+
+
+def flagged(d):
+    """A decision worth reviewing: an inaccuracy, an error or a missed mate."""
+    return d['loss'] >= INACCURACY_CP or bool(d.get('missedMate'))
+
+
+def severity(d):
+    """Ordering key for the costliest decisions; a missed mate weighs at least as an error."""
+    return max(d['loss'], ERROR_CP) if d.get('missedMate') else d['loss']
+
+
+def rescore(d):
+    d['loss'] = review_loss(d['best'], d['actual'])
+    d['missedMate'] = missed_mate(d['best'], d['actual'])
+    d['label'] = review_label(d)
+    return d
+
+
+def critical(decisions):
+    return sorted([d for d in decisions if flagged(d)], key=lambda d: -severity(d))[:3]
 
 
 def load_analysis(text):
-    """Stored game analysis with losses rescored by review_loss, so older analyses follow the current rule."""
+    """Stored game analysis rescored by the current rule (loss, missed mate, label), so older analyses follow it."""
     analysis = json.loads(text)
     for key in ('moves', 'decisions', 'critical'):
         for d in analysis.get(key, []):
-            d['loss'] = review_loss(d['best'], d['actual'])
+            rescore(d)
     if 'critical' in analysis:
-        analysis['critical'] = sorted([d for d in analysis.get('decisions', []) if d['loss'] >= 80], key=lambda d: -d['loss'])[:3]
+        analysis['critical'] = critical(analysis.get('decisions', []))
     return analysis
 
 

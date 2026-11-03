@@ -8,7 +8,7 @@ from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from . import insights, learning, tutor
-from .engine import load_analysis
+from .engine import load_analysis, severity
 
 VERSION = 'final-review-1'
 
@@ -52,8 +52,8 @@ def build_context(con, row, result):
                       'lossCp': d['loss'] if d['best'].get('mate') is None and d['actual'].get('mate') is None else None})
     own = learning.decisions(row, start)
     opposing = [d for d in reviewed if chess.Board(d['fen']).turn != (player == 'w') and not d.get('forced')]
-    selected = sorted(own, key=lambda d: -d['loss'])[:3] + sorted(opposing, key=lambda d: -d['loss'])[:2]
-    maintained = [d for d in own if d['loss'] < 80 and learning.value(d['best']) >= 150 and learning.value(d['actual']) >= 150]
+    selected = sorted(own, key=lambda d: -severity(d))[:3] + sorted(opposing, key=lambda d: -severity(d))[:2]
+    maintained = [d for d in own if d['loss'] < 80 and not d.get('missedMate') and learning.value(d['best']) >= 150 and learning.value(d['actual']) >= 150]
     if maintained:
         selected.append(maintained[-1])
     evidence = []
@@ -100,7 +100,7 @@ le mosse non documentano ciò che il giocatore aveva visto o pensato.
 trajectory contiene tutte le mosse ANALIZZATE di entrambi i colori in ordine:
 before/after/best/actual sono già dalla prospettiva del giocatore, anche quando
 muove l'avversario. Non invertire nuovamente i segni. lossCp è la perdita del lato
-che ha mosso. cp è in centesimi di pedone, non materiale perso né Elo. mate è
+che ha mosso (con franchigia: le valutazioni oltre ±600 contano come ±600, perché la partita è già decisa). cp è in centesimi di pedone, non materiale perso né Elo. mate è
 separato, non convertirlo in pedoni. Non chiamare matto un abbandono: termination='resign'
 significa che ha abbandonato il giocatore, 'engine_resign' che ha abbandonato il bot. result='*'
 significa risultato non noto/partita non conclusa: il bilancio è provvisorio.

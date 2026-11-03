@@ -7,7 +7,7 @@ import {evaluationSeries,type EvaluationPoint} from './evaluationSeries'
 import {gameAccuracy} from './accuracy'
 import {calibrationInfo,performanceFromAccuracy} from './performance'
 
-const kinds:MoveClass[]=['best','good','inaccuracy','error','blunder']
+const kinds:MoveClass[]=['best','good','inaccuracy','error','blunder','missedMate']
 
 function moveName(d:Decision){const f=d.fen.split(' ');return `${f[5]}${f[1]==='w'?'.':'…'} ${d.playedSan}`}
 
@@ -71,7 +71,7 @@ export default function ReviewSummary({game,cursor,onPosition}:{game:Game;cursor
   })
   const {points}=useMemo(()=>evaluationSeries(game),[game.initialFen,game.moves,game.analysis])
   const accuracy=useMemo(()=>gameAccuracy(game,points.filter(p=>p.position>=start),new Set(game.assistedPlies??[])),[points,start,game.initialFen,game.assistedPlies])
-  const marks=[...byPly.values()].filter(d=>d.ply>=start&&!assisted.has(d.ply)&&['inaccuracy','error','blunder'].includes(classifyMove(d)))
+  const marks=[...byPly.values()].filter(d=>d.ply>=start&&!assisted.has(d.ply)&&['inaccuracy','error','blunder','missedMate'].includes(classifyMove(d)))
   const current=byPly.get(cursor)
   const opening=game.opening,book=opening?.bookPlies??0
   // The name follows the board: the deepest named position reached by the one shown.

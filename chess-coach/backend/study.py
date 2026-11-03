@@ -18,7 +18,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from . import learning, mistakes, training_schedule, tutor
-from .engine import evaluator
+from .engine import evaluator, flagged, severity
 
 # Ratings of a self-assessed flashcard, SM-2 style: transparent and predictable intervals.
 RATINGS = ('again', 'hard', 'good', 'easy')
@@ -207,7 +207,7 @@ def choice_question(kind, prompt, board, correct, wrong, explanation, line, ply)
 
 def build_quiz(row, start):
     """Up to five questions on the player's costliest decisions; every answer is engine-verified."""
-    chosen = sorted([d for d in learning.decisions(row, start) if d['loss'] >= 80], key=lambda d: -d['loss'])[:3]
+    chosen = sorted([d for d in learning.decisions(row, start) if flagged(d)], key=lambda d: -severity(d))[:3]
     best_moves, refutations, evaluation = [], [], None
     for d in chosen:
         board = chess.Board(d['fen'])
@@ -439,7 +439,7 @@ Usa SOLO le mosse presenti nelle varianti fornite, scritte esattamente con la lo
 inglese (N, B, R, Q, K): non inventare altre mosse o continuazioni. Se la domanda chiede
 qualcosa che le varianti non dimostrano, dillo esplicitamente. Le valutazioni sono in
 centesimi di pedone dal punto di vista di chi muove; lossCp è la differenza rispetto alla
-migliore, non materiale perso. Le varianti sono esempi con risposte forti, non mosse obbligate.
+migliore (con franchigia: le valutazioni oltre ±600 contano come ±600, perché la partita è già decisa), non materiale perso. Le varianti sono esempi con risposte forti, non mosse obbligate.
 Restituisci solo JSON: {"answer":"risposta chiara, massimo 2000 caratteri",
 "lesson":"un controllo concreto da fare prima di muovere, massimo 400 caratteri"}.
 ''' + tutor.PEDAGOGY
@@ -476,7 +476,7 @@ def notebook_entries(con, timestamp):
         WHERE g.analysis IS NOT NULL AND g.source NOT IN ('snapshot','stockfish') ORDER BY g.created_at DESC'''):
         for d in learning.decisions(row, row['start_ply']):
             identity = (d['fen'], d['played'])
-            if d['loss'] < 80 or identity in seen:
+            if not flagged(d) or identity in seen:
                 continue
             seen.add(identity)
             board = chess.Board(d['fen'])
@@ -486,7 +486,7 @@ def notebook_entries(con, timestamp):
                 'gameId': row['id'], 'gameTitle': training_schedule.numbered(row['title'], row['number']), 'createdAt': row['created_at'], 'ply': d['ply'],
                 'fen': d['fen'], 'turn': 'w' if board.turn else 'b', 'moveNumber': board.fullmove_number,
                 'played': d['played'], 'playedSan': d['playedSan'], 'best': d['best']['pv'][:1], 'bestSan': d['best']['san'][:1],
-                'line': d['best']['san'], 'loss': d['loss'], 'label': 'Errore' if d['loss'] >= 180 else 'Imprecisione',
+                'line': d['best']['san'], 'loss': d['loss'], 'label': d['label'],
                 'insight': (d.get('insight') or {}).get('label'), 'lessons': lessons})
     for card in cards:
         entry = themes.setdefault(card['theme'], {'theme': card['theme'], 'decisions': [], 'lessons': []})
@@ -494,8 +494,8 @@ def notebook_entries(con, timestamp):
             entry['lessons'].append(card['lesson'])
     result = []
     for entry in themes.values():
-        ordered = sorted(entry['decisions'], key=lambda d: -d['loss'])
-        result.append({'theme': entry['theme'], 'count': len(ordered), 'errors': sum(d['loss'] >= 180 for d in ordered),
+        ordered = sorted(entry['decisions'], key=lambda d: -severity(d))
+        result.append({'theme': entry['theme'], 'count': len(ordered), 'errors': sum(d['label'] in ('Errore', 'Matto mancato') for d in ordered),
                        'lessons': entry['lessons'][:6], 'examples': ordered[:3]})
     return sorted(result, key=lambda t: (-t['count'], t['theme']))
 
@@ -511,7 +511,8 @@ def notebook_pgn(themes):
                                  'Date': example['createdAt'][:10].replace('-', '.'), 'White': '?', 'Black': '?',
                                  'Result': '*', 'Annotator': 'SparringMate · Stockfish',
                                  'Source': f"{example['gameTitle']} · mossa {example['moveNumber']}"})
-            notes = [f"{example['label']}: perdi {example['loss'] / 100:.2f} punti rispetto alla scelta di Stockfish.".replace('.', ',', 1)]
+            notes = [f"Matto mancato: c'era {example['bestSan'][0]} con matto in poche mosse." if example['label'] == 'Matto mancato' and example['bestSan'] else
+                     f"{example['label']}: perdi {example['loss'] / 100:.2f} punti rispetto alla scelta di Stockfish.".replace('.', ',', 1)]
             notes += [f'Lezione: {lesson}' for lesson in example['lessons'] or theme['lessons'][:1]]
             game.comment = f"Tema: {theme['theme']}."
             game.add_main_variation(chess.Move.from_uci(example['played']), comment=' '.join(notes))
@@ -661,7 +662,7 @@ def install(app, database, find_game, now, lock):
         if move not in board.legal_moves:
             raise HTTPException(422, 'Mossa non legale')
         best, actual, loss = evaluator.compare(board, move, nodes=80000)
-        success = loss < mistakes.PUZZLE_TOLERANCE_CP
+        success = mistakes.accepted(best, actual)
         with database() as con:
             con.execute('BEGIN IMMEDIATE')
             exam = open_exam(con, exam_id, now())
@@ -708,13 +709,13 @@ def install(app, database, find_game, now, lock):
                 FROM study_quizzes q WHERE q.game_id=? ORDER BY q.created_at DESC LIMIT 1''', (game_id,)).fetchone()
             decisions = learning.decisions(row, start)
         moments = []
-        for d in sorted([d for d in decisions if d['loss'] >= 80], key=lambda d: d['ply']):
+        for d in sorted([d for d in decisions if flagged(d)], key=lambda d: d['ply']):
             board = chess.Board(d['fen'])
             moments.append({'ply': d['ply'], 'fen': d['fen'], 'turn': 'w' if board.turn else 'b', 'moveNumber': board.fullmove_number,
                             'played': d['played'], 'playedSan': d['playedSan'], 'best': d['best']['pv'][:1], 'bestSan': d['best']['san'][:1],
                             'line': d['best']['san'], 'refutation': d['actual']['san'][:4], 'loss': d['loss'],
                             'lossCp': d['loss'] if d['best']['mate'] is None and d['actual']['mate'] is None else None,
-                            'label': 'Errore' if d['loss'] >= 180 else 'Imprecisione', 'theme': d['theme'],
+                            'label': d['label'], 'theme': d['theme'],
                             'insight': (d.get('insight') or {}).get('label'),
                             'exerciseId': exercises.get(d['ply']), 'preventionId': positions.get(d['ply']), 'cards': cards.get(d['ply'], 0)})
         return {'gameId': game_id, 'title': training_schedule.numbered(row['title'], row['number']), 'createdAt': row['created_at'], 'playerColor': row['player_color'],

@@ -36,7 +36,22 @@ test('estimated performance reads the Lichess calibration and needs enough moves
 
 test('move classes separate errors from blunders that lose three points or allow mate',()=>{
   const move=(loss:number)=>classifyMove({loss,played:'e2e4',best:{pv:['d2d4']} as never,forced:false})
-  expect([79,80,179,180,299,300,99395].map(move)).toEqual(['good','inaccuracy','inaccuracy','error','error','blunder','blunder'])
+  expect([79,80,179,180,299,300,1200].map(move)).toEqual(['good','inaccuracy','inaccuracy','error','error','blunder','blunder'])
+  expect(classifyMove({loss:0,played:'e2e4',best:{pv:['d2d4']} as never,forced:false,missedMate:true})).toBe('missedMate')
+  expect(classifyMove({loss:0,played:'e2e4',best:{pv:['d2d4']} as never,forced:true,missedMate:true})).toBe('forced')
+})
+
+test('a mate in one not played is marked as a missed mate',async({page,request})=>{
+  const imported=await(await request.post('/api/import',{data:{pgn:'1. e4 e5 2. Qh5 Nc6 3. Bc4 Nf6 4. d3 Nxh5 *',color:'w'}})).json()
+  await page.addInitScript(id=>localStorage.setItem('chess-coach-game',id),imported.id)
+  await page.goto('/')
+  await page.getByRole('button',{name:'Rivedi',exact:true}).click()
+  await page.getByRole('button',{name:/^(Analizza partita|Ricalcola analisi)$/}).click()
+  await expect(page.getByText(/Revisione pronta/)).toBeVisible({timeout:60000})
+  const summary=page.getByRole('region',{name:'Riepilogo della partita'})
+  await expect(summary.getByRole('button',{name:'Grafico: 4. d3 · Matto mancato'})).toBeVisible()
+  await expect(summary.getByRole('button',{name:/^Vai a 4\. d3 · Matto mancato/})).toBeVisible()
+  await expect(summary.getByRole('table',{name:'Confronto tra i due lati'}).getByRole('row',{name:/Matto mancato/})).toContainText('1')
 })
 
 test('review summary compares both sides, marks mistakes on the graph and lists Stockfish lines',async({page,request})=>{

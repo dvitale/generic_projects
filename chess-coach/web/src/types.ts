@@ -1,7 +1,7 @@
 export type Color = 'w' | 'b'
 import type {Insight} from './ChessInsights'
 export interface Evaluation { cp: number; mate: number | null; pv: string[]; san: string[]; depth: number; nodes: number; perspective: Color }
-export interface Decision { ply: number; fen: string; played: string; playedSan: string; best: Evaluation; stockfishCandidates?:Evaluation[]; actual: Evaluation; loss: number; theme: string; label: string; isPlayer?:boolean; forced?:boolean; insight?:Insight }
+export interface Decision { ply: number; fen: string; played: string; playedSan: string; best: Evaluation; stockfishCandidates?:Evaluation[]; actual: Evaluation; loss: number; missedMate?:boolean; theme: string; label: string; isPlayer?:boolean; forced?:boolean; insight?:Insight }
 export interface Analysis { createdAt:string; decisions: Decision[]; moves?:Decision[]; reviewVersion?:number; critical: Decision[]; engine: string; version: number; note: string }
 export interface Rating { estimate:number|null; boundary:'lower'|'upper'|null; status:'estimated'|'tied'|'inconclusive'; positions:number; totalPositions:number; createdAt:string; method:string; tiedLevels?:number[]; comparisons?:{level:number;meanLogLikelihood:number;geometricMoveProbability:number}[] }
 /** Lichess catalogue name of the deepest named position; bookPlies is the last ply still on a catalogue line, where the book ends. */

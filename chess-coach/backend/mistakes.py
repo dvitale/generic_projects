@@ -8,7 +8,7 @@ from fastapi import HTTPException
 
 from . import tutor
 from . import insights
-from .engine import evaluator
+from .engine import evaluator, missed_mate, review_loss
 
 COMPARISON_VERSION = 'contrast-3'
 
@@ -26,18 +26,23 @@ def init_schema(con):
     ''')
 
 
-# A puzzle move is rejected when it gives up 0.70 or more against Stockfish's best move.
+# A puzzle move is rejected when it gives up 0.70 or more against Stockfish's best move on the capped outcome
+# scale (engine.review_loss), or when it misses a mate in 1-2.
 PUZZLE_TOLERANCE_CP = 70
+
+
+def accepted(best, actual):
+    return review_loss(best, actual) < PUZZLE_TOLERANCE_CP and not missed_mate(best, actual)
 
 
 def record(con, kind, target_id, attempt_id, board, move, best, actual, timestamp):
     # Mate scores are not pawn values: never turn engine mate sentinels into a loss.
-    loss = max(0, best['cp'] - actual['cp']) if best['mate'] is None and actual['mate'] is None else None
+    loss = review_loss(best, actual) if best['mate'] is None and actual['mate'] is None else None
     evidence = {'fen': board.fen(), 'turn': 'w' if board.turn else 'b',
                 'move': move.uci(), 'san': board.san(move), 'best': best, 'actual': actual,
                 'lossCp': loss, 'engine': evaluator.name,
                 'criterion': 'Evita il blunder della partita: resta almeno a −1,00 o perdi meno di 2,00 rispetto alla migliore, senza matto contro di te.' if kind == 'prevention'
-                else 'Perdi meno di 0,70 rispetto alla migliore mossa di Stockfish.'}
+                else 'Perdi meno di 0,70 rispetto alla migliore mossa di Stockfish (oltre ±6,00 la partita è decisa e la differenza non conta) e non manchi un matto in 1–2.'}
     con.execute('''INSERT INTO training_mistakes(kind,target_id,attempt_id,created_at,evidence)
                    VALUES(?,?,?,?,?)''', (kind, target_id, attempt_id, timestamp, json.dumps(evidence)))
 
@@ -83,14 +88,14 @@ def verified_context(evidence, kind):
         raise HTTPException(409, 'Tentativo salvato non legale per questa posizione.')
     best, actual, loss = evaluator.compare(board, move, nodes=320000)
     if kind == 'puzzle':
-        accepted = loss < PUZZLE_TOLERANCE_CP
+        accepted_now = accepted(best, actual)
     else:
         from .prevention import accepted as avoids
-        accepted = avoids(best, actual)
+        accepted_now = avoids(best, actual)
     context = context_for({**evidence, 'best': best, 'actual': actual,
                           'lossCp': loss if best['mate'] is None and actual['mate'] is None else None})
     context['verification'] = {
-        'acceptedNow': accepted, 'requestedNodesPerLine': 320000,
+        'acceptedNow': accepted_now, 'requestedNodesPerLine': 320000,
         'original': {k: evidence[k] for k in ('best', 'actual', 'lossCp')},
         'note': 'Ricerca più approfondita, non una certezza assoluta. Il tentativo storico non viene riscritto.'}
     # Test the same opponent response after the alternative. It may have a

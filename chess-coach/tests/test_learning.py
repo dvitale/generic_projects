@@ -25,7 +25,7 @@ def seed(client, color='w', source='pgn'):
 def test_quality_thresholds_and_mates():
     items=[{'best':evaluation(200),'actual':evaluation(200-loss),'loss':loss} for loss in (0,79,80,179,180)]
     result=learning.quality(items)
-    assert result=={'decisions':5,'sound':2,'inaccuracies':2,'errors':1,'advantages':5,'maintained':1}
+    assert result=={'decisions':5,'sound':2,'inaccuracies':2,'errors':1,'missedMates':0,'advantages':5,'maintained':1}
     assert learning.quality([{'best':evaluation(0,mate=3),'actual':evaluation(0,mate=-2),'loss':20000}])['maintained']==0
     for cp,expected in [(-300,'much_worse'),(-101,'worse'),(-100,'equal'),(100,'equal'),(101,'better'),(300,'much_better')]:
         assert learning.category(evaluation(cp))==expected
