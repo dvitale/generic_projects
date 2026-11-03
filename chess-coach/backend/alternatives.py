@@ -23,7 +23,7 @@ from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from . import diagnosis, explain, learning, pgn_import, training_schedule, tutor
-from .engine import evaluator, expected
+from .engine import evaluator, expected, objective
 from .insights import material
 
 MODEL_VERSION = 1
@@ -185,10 +185,9 @@ def named(piece, me):
     return own(piece) if piece.color == me else theirs(piece)
 
 
-def fmt(e):
-    if e['mate'] is not None:
-        return f"matto {'a tuo favore' if e['mate'] > 0 else 'contro di te'} in {abs(e['mate'])}"
-    return f"{e['cp'] / 100:+.2f}".replace('.', ',')
+def fmt(e, board):
+    """An evaluation from the side to move in `board`, shown on the objective scale."""
+    return objective(e, board.turn == chess.WHITE)
 
 
 def numbered(board, pv, count=6):
@@ -364,11 +363,11 @@ def explanation(board, reasoning, evidence):
     if board.is_check():
         concrete = 'Eri sotto scacco: la minaccia era già sulla scacchiera.'
     elif threat and threat['real']:
-        concrete = f"Se {opponent} avesse potuto muovere, la minaccia concreta era {threat['san']} (valutazione {fmt(threat['evaluation'])} dal tuo punto di vista)."
+        concrete = f"Se {opponent} avesse potuto muovere, la minaccia concreta era {threat['san']} (valutazione {fmt(threat['evaluation'], board)})."
     else:
         concrete = f"Stockfish non trova una minaccia immediata decisiva: anche con la mossa {explain.articled('al', opponent)} la valutazione non peggiorerebbe molto."
     if stated and not stated['concrete']:
-        concrete += f" Dopo {stated['san']} la valutazione resterebbe {fmt(stated['evaluation'])}: quella minaccia non era concreta."
+        concrete += f" Dopo {stated['san']} la valutazione resterebbe {fmt(stated['evaluation'], board)}: quella minaccia non era concreta."
     after = board.copy(stack=False)
     after.push(move)
     to, origin = chess.square_name(move.to_square), chess.square_name(move.from_square)
@@ -389,16 +388,16 @@ def explanation(board, reasoning, evidence):
         'defend': lambda: f"{san} difende {own(board.piece_at(target))} in {chess.square_name(target)}.",
         'indirect_defense': lambda: f"{san} non difende direttamente {own(board.piece_at(target))} in {chess.square_name(target)}, ma nella variante verificata catturarlo non conviene {explain.articled('al', opponent)}.",
     }
-    detail = details.get(kind, lambda: f"{san} è una mossa tranquilla: {own(piece)} va in {to} e la valutazione resta {fmt(best)}.")()
+    detail = details.get(kind, lambda: f"{san} è una mossa tranquilla: {own(piece)} va in {to} e la valutazione resta {fmt(best, board)}.")()
     status = None
     if evidence['status'] == 'much_worse':
-        status = (f"La posizione resta compromessa: fra le {len(evidence['alternatives'])} mosse analizzate la migliore vale {fmt(best)}. "
+        status = (f"La posizione resta compromessa: fra le {len(evidence['alternatives'])} mosse analizzate la migliore vale {fmt(best, board)}. "
                   'Non è una prova che ogni mossa perda, ma non c’è una salvezza evidente: qui l’obiettivo è la resistenza migliore, '
                   'e conviene rivedere anche le decisioni precedenti.')
     kind_label = 'tactical' if kind in TACTICAL or after.is_check() else 'positional' if kind in {'improve_piece', 'king_activity', 'pawn_move', 'free_square'} else \
         ('tactical' if threat and threat['real'] else 'mixed')
     return {'feared': feared, 'threat': concrete, 'detail': detail,
-            'continuation': f"Una continuazione possibile: {numbered(board, teach['line'])}. Valutazione al termine della ricerca: {fmt(best)}.",
+            'continuation': f"Una continuazione possibile: {numbered(board, teach['line'])}. Valutazione al termine della ricerca: {fmt(best, board)}.",
             'line': teach['line'][:6], 'kind': kind_label, 'status': status}
 
 

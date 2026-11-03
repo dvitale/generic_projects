@@ -1,9 +1,10 @@
 import {useEffect,useState} from 'react'
 import {api} from '../api'
+import {SCORE_NOTE,objectiveScore} from '../evalText'
 import InfoNote from '../InfoNote'
 import StudyBoard from './StudyBoard'
 import type {AnalysisArrow} from '../Board'
-import type {CardsOverview,Rating} from './types'
+import type {CardTry,CardsOverview,Rating} from './types'
 
 const ratings:[Rating,string][]=[['again','Di nuovo'],['hard','Difficile'],['good','Bene'],['easy','Facile']]
 export function interval(days:number){
@@ -19,13 +20,14 @@ export default function Flashcards({onReview}:{onReview:(gameId:string,ply:numbe
   const [busy,setBusy]=useState(false)
   const [error,setError]=useState('')
   const [session,setSession]=useState(0)
+  const [tried,setTried]=useState<CardTry|null>(null)
   async function load(){try{setData(await api<CardsOverview>('/study/cards'));setError('')}catch(e){setError(e instanceof Error?e.message:'Schede non disponibili')}}
   useEffect(()=>{void load()},[])
   const card=data?.due[0]
   async function act(path:string,body:object){
     if(!card||busy)return
     setBusy(true)
-    try{await api(`/study/cards/${card.id}/${path}`,body);setRevealed(false);setSession(n=>n+1);await load()}
+    try{await api(`/study/cards/${card.id}/${path}`,body);setRevealed(false);setTried(null);setSession(n=>n+1);await load()}
     catch(e){setError(e instanceof Error?e.message:'Operazione non riuscita')}
     finally{setBusy(false)}
   }
@@ -39,8 +41,17 @@ export default function Flashcards({onReview}:{onReview:(gameId:string,ply:numbe
     window.addEventListener('keydown',key)
     return()=>window.removeEventListener('keydown',key)
   },[card?.id,revealed,busy])
+  // Optional: a move played on the front turns the card and is judged by Stockfish; the schedule still follows the rating.
+  async function attempt(move:string){
+    if(!card||busy||revealed)return
+    setBusy(true)
+    try{setTried(await api<CardTry>(`/study/cards/${card.id}/try`,{move}));setRevealed(true);setError('')}
+    catch(e){setError(e instanceof Error?e.message:'Mossa non valutata')}
+    finally{setBusy(false)}
+  }
   const arrows:AnalysisArrow[]=[]
   if(card&&revealed){
+    if(tried&&!tried.sameAsPlayed)arrows.push({move:tried.move,source:'solution',rank:1})
     if(card.bestMove)arrows.push({move:card.bestMove,source:'stockfish',rank:1})
     if(card.move)arrows.push({move:card.move,source:'played',rank:1})
   }
@@ -51,20 +62,26 @@ export default function Flashcards({onReview}:{onReview:(gameId:string,ply:numbe
       <p>{data?.nextDue?`La prossima scheda torna il ${new Date(data.nextDue).toLocaleString('it-IT',{dateStyle:'medium',timeStyle:'short'})}.`:'Le schede nascono dalle tue lezioni.'}</p>
       <ul className="study-list"><li>Ogni <strong>Spiega motivo</strong> nei puzzle e in Blunder prevention diventa una scheda con la sua lezione.</li><li>In <strong>Impara da una partita</strong> e in <strong>Chiedi al tutor</strong> puoi scrivere la tua lezione e salvarla.</li></ul>
     </section>:<div className="training-layout layout-study">
-      <StudyBoard fen={card.fen} side={card.turn} arrows={arrows} caption={revealed?'Freccia bianca: la tua mossa di allora. Freccia blu: la scelta di Stockfish.':'Osserva la posizione prima di girare la scheda.'}/>
+      <StudyBoard fen={card.fen} side={card.turn} arrows={arrows} legalMoves={revealed||busy?[]:card.legalMoves} onMove={move=>void attempt(move)}
+        caption={revealed?`${tried&&!tried.sameAsPlayed?'Freccia verde: la tua mossa di oggi. ':''}Freccia bianca: la tua mossa di allora. Freccia blu: la scelta di Stockfish.`:busy?'Stockfish valuta la tua mossa…':'Ripeti a mente la regola. Se vuoi, gioca sulla scacchiera la mossa che sceglieresti: la scheda si gira e Stockfish la giudica.'}/>
       <aside className="coach-column">
         <section className="panel flashcard" aria-label="Scheda">
           <span className="eyebrow">{card.theme} · {card.kind==='explanation'?'dalla spiegazione di un tentativo':'la tua lezione'}</span>
           <h2>{card.question}</h2>
           {!revealed?<button className="primary full" onClick={()=>setRevealed(true)}>Mostra risposta <kbd>Spazio</kbd></button>:<>
             <p className="hint flashcard-lesson">{card.lesson}</p>
+            {tried&&<div role="status" aria-label="La tua mossa" className={tried.accepted?'notice':'alert'}><span>
+              <b>{tried.accepted?'✓':'✗'} Oggi: {tried.san} {objectiveScore(tried,card.turn)}</b> · {tried.sameAsBest?'la prima scelta di Stockfish':tried.label}.
+              {tried.sameAsPlayed?' È la stessa mossa di allora.':tried.played&&<> Allora: {tried.played.san} {objectiveScore(tried.played,card.turn)}.</>}
+              {!tried.accepted&&tried.best.san&&<> Migliore: {tried.best.san} {objectiveScore(tried.best,card.turn)}.</>}</span></div>}
             {(card.san||card.bestSan)&&<p>{card.san&&<>Avevi giocato <strong>{card.san}</strong>. </>}{card.bestSan&&<>Stockfish preferisce <strong>{card.bestSan}</strong>.</>}</p>}
-            <p className="muted">Quanto ti è venuto facile ricordarla?</p>
+            {tried&&<p className="footnote">{SCORE_NOTE}</p>}
+            <p className="muted">Quanto ti è venuto facile ricordarla? La mossa non decide il ripasso: conta il tuo voto.</p>
             <div className="rating-row" role="group" aria-label="Valuta il ricordo">{ratings.map(([rating,label],i)=><button key={rating} className={'rating-'+rating} disabled={busy} onClick={()=>void act('review',{rating})}><strong>{label}</strong><small>{interval(card.preview[rating])} · {i+1}</small></button>)}</div>
           </>}
           <div className="row">{card.gameId&&card.ply!==null&&<button className="quiet" onClick={()=>onReview(card.gameId!,card.ply!)}>Rivedi nella partita</button>}<button className="quiet" disabled={busy} onClick={()=>{if(window.confirm('Archiviare la scheda? Non tornerà più nei ripassi.'))void act('archive',{})}}>Archivia scheda</button></div>
         </section>
-        <InfoNote summary="Come funzionano gli intervalli">Rispondi a mente, poi gira la scheda e valuta con sincerità: <em>Di nuovo</em> la ripropone tra 10 minuti, le altre risposte allungano l’intervallo (1, 3 giorni e poi in crescita). Le schede allenano il principio, non la mossa: i puzzle restano il posto dove trovare la mossa giusta.</InfoNote>
+        <InfoNote summary="Come funzionano gli intervalli">Rispondi a mente, se vuoi gioca anche la mossa sulla scacchiera, poi gira la scheda e valuta con sincerità: <em>Di nuovo</em> la ripropone tra 10 minuti, le altre risposte allungano l’intervallo (1, 3 giorni e poi in crescita). Le schede allenano il principio, non la mossa: i puzzle restano il posto dove trovare la mossa giusta.</InfoNote>
       </aside>
     </div>}
   </>

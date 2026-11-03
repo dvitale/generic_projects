@@ -960,7 +960,7 @@ details.panel>summary{font-weight:650;font-size:var(--fs-lg)}
 .lesson-verdict-game,.lesson-verdict-good{background:var(--success-bg);color:var(--success)}
 .lesson-verdict-partial{background:var(--surface-2);color:var(--muted)}
 .lesson-verdict-weak,.lesson-verdict-other{background:var(--error-bg);color:var(--error)}
-.lesson-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.lesson-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px}
 .lesson-actions .footnote{flex-basis:100%;margin:0}
 .lesson-citation{margin-top:8px}
 

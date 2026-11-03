@@ -8,7 +8,7 @@ from fastapi import HTTPException
 
 from . import tutor
 from . import insights
-from .engine import evaluator, missed_mate, review_loss
+from .engine import evaluator, missed_mate, objective, review_loss
 
 COMPARISON_VERSION = 'contrast-3'
 
@@ -41,7 +41,7 @@ def record(con, kind, target_id, attempt_id, board, move, best, actual, timestam
     evidence = {'fen': board.fen(), 'turn': 'w' if board.turn else 'b',
                 'move': move.uci(), 'san': board.san(move), 'best': best, 'actual': actual,
                 'lossCp': loss, 'engine': evaluator.name,
-                'criterion': 'Evita il blunder della partita: resta almeno a −1,00 o perdi meno di 2,00 rispetto alla migliore, senza matto contro di te.' if kind == 'prevention'
+                'criterion': 'Evita il blunder della partita: non andare oltre 1,00 di svantaggio (col Bianco non sotto −1,00, col Nero non sopra +1,00) oppure perdi meno di 2,00 rispetto alla migliore, senza subire un matto forzato.' if kind == 'prevention'
                 else 'Perdi meno di 0,70 rispetto alla migliore mossa di Stockfish (oltre ±6,00 la partita è decisa e la differenza non conta) e non manchi un matto in 1–2.'}
     con.execute('''INSERT INTO training_mistakes(kind,target_id,attempt_id,created_at,evidence)
                    VALUES(?,?,?,?,?)''', (kind, target_id, attempt_id, timestamp, json.dumps(evidence)))
@@ -145,11 +145,10 @@ def verified_mate_explanation(context):
                       f"Dopo {alternative} {check} esistono invece queste risposte: {', '.join(replies)}.")
     best = context['best']
     if best['mate'] is not None:
-        assessment = ('Stockfish trova un matto a favore.' if best['mate'] > 0 else
-                      'Stockfish trova ancora un matto contro: evitare quello immediato non basta a salvare la partita.')
+        assessment = (f"Stockfish trova un {objective(best, chess.Board(context['fen']).turn == chess.WHITE)}." if best['mate'] > 0 else
+                      f"Stockfish trova ancora un {objective(best, chess.Board(context['fen']).turn == chess.WHITE)}: evitare quello immediato non basta a salvare la partita.")
     else:
-        number = f"{best['cp']/100:+.2f}".replace('.', ',')
-        assessment = f"La valutazione di {alternative}, con le risposte migliori trovate da Stockfish, è {number} dal tuo punto di vista."
+        assessment = f"La valutazione di {alternative}, con le risposte migliori trovate da Stockfish, è {objective(best, chess.Board(context['fen']).turn == chess.WHITE)}."
         if abs(best['cp']) <= 100:
             assessment += ' È una valutazione vicina alla parità, non un grande vantaggio.'
     explanation = {

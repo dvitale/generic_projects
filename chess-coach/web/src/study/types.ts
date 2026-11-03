@@ -1,7 +1,9 @@
 import type {Color,Evaluation} from '../types'
 
 export type Rating='again'|'hard'|'good'|'easy'
-export interface Card {id:number;kind:'explanation'|'note';fen:string;turn:Color;move:string|null;san:string|null;bestMove:string|null;bestSan:string|null;question:string;lesson:string;theme:string;gameId:string|null;ply:number|null;dueAt:string;reps:number;lapses:number;intervalDays:number;preview:Record<Rating,number>}
+export interface Card {id:number;kind:'explanation'|'note';fen:string;turn:Color;move:string|null;san:string|null;bestMove:string|null;bestSan:string|null;question:string;lesson:string;theme:string;gameId:string|null;ply:number|null;dueAt:string;reps:number;lapses:number;intervalDays:number;legalMoves:string[];preview:Record<Rating,number>}
+export interface CardTry {move:string;san:string;cp:number;mate:number|null;loss:number;label:string;accepted:boolean;sameAsPlayed:boolean;sameAsBest:boolean;
+  best:{move:string|null;san:string|null;cp:number;mate:number|null};played:{san:string;cp:number;mate:number|null;loss:number}|null}
 export interface CardsOverview {due:Card[];total:number;nextDue:string|null;reviewedToday:number}
 
 export interface QuizQuestion {index:number;kind:'best'|'refutation'|'evaluation';prompt:string;fen:string;turn:Color;ply:number;options:{uci:string|null;label:string}[];result?:{choice:number;correct:boolean;answer:number;explanation:string;line:string[]}}
@@ -25,4 +27,5 @@ export type StudySection='cards'|'quiz'|'exam'|'pack'|'ask'|'notebook'
 export interface Refutation {fen:string;move:string;san:string}
 
 export const pawns=(cp:number)=>(cp/100).toFixed(2).replace('.',',')
-export const scoreText=(e:{cp:number;mate:number|null})=>e.mate!==null?(e.mate>0?`matto a favore in ${e.mate}`:`matto contro in ${Math.abs(e.mate)}`):`${e.cp>=0?'+':''}${pawns(e.cp)}`
+// Engine scores come from the side to move; they are shown on the objective scale, like everywhere in the app.
+export {objectiveScore as scoreText} from '../evalText'

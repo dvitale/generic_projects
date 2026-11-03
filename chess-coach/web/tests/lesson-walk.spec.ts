@@ -16,6 +16,7 @@ test('following a book game: guess the black moves, white answers with a note',a
   await expect(page.getByRole('region',{name:'Idea del libro'})).toContainText('Nella partita: e5')
   await expect(page.getByRole('region',{name:'Valutazione di Stockfish'})).toContainText('Migliore per il motore')
   await expect(page.getByLabel('Punteggio')).toHaveText('1 su 1 trovate')
+  await expect(panel.getByRole('button',{name:'Continua →'})).toBeInViewport()
 
   // White's reply is played for you; the second move is one of the lessons.
   await page.getByRole('button',{name:'Continua →'}).click()

@@ -162,6 +162,21 @@ SHORT_MATE = 2
 INACCURACY_CP, ERROR_CP = 80, 180
 
 
+def objective(e, white):
+    """A score given from the player's side (white: the player has White), shown on the one scale used everywhere:
+    positive means White is better, negative Black. What one side gains the other loses."""
+    sign = 1 if white else -1
+    if e.get('mate') is not None:
+        mate = e['mate'] * sign
+        return f"matto del {'Bianco' if mate > 0 else 'Nero'} in {abs(mate)}"
+    return f"{e['cp'] * sign / 100:+.2f}".replace('.', ',').replace('-', '−')
+
+
+# How a loss reads on that scale, in the same words wherever a loss is shown.
+LOSS_NOTE = ('Il punteggio è oggettivo: positivo se è avanti il Bianco, negativo se è avanti il Nero. Perdere 1,20 '
+             'significa, per il Bianco, scendere di 1,20 (da 0,00 a −1,20); per il Nero, salire di 1,20 (da 0,00 a +1,20).')
+
+
 def capped(e):
     if e['mate'] is not None:
         return OUTCOME_CAP_CP if e['mate'] > 0 else -OUTCOME_CAP_CP

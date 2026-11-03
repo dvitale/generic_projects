@@ -21,6 +21,22 @@ Fino al 3 novembre 2026 la perdita era la differenza grezza in centesimi tra la 
 | +1 | −7 | 700 | errore grave |
 | matto in 1 | +15 | 0 | matto mancato |
 
+## Come si mostrano i punteggi
+
+Stockfish e le regole lavorano dal punto di vista di chi muove (positivo = buono per chi deve giocare): così una perdita
+si calcola nello stesso modo per i due colori. **Ciò che si mostra** è invece sempre sulla scala oggettiva: positivo se è
+avanti il Bianco, negativo se è avanti il Nero, chiunque muova. La conversione si fa solo nel testo:
+
+- interfaccia: `web/src/evalText.ts` (`objectiveScore(score, chi muove)`, `SCORE_NOTE`), usata da lezioni, «Segui la
+  partita», Rivedi, Trova un’alternativa, confronto e storico degli errori, Blunder prevention, diagnosi e tutor dello
+  Studio;
+- backend: `engine.objective(score, white)` e `LOSS_NOTE`, per i testi generati (spiegazioni, quiz, regole).
+
+Dicitura standard, la stessa ovunque: «Perdere 1,20 significa, per il Bianco, scendere di 1,20 (da 0,00 a −1,20); per
+il Nero, salire di 1,20 (da 0,00 a +1,20).» Le soglie delle regole si scrivono per i due colori («col Bianco non sotto
+−1,00, col Nero non sopra +1,00»). I matti: «matto del Bianco in 3», «matto del Nero in 3».
+I prompt del tutor DeepSeek restano dal punto di vista di chi muove: sono istruzioni interne, non testo mostrato.
+
 ## Dati già salvati
 
 Le analisi salvate vengono rivalutate alla lettura (`load_analysis`): perdita, matto mancato ed etichetta seguono la regola attuale, e così l'elenco dei momenti critici. Gli esercizi già creati restano nel database. Quelli nati in una posizione già decisa (come il puzzle della #37) ora accettano qualunque mossa che resti vincente e non manchi un matto breve.

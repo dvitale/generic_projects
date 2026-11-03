@@ -115,7 +115,7 @@ Il quiz propone fino a cinque domande sulle tre decisioni più costose della par
 Quando, dopo un puzzle o una prevenzione sbagliati, usi **Spiega motivo**, la lezione ottenuta diventa una scheda, tranne quando un’analisi più profonda di Stockfish giudica buona la mossa giocata. Altre schede nascono dal pacchetto di una partita o dal tutor.
 
 1. Osserva la posizione e la domanda; prova a dire la regola ad alta voce.
-2. Premi **Mostra risposta**: vedi la lezione con la freccia della tua mossa e di quella di Stockfish.
+2. Premi **Mostra risposta**: vedi la lezione con la freccia della tua mossa e di quella di Stockfish. In alternativa, gioca sulla scacchiera la mossa che sceglieresti: la scheda si gira da sola, Stockfish giudica la mossa (freccia verde) e la confronta con quella di allora. È facoltativo e non cambia la scadenza.
 3. Valuta con onestà quanto ricordavi (tasti 1–4):
 
 | Valutazione | Quando usarla | Prossima scadenza |

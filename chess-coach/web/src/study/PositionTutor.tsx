@@ -7,6 +7,7 @@ import type {AnalysisArrow} from '../Board'
 import type {Color} from '../types'
 import type {Answer,StudyPosition} from './types'
 import {pawns,scoreText} from './types'
+import {SCORE_NOTE} from '../evalText'
 
 interface Exchange {question:string;reply:Answer}
 
@@ -75,11 +76,11 @@ export default function PositionTutor({position}:{position:StudyPosition|null}){
         <p className="hint"><strong>Da controllare prima di muovere. </strong>{x.reply.lesson}</p>
         <details open={i===exchanges.length-1}><summary>Varianti verificate da Stockfish</summary>
           <ul className="verified-lines">
-            {x.reply.moves.map(m=><li key={m.uci}><strong>{m.san}</strong> {m.lossCp!=null?`· perde ${pawns(m.lossCp)}`:''} · {scoreText(m)}<p className="variation">{m.line.join(' ')}</p></li>)}
-            <li><strong>Migliore: {x.reply.best.san[0]??'—'}</strong> · {scoreText(x.reply.best)}<p className="variation">{x.reply.best.san.join(' ')}</p></li>
+            {x.reply.moves.map(m=><li key={m.uci}><strong>{m.san}</strong> {m.lossCp!=null?`· perde ${pawns(m.lossCp)}`:''} · {scoreText(m,turn)}<p className="variation">{m.line.join(' ')}</p></li>)}
+            <li><strong>Migliore: {x.reply.best.san[0]??'—'}</strong> · {scoreText(x.reply.best,turn)}<p className="variation">{x.reply.best.san.join(' ')}</p></li>
           </ul></details>
         <div className="row"><button onClick={()=>void saveLesson(i)} disabled={!!saved[i]}>Salva la lezione come flashcard</button>{saved[i]&&<span role="status" className="footnote">{saved[i]}</span>}</div>
-        <small className="footnote">{x.reply.provider==='DeepSeek'?'Risposta DeepSeek basata sulle varianti Stockfish: le mosse di pezzo citate sono state controllate.':'Risposta costruita solo dalle varianti di Stockfish (tutor DeepSeek non configurato o risposta scartata).'} Valutazioni dal punto di vista di chi muove.</small>
+        <small className="footnote">{x.reply.provider==='DeepSeek'?'Risposta DeepSeek basata sulle varianti Stockfish: le mosse di pezzo citate sono state controllate.':'Risposta costruita solo dalle varianti di Stockfish (tutor DeepSeek non configurato o risposta scartata).'} {SCORE_NOTE}</small>
       </section>)}
       <InfoNote summary="Come vengono verificate le risposte">Le mosse citate nella domanda (anche in notazione italiana: C, A, T, D, R) vengono analizzate da Stockfish. Se il tutor DeepSeek è configurato riceve solo quelle varianti; una risposta che cita mosse di pezzo o catture non presenti nelle varianti viene scartata e sostituita dai fatti di Stockfish.</InfoNote>
     </aside>

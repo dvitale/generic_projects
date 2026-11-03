@@ -4,6 +4,7 @@ import Board,{type AnalysisArrow} from './Board'
 import MiniBoard from './MiniBoard'
 import InfoNote from './InfoNote'
 import {api} from './api'
+import {SCORE_NOTE,objectiveScore} from './evalText'
 import {useBoardOrientation} from './boardFlip'
 import type {Color,Evaluation,Game} from './types'
 
@@ -29,7 +30,7 @@ export const labels:Record<string,string>={not_considered:'Alternativa non consi
 const areas:Record<string,string>={search:'ricerca delle mosse',calculation:'calcolo delle risposte',evaluation:'valutazione',unclear:'da chiarire'}
 const details=[['reply','Ho visto come rispondere alla replica che temevo'],['threat','La minaccia non era inevitabile'],['evaluation','La posizione dopo è migliore di quanto pensassi'],['resource','Ho notato una risorsa di un pezzo'],['unclear','Non mi è ancora chiaro']] as const
 const phases:Record<string,string>={marked:'Segnato',reasoning:'Prima della ricerca',searching:'Ricerca in corso',reflecting:'Dopo la soluzione',complete:'Completato'}
-export function score(e:{cp:number;mate:number|null}){return e.mate!=null?`matto ${e.mate>0?'a tuo favore':'contro di te'} in ${Math.abs(e.mate)}`:`${e.cp>=0?'+':''}${(e.cp/100).toFixed(2).replace('.',',')}`}
+export const score=objectiveScore
 const when=(iso:string)=>new Date(iso).toLocaleString('it-IT',{dateStyle:'short',timeStyle:'short'})
 function play(fen:string,moves:string[]){const board=new Chess(fen);for(const m of moves)board.move({from:m.slice(0,2),to:m.slice(2,4),promotion:m[4]});return board}
 
@@ -171,9 +172,9 @@ export default function FindAlternative({episodeId,onEpisode,embedded=false,onCl
         {solution.tempting&&<p>Qui {solution.tempting.san} usa la stessa idea dell’episodio di partenza, ma Stockfish la respinge: è il controesempio da ricordare.</p>}
         {e.playedMove&&<p className="muted">In partita hai giocato {e.playedMove.san}.</p>}
         <details><summary>Alternative verificate e tuoi tentativi</summary>
-          <ul className="alternative-attempts">{solution.alternatives.map(a=><li key={a.move}><b>{a.san}</b> · {a.label} · {score(a.evaluation)}</li>)}</ul>
-          {e.attempts.length>0&&<ul className="alternative-attempts">{e.attempts.map(a=><li key={a.id}>Tuo tentativo <b>{a.san}</b> · {a.label}{a.evaluation?` · ${score(a.evaluation)}`:''}</li>)}</ul>}
-          <p className="footnote">Valori dal tuo punto di vista. {solution.engine.name}, {solution.engine.nodes.toLocaleString('it-IT')} nodi per mossa, {solution.engine.candidates} candidate a confronto: è una stima, non una dimostrazione.</p>
+          <ul className="alternative-attempts">{solution.alternatives.map(a=><li key={a.move}><b>{a.san}</b> · {a.label} · {score(a.evaluation,e.color)}</li>)}</ul>
+          {e.attempts.length>0&&<ul className="alternative-attempts">{e.attempts.map(a=><li key={a.id}>Tuo tentativo <b>{a.san}</b> · {a.label}{a.evaluation?` · ${score(a.evaluation,e.color)}`:''}</li>)}</ul>}
+          <p className="footnote">{SCORE_NOTE} {solution.engine.name}, {solution.engine.nodes.toLocaleString('it-IT')} nodi per mossa, {solution.engine.candidates} candidate a confronto: è una stima, non una dimostrazione.</p>
         </details>
         {e.origin==='live'&&e.pendingInGame&&<button className="primary" disabled={busy} onClick={()=>void apply()}>Gioca {e.found?.san??solution.san} nella partita</button>}
       </section>}

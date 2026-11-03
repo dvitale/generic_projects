@@ -196,3 +196,18 @@ def test_notebook_groups_errors_by_theme_and_exports_annotated_pgn(client):
     assert game.headers['Event'].startswith('Quaderno degli errori')
     assert game.next().san() == 'Nxe5' and 'Lezione: Il cavallo c6 difende e5.' in game.next().comment
     assert len(game.variations) == 2 and game.variations[1].comment == 'Alternativa di Stockfish'
+
+
+def test_a_move_tried_on_the_card_is_judged_without_changing_the_schedule(client):
+    card = client.post('/api/study/cards', json={'fen': FEN, 'lesson': 'Chi difende e5?', 'move': 'f3e5', 'bestMove': 'f1c4'}).json()
+    assert 'f1c4' in card['legalMoves'] and len(card['legalMoves']) == chess.Board(FEN).legal_moves.count()
+    assert client.post(f"/api/study/cards/{card['id']}/try", json={'move': 'e1e3'}).status_code == 422
+    good = client.post(f"/api/study/cards/{card['id']}/try", json={'move': 'f1c4'}).json()
+    assert good['san'] == 'Bc4' and good['accepted'] and not good['sameAsPlayed']
+    assert good['played']['san'] == 'Nxe5' and good['played']['loss'] >= 200
+    again = client.post(f"/api/study/cards/{card['id']}/try", json={'move': 'f3e5'}).json()
+    assert again['sameAsPlayed'] and again['played'] is None and not again['accepted'] and again['label'] == 'Errore'
+    # Trying is not rating: the card is still due and unrated.
+    due = client.get('/api/study/cards').json()['due']
+    assert [c['id'] for c in due] == [card['id']] and due[0]['reps'] == 0
+    assert client.post('/api/study/cards/999/try', json={'move': 'f1c4'}).status_code == 404

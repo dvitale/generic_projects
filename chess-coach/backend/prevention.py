@@ -22,8 +22,9 @@ BLUNDER_CP = -200
 AVOID_CP = 200
 RULE_VERSION = 1
 RULE = ('Basta evitare il blunder della partita: è accettata ogni mossa diversa da quella giocata allora che non è a sua '
-        'volta un blunder, cioè resta almeno a −1,00 dalla tua parte oppure perde meno di 2,00 rispetto alla migliore, '
-        'senza matto forzato contro di te. Non è richiesta la migliore: anche una mossa a −1,10 da quella va bene.')
+        'volta un blunder, cioè non porta oltre 1,00 di svantaggio (col Bianco non sotto −1,00, col Nero non sopra +1,00) '
+        'oppure perde meno di 2,00 rispetto alla migliore, senza subire un matto forzato. Non è richiesta la migliore: '
+        'anche una mossa che perde 1,10 rispetto a quella va bene.')
 
 
 # «Alla portata»: a blunder is a lapse (abbaglio), not a skill gap, when humans of the game's level rarely play it

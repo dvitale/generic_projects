@@ -1,13 +1,14 @@
 import {useState} from 'react'
 import Board,{type AnalysisArrow} from './Board'
 import {api} from './api'
+import {SCORE_NOTE,objectiveScore} from './evalText'
 import {useBoardOrientation} from './boardFlip'
 import type {Color} from './types'
 
 type Verdict='game'|'good'|'partial'|'weak'|'other'
 interface Score {cp:number;mate:number|null}
 interface Judged extends Score {san:string;loss:number;label:string;best:string;bestScore:Score;live?:boolean}
-export interface Run {id:string;startedAt:string;finishedAt:string|null;nextPly:number;answered:number;found:number;clean:number;total:number}
+export interface Run {firstPly:number;fromNumber:number;id:string;startedAt:string;finishedAt:string|null;nextPly:number;answered:number;found:number;clean:number;total:number}
 export interface WalkItem {id:string;title:string;game:number;side:Color;event:string;opening:string;result:string|null;summary:string;total:number;current:Run|null;last:Run|null;best:Run|null}
 interface Reply {ply:number;san:string;uci:string;number:number;white:boolean;note:string;page:number;engine:Judged}
 interface Step {walk:string;ply:number;number:number;total:number;fen:string;turn:Color;line:string;lastMove:string|null;replies:Reply[];question:string;hints:string[];lesson:string|null;legalMoves:string[];run:Run}
@@ -16,9 +17,8 @@ interface Answer {success:boolean;verdict:Verdict;verdictLabel:string;move:strin
   engine:{depth:number;lines:(Score&{san:string;pv:string[]})[];move:Judged;played:Judged};moves:Considered[];nextPly:number|null;finished:boolean;tail:Reply[];result:string|null;ending:string|null;citation:string;run:Run;fenAfter:string;lastMove:string}
 
 const VERDICT:Record<Verdict,string>={game:'Partita',good:'Valida',partial:'Sensata',weak:'Debole',other:'Fuori lista'}
-const score=(s:Score)=>s.mate!==null?(s.mate>0?`#${s.mate}`:`#-${-s.mate}`):`${s.cp>=0?'+':'−'}${(Math.abs(s.cp)/100).toFixed(2)}`
 const moveName=(r:Reply)=>`${r.number}${r.white?'.':'…'}${r.san}`
-const judgement=(j:Judged)=>j.best===j.san?`la prima scelta del motore (${score(j)})`:`${j.label}, ${score(j)} · migliore ${j.best} ${score(j.bestScore)}`
+const judgement=(j:Judged,turn:Color)=>j.best===j.san?`la prima scelta del motore (${objectiveScore(j,turn)})`:`${j.label}, ${objectiveScore(j,turn)} · migliore ${j.best} ${objectiveScore(j.bestScore,turn)}`
 
 /** Segui la partita: the player guesses every move of one side of a book game; the other side's moves are played for them. */
 export default function LessonWalk({walk,start,onExit}:{walk:WalkItem;start:Step;onExit:()=>void}){
@@ -49,12 +49,19 @@ export default function LessonWalk({walk,start,onExit}:{walk:WalkItem;start:Step
         <span className="eyebrow">PARTITA {walk.game} · MOSSA {current.number} DI {current.total}{current.lesson?' · LEZIONE':''}</span>
         <p className="lesson-line">{current.line||'Posizione iniziale'}</p>
         {current.replies.map(r=><div key={r.ply} className="walk-reply"><b>{r.white?'Il Bianco':'Il Nero'} gioca {moveName(r)}.</b> {r.note}
-          <small> Stockfish: {judgement(r.engine)}.</small></div>)}
+          <small> Stockfish: {judgement(r.engine,r.white?'w':'b')}.</small></div>)}
         <h3>{current.question}</h3>
         {shown>0&&<ol className="lesson-hints" aria-label="Indizi">{current.hints.slice(0,shown).map(h=><li key={h}>{h}</li>)}</ol>}
         {!answer&&shown<current.hints.length&&<button disabled={busy} onClick={()=>setShown(shown+1)}>Indizio {shown+1} di {current.hints.length}</button>}
         {!answer&&<p className="footnote">Gioca la mossa che sceglieresti per {side}.</p>}
         {answer&&<div role="status" className={answer.success?'notice':'alert'}><span><b>{answer.success?'✓':'✗'} {answer.move}: {answer.verdictLabel}.</b> {answer.note??''}</span></div>}
+        <div className="lesson-actions">
+        {answer&&!answer.counted&&<p className="footnote">Secondo tentativo: non cambia il punteggio.</p>}
+        {answer&&!finished&&answer.nextPly!==null&&<button className="primary" disabled={busy} onClick={()=>go(answer.nextPly!)}>Continua →</button>}
+        {finished&&<button className="primary" disabled={busy} onClick={restart}>Ricomincia la partita</button>}
+        {answer&&<button disabled={busy} onClick={()=>{setAnswer(null);setShown(0)}}>Riprova questa mossa</button>}
+        <button disabled={busy} title="Il percorso resta salvato: lo riprendi dall’elenco" onClick={onExit}>{answer?'Tutte le lezioni':'Interrompi'}</button>
+        </div>
         {error&&<p role="alert">{error}</p>}
       </section>
       {answer&&<>
@@ -66,27 +73,20 @@ export default function LessonWalk({walk,start,onExit}:{walk:WalkItem;start:Step
         </section>
         <section className="panel lesson-engine" aria-label="Valutazione di Stockfish">
           <span className="eyebrow">STOCKFISH · PROFONDITÀ {answer.engine.depth}</span>
-          <p>La tua mossa {answer.move}: <b>{score(answer.engine.move)}</b> · {answer.engine.move.label}{answer.engine.move.live?' (analisi rapida)':''}.
-            {answer.move!==answer.played&&<> Mossa della partita {answer.played}: <b>{score(answer.engine.played)}</b> · {answer.engine.played.label}.</>} Migliore per il motore: <b>{answer.engine.lines[0].san} {score(answer.engine.lines[0])}</b>.</p>
+          <p>La tua mossa {answer.move}: <b>{objectiveScore(answer.engine.move,current.turn)}</b> · {answer.engine.move.label}{answer.engine.move.live?' (analisi rapida)':''}.
+            {answer.move!==answer.played&&<> Mossa della partita {answer.played}: <b>{objectiveScore(answer.engine.played,current.turn)}</b> · {answer.engine.played.label}.</>} Migliore per il motore: <b>{answer.engine.lines[0].san} {objectiveScore(answer.engine.lines[0],current.turn)}</b>.</p>
           {answer.engineNote&&<p className="lesson-disagree">{answer.engineNote}</p>}
           {answer.moves.length>1&&<table className="lesson-moves"><thead><tr><th>Mossa</th><th>Giudizio</th><th>Motore</th></tr></thead>
-            <tbody>{answer.moves.map(m=><tr key={m.san} className={m.san===answer.move?'chosen':''}><td>{m.san}</td><td><span className={`kind-tag lesson-verdict-${m.verdict}`}>{VERDICT[m.verdict]}</span> {m.note}</td><td>{score(m)}</td></tr>)}</tbody></table>}
-          <p className="footnote">Valori dal punto di vista di chi muove.</p>
+            <tbody>{answer.moves.map(m=><tr key={m.san} className={m.san===answer.move?'chosen':''}><td>{m.san}</td><td><span className={`kind-tag lesson-verdict-${m.verdict}`}>{VERDICT[m.verdict]}</span> {m.note}</td><td>{objectiveScore(m,current.turn)}</td></tr>)}</tbody></table>}
+          <p className="footnote">{SCORE_NOTE}</p>
         </section>
         {finished&&<section className="panel walk-end" aria-label="Fine della partita">
           <span className="eyebrow">FINE · {answer.result}</span>
           {answer.tail.map(r=><p key={r.ply}><b>{moveName(r)}</b> {r.note}</p>)}
           {answer.ending&&<p>{answer.ending}</p>}
-          <h3>Hai trovato {run.found} mosse su {run.total} al primo tentativo, {run.clean} senza indizi.</h3>
+          <h3>Hai trovato {run.found} mosse su {run.total}{run.fromNumber>1?` (dalla mossa ${run.fromNumber})`:''} al primo tentativo, {run.clean} senza indizi.</h3>
         </section>}
       </>}
-      <section className="panel lesson-actions">
-        {answer&&!answer.counted&&<p className="footnote">Secondo tentativo: non cambia il punteggio.</p>}
-        {answer&&!finished&&answer.nextPly!==null&&<button className="primary" disabled={busy} onClick={()=>go(answer.nextPly!)}>Continua →</button>}
-        {finished&&<button className="primary" disabled={busy} onClick={restart}>Ricomincia la partita</button>}
-        {answer&&<button disabled={busy} onClick={()=>{setAnswer(null);setShown(0)}}>Riprova questa mossa</button>}
-        <button disabled={busy} title="Il percorso resta salvato: lo riprendi dall’elenco" onClick={onExit}>{answer?'Tutte le lezioni':'Interrompi'}</button>
-      </section>
       <p className="footnote lesson-citation">{answer?.citation??`Partita ${walk.game} del libro: ${walk.title}, ${walk.event}.`}</p>
     </aside>
   </div>

@@ -217,7 +217,11 @@ def install(app, database, now):
                             (lesson_id, stage, due, int(success), int(success), timestamp))
             current = state(progress(con).get(lesson_id), timestamp)
         analysis = lesson['engine']
-        return {'success': success, 'verdict': verdict, 'verdictLabel': VERDICTS[verdict], 'move': san,
+        # After the answer the board shows the game move played, and the lesson says where its game can be followed on.
+        after = board.copy()
+        after.push_san(lesson['played'])
+        return {'fenAfter': after.fen(), 'playedUci': after.peek().uci(), 'walk': walk_from_lesson(lesson),
+                'success': success, 'verdict': verdict, 'verdictLabel': VERDICTS[verdict], 'move': san,
                 'note': entry['note'] if entry else None, 'uci': move.uci(), 'played': lesson['played'], 'explanation': lesson['explanation'],
                 'bookIdea': lesson['bookIdea'], 'engineNote': lesson.get('engineNote'), 'counted': counted, 'hints': body.hints,
                 'moves': [{'san': s, 'uci': board.parse_san(s).uci(), 'verdict': e['verdict'], 'note': e['note'], **analysis['moves'][s]} for s, e in
@@ -255,6 +259,17 @@ def walk_step(walk, ply):
     hints = lesson['hints'] if lesson else entry['hints']
     accepted = lesson['moves'] if lesson else entry.get('moves', {})
     return entry, lesson, question, hints, {**accepted, entry['san']: {'verdict': 'game', 'note': (accepted.get(entry['san']) or {}).get('note') or 'La mossa giocata nella partita.'}}
+
+
+def walk_from_lesson(lesson):
+    """The followed game that goes through the lesson's position, and the first move to guess after the lesson move."""
+    history = lesson['history'] + [lesson['played']]
+    for walk in load().get('walks', []):
+        if walk['game'] == lesson['game'] and [m['san'] for m in walk['moves'][:len(history)]] == history:
+            later = [p for p in walk_plies(walk) if p >= len(history)]
+            if later:
+                return {'id': walk['id'], 'ply': later[0], 'number': walk_plies(walk).index(later[0]) + 1}
+    return None
 
 
 def walk_step_moves(walk, ply, lessons):
@@ -342,6 +357,9 @@ def init_walk_schema(con):
       id TEXT PRIMARY KEY, run_id TEXT NOT NULL, ply INTEGER NOT NULL, created_at TEXT NOT NULL, move TEXT NOT NULL,
       verdict TEXT NOT NULL, hints INTEGER NOT NULL, success INTEGER NOT NULL, counted INTEGER NOT NULL);
     ''')
+    # first_ply: a run can start from a lesson, in the middle of the game; only the moves from there on are scored.
+    if 'first_ply' not in {r[1] for r in con.execute('PRAGMA table_info(lesson_walk_runs)')}:
+        con.execute('ALTER TABLE lesson_walk_runs ADD COLUMN first_ply INTEGER NOT NULL DEFAULT 0')
 
 
 def install_walks(app, database, now):
@@ -354,8 +372,11 @@ def install_walks(app, database, now):
     def run_view(row, walk):
         if row is None:
             return None
+        plies = walk_plies(walk)
         return {'id': row['id'], 'startedAt': row['started_at'], 'finishedAt': row['finished_at'], 'nextPly': row['next_ply'],
-                'answered': row['answered'], 'found': row['found'], 'clean': row['clean'], 'total': len(walk_plies(walk))}
+                'answered': row['answered'], 'found': row['found'], 'clean': row['clean'], 'firstPly': row['first_ply'],
+                'fromNumber': plies.index(row['first_ply']) + 1 if row['first_ply'] in plies else 1,
+                'total': len([p for p in plies if p >= row['first_ply']])}
 
     def runs(con, walk):
         return [run_view(r, walk) for r in con.execute('SELECT * FROM lesson_walk_runs WHERE walk_id=? ORDER BY started_at DESC', (walk['id'],))]
@@ -390,20 +411,28 @@ def install_walks(app, database, now):
             items = []
             for walk in data.get('walks', []):
                 game, done = data['games'][walk['game']], runs(con, walk)
+                # The best score only compares runs played from the first move.
                 finished = [r for r in done if r['finishedAt']]
+                whole = [r for r in finished if r['fromNumber'] == 1]
                 items.append({'id': walk['id'], 'title': walk_title(walk), 'game': int(walk['game']), 'side': walk['side'],
                               'event': game['event'], 'opening': game['opening'], 'result': walk.get('result'),
                               'summary': walk['summary'], 'total': len(walk_plies(walk)),
                               'current': next((r for r in done if not r['finishedAt']), None),
-                              'last': finished[0] if finished else None, 'best': max(finished, key=lambda r: r['found'], default=None)})
+                              'last': finished[0] if finished else None, 'best': max(whole, key=lambda r: r['found'], default=None)})
         return {'walks': items}
 
+    class StartBody(BaseModel):
+        ply: int | None = Field(default=None, ge=0, le=1000)
+
     @app.post('/api/lesson-walks/{walk_id}/start')
-    def walk_start(walk_id: str):
+    def walk_start(walk_id: str, body: StartBody | None = None):
         walk = walk_by_id(walk_id)
-        run_id, first = str(uuid.uuid4()), walk_plies(walk)[0]
+        run_id, first = str(uuid.uuid4()), walk_plies(walk)[0] if body is None or body.ply is None else body.ply
+        if first not in walk_plies(walk):
+            raise HTTPException(422, 'Questa mossa non tocca a te')
         with database() as con:
-            con.execute('INSERT INTO lesson_walk_runs VALUES(?,?,?,NULL,?,0,0,0)', (run_id, walk_id, now(), first))
+            con.execute('''INSERT INTO lesson_walk_runs(id, walk_id, started_at, finished_at, next_ply, answered, found, clean, first_ply)
+              VALUES(?,?,?,NULL,?,0,0,0,?)''', (run_id, walk_id, now(), first, first))
             run = run_view(run_row(con, walk, run_id), walk)
         return step(walk, first, run)
 

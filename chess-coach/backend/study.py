@@ -18,7 +18,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from . import learning, mistakes, training_schedule, tutor
-from .engine import evaluator, flagged, severity
+from .engine import evaluator, flagged, objective, review_label, review_loss, severity
 
 # Ratings of a self-assessed flashcard, SM-2 style: transparent and predictable intervals.
 RATINGS = ('again', 'hard', 'good', 'easy')
@@ -76,11 +76,9 @@ def move_label(board):
     return f"{board.fullmove_number}{'.' if board.turn else '…'}"
 
 
-def score_text(evaluation):
-    if evaluation.get('mate') is not None:
-        mate = evaluation['mate']
-        return f"matto {'a favore' if mate > 0 else 'contro'} in {abs(mate)}"
-    return f"{evaluation['cp'] / 100:+.2f}".replace('.', ',')
+def score_text(evaluation, white):
+    """An evaluation from the player's side (white: the player has White), on the objective scale."""
+    return objective(evaluation, white)
 
 
 # ---------------------------------------------------------------- flashcards
@@ -109,6 +107,7 @@ def card_view(row, timestamp):
             'question': row['question'], 'lesson': row['lesson'], 'theme': row['theme'],
             'gameId': row['game_id'], 'ply': row['ply'], 'dueAt': row['due_at'], 'reps': row['reps'],
             'lapses': row['lapses'], 'intervalDays': row['interval_days'],
+            'legalMoves': [m.uci() for m in board.legal_moves],
             'preview': {r: next_schedule(row, r, timestamp)[0] for r in RATINGS}}
 
 
@@ -165,6 +164,30 @@ class ReviewInput(BaseModel):
     rating: Literal['again', 'hard', 'good', 'easy']
 
 
+class TryInput(BaseModel):
+    move: str = Field(pattern=r'^[a-h][1-8][a-h][1-8][qrbn]?$')
+
+
+def card_try(card, move):
+    """Stockfish's judgement of a move tried on the card's front, next to the move played then and the engine's best."""
+    board = chess.Board(card['fen'])
+    move = chess.Move.from_uci(move)
+    if move not in board.legal_moves:
+        raise HTTPException(422, 'Mossa non legale in questa posizione')
+    best, actual, loss = evaluator.compare(board, move, nodes=80000)
+    missed = mistakes.missed_mate(best, actual)
+    score = lambda e: {'cp': e['cp'], 'mate': e['mate']}
+    played = None
+    if card['move'] and card['move'] != move.uci():
+        then = evaluator.evaluate(board, chess.Move.from_uci(card['move']), nodes=80000)
+        played = {'san': card['san'], **score(then), 'loss': review_loss(best, then)}
+    return {'move': move.uci(), 'san': board.san(move), **score(actual), 'loss': loss,
+            'label': review_label({'loss': loss, 'missedMate': missed}), 'accepted': mistakes.accepted(best, actual),
+            'sameAsPlayed': move.uci() == card['move'], 'sameAsBest': bool(best['pv']) and best['pv'][0] == move.uci(),
+            'best': {'move': best['pv'][0] if best['pv'] else None, 'san': best['san'][0] if best['san'] else None, **score(best)},
+            'played': played}
+
+
 def legal_san(board, uci):
     if uci is None:
         return None
@@ -219,7 +242,7 @@ def build_quiz(row, start):
                 'best', f'Mossa {label} Quale mossa manteneva meglio la posizione?', board, best['pv'][0], [played, *extra],
                 f"In partita hai giocato {d['playedSan']}, che perde {d['loss'] / 100:.2f} punti rispetto a {best['san'][0]}.".replace('.', ',', 1)
                 if best['mate'] is None and d['actual']['mate'] is None else
-                f"In partita hai giocato {d['playedSan']}. Con {best['san'][0]} il confronto riguarda un matto: {score_text(best)} contro {score_text(d['actual'])}.",
+                f"In partita hai giocato {d['playedSan']}. Con {best['san'][0]} il confronto riguarda un matto: {score_text(best, board.turn)} contro {score_text(d['actual'], board.turn)}.",
                 best['san'], d['ply']))
         actual = d['actual']
         if len(actual['pv']) >= 2 and actual['pv'][0] == played:
@@ -231,19 +254,21 @@ def build_quiz(row, start):
                 refutations.append(choice_question(
                     'refutation', f"Dopo {move_label(board)} {d['playedSan']}, qual era la risposta più forte dell’avversario?",
                     after, reply, wrong,
-                    f"Stockfish risponde {actual['san'][1]}: dal tuo punto di vista la posizione diventa {score_text(actual)}.",
+                    f"Stockfish risponde {actual['san'][1]}: la posizione diventa {score_text(actual, board.turn)}.",
                     actual['san'], d['ply'] + 1))
         value = actual['cp'] if actual['mate'] is None else (100000 if actual['mate'] > 0 else -100000)
         # Skip values near the ±1,00 boundaries: the answer would depend on search noise.
         if evaluation is None and len(actual['pv']) >= 1 and actual['pv'][0] == played and not (60 <= abs(value) <= 140):
             after = board.copy()
             after.push_uci(played)
-            labels = ['Sono in vantaggio (oltre +1,00)', 'Circa pari (tra −1,00 e +1,00)', 'Sono in svantaggio (oltre −1,00)']
+            # Thresholds on the objective scale: for Black an advantage is below −1,00.
+            ahead, behind = ('oltre +1,00', 'sotto −1,00') if board.turn == chess.WHITE else ('sotto −1,00', 'oltre +1,00')
+            labels = [f'Sono in vantaggio ({ahead})', 'Circa pari (tra −1,00 e +1,00)', f'Sono in svantaggio ({behind})']
             answer = 0 if value > 100 else 2 if value < -100 else 1
             evaluation = {'kind': 'evaluation', 'prompt': f"Dopo {move_label(board)} {d['playedSan']}, com’è la posizione per te?",
                           'fen': after.fen(), 'turn': 'w' if after.turn else 'b', 'ply': d['ply'] + 1,
                           'options': [{'uci': None, 'label': text} for text in labels], 'answer': answer,
-                          'explanation': f"Valutazione di Stockfish dal tuo punto di vista: {score_text(actual)}.",
+                          'explanation': f"Valutazione di Stockfish: {score_text(actual, board.turn)} (positivo se è avanti il Bianco).",
                           'line': actual['san']}
     ordered = []
     for pair in zip(best_moves + [None] * 3, refutations + [None] * 3):
@@ -452,10 +477,10 @@ def engine_answer(facts):
         verdict = ('tiene la posizione' if item['lossCp'] is not None and item['lossCp'] < mistakes.PUZZLE_TOLERANCE_CP
                    else 'peggiora la posizione')
         detail = f" (perde {item['lossCp'] / 100:.2f} punti)".replace('.', ',') if item['lossCp'] else ''
-        parts.append(f"{item['san']} {verdict}{detail}: dopo la mossa la valutazione è {score_text(item)}. "
+        parts.append(f"{item['san']} {verdict}{detail}: dopo la mossa la valutazione è {score_text(item, facts['turn'] == 'w')}. "
                      f"Possibile seguito: {' '.join(item['san_line'])}.")
     if best['san']:
-        parts.append(f"La prima scelta di Stockfish è {best['san'][0]} ({score_text(best)}), con seguito {' '.join(best['san'])}.")
+        parts.append(f"La prima scelta di Stockfish è {best['san'][0]} ({score_text(best, facts['turn'] == 'w')}), con seguito {' '.join(best['san'])}.")
     if not facts['moves']:
         parts.insert(0, 'Nella domanda non ho riconosciuto mosse legali da verificare: scrivile in notazione, per esempio Cxe5 o Nxe5, oppure muovi sulla scacchiera.')
     return {'answer': ' '.join(parts),
@@ -569,6 +594,15 @@ def install(app, database, find_game, now, lock):
             con.execute('INSERT INTO study_card_reviews(card_id,rating,interval_days,created_at) VALUES(?,?,?,?)',
                         (card_id, body.rating, interval, timestamp))
             return card_view(con.execute('SELECT * FROM study_cards WHERE id=?', (card_id,)).fetchone(), timestamp)
+
+    @app.post('/api/study/cards/{card_id}/try')
+    def try_card(card_id: int, body: TryInput):
+        # Only a judgement: the schedule still follows the self-rating.
+        with database() as con:
+            card = con.execute('SELECT * FROM study_cards WHERE id=? AND archived=0', (card_id,)).fetchone()
+        if card is None:
+            raise HTTPException(404, 'Scheda non trovata')
+        return card_try(card, body.move)
 
     @app.post('/api/study/cards/{card_id}/archive')
     def archive_card(card_id: int):

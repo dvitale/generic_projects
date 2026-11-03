@@ -2,6 +2,7 @@ import {useEffect,useState} from 'react'
 import Board from './Board'
 import {api} from './api'
 import type {Color,Evaluation} from './types'
+import {SCORE_NOTE,objectiveScore} from './evalText'
 
 export type DiagnosisKind='puzzle'|'problem'|'prevention'
 type Move={uci:string;san:string}
@@ -36,35 +37,32 @@ export const solutionLabels:Record<Solution['kind'],{title:string;practice:strin
 const pieceNames:Record<string,string>={K:'il re',Q:'la donna',R:'la torre',B:'l’alfiere',N:'il cavallo',P:'il pedone'}
 const bandLabel=(id:string)=>bands.find(b=>b[0]===id)?.[1]??id
 
-export function formatEvaluation(e:Evaluation){
-  if(e.mate!=null)return `matto ${e.mate>0?'a tuo favore':'contro di te'} in ${Math.abs(e.mate)}`
-  return `${e.cp>0?'+':''}${(e.cp/100).toFixed(2)}`
-}
+
 
 const sanList=(sans:string[])=>sans.length>1?`${sans.slice(0,-1).join(', ')} e ${sans.at(-1)}`:sans[0]
 
-function explain(d:Diagnosis,label:string){
+function explain(d:Diagnosis,label:string,color:Color){
   const e=d.evidence,tried=e.tried??[]
   const played=tried.length?`Hai provato ${sanList(tried)}, che non ${tried.length>1?'risolvono':'risolve'}`:''
   switch(label){
     case 'missed_solution':
-      if(e.candidate)return `${played?`${played}; avevi considerato anche`:'Avevi considerato'} ${e.candidate.san} (${formatEvaluation(e.candidate.evaluation)}), che non risolve: scartarla era giusto, ma la mossa buona non era fra le tue candidate.`
+      if(e.candidate)return `${played?`${played}; avevi considerato anche`:'Avevi considerato'} ${e.candidate.san} (${objectiveScore(e.candidate.evaluation,color)}), che non risolve: scartarla era giusto, ma la mossa buona non era fra le tue candidate.`
       return played?`${played}: la mossa buona non era fra le tue candidate.`:'Non avevi una candidata: la mossa buona non è entrata nella tua ricerca.'
-    case 'rejected_solution':return `Avevi visto ${e.candidate!.san}, che funzionava (${formatEvaluation(e.candidate!.evaluation)}), ma l’hai scartata${d.answer.candidateReason?`: «${reasons.find(r=>r[0]===d.answer.candidateReason)?.[1].toLowerCase()}»`:''}${tried.length?`, e hai giocato ${sanList(tried)}`:''}.`
-    case 'pessimistic':case 'optimistic':return `Hai indicato «${bandLabel(d.answer.assessment)}»${d.answer.fearedLost?' e la davi per persa':''}; Stockfish: «${bandLabel(e.engineBand)}» (${formatEvaluation(e.best)}).`
-    case 'ignored_threat':return `Se l’avversario potesse muovere, ${e.threat?.san} porterebbe la valutazione a ${formatEvaluation(e.threat!.evaluation)}.`
-    case 'phantom_threat':return `Dopo ${e.statedThreat?.san} la valutazione resterebbe ${formatEvaluation(e.statedThreat!.evaluation)}: la minaccia non era concreta.`
-    default:return `Hai indicato «${bandLabel(d.answer.assessment)}», in linea con Stockfish (${formatEvaluation(e.best)})${e.statedThreat?.concrete?`, e la minaccia ${e.statedThreat.san} era reale`:''}.`
+    case 'rejected_solution':return `Avevi visto ${e.candidate!.san}, che funzionava (${objectiveScore(e.candidate!.evaluation,color)}), ma l’hai scartata${d.answer.candidateReason?`: «${reasons.find(r=>r[0]===d.answer.candidateReason)?.[1].toLowerCase()}»`:''}${tried.length?`, e hai giocato ${sanList(tried)}`:''}.`
+    case 'pessimistic':case 'optimistic':return `Hai indicato «${bandLabel(d.answer.assessment)}»${d.answer.fearedLost?' e la davi per persa':''}; Stockfish: «${bandLabel(e.engineBand)}» (${objectiveScore(e.best,color)}).`
+    case 'ignored_threat':return `Se l’avversario potesse muovere, ${e.threat?.san} porterebbe la valutazione a ${objectiveScore(e.threat!.evaluation,color)}.`
+    case 'phantom_threat':return `Dopo ${e.statedThreat?.san} la valutazione resterebbe ${objectiveScore(e.statedThreat!.evaluation,color)}: la minaccia non era concreta.`
+    default:return `Hai indicato «${bandLabel(d.answer.assessment)}», in linea con Stockfish (${objectiveScore(e.best,color)})${e.statedThreat?.concrete?`, e la minaccia ${e.statedThreat.san} era reale`:''}.`
   }
 }
 
-function describeSolution(d:Diagnosis,s:Solution){
+function describeSolution(d:Diagnosis,s:Solution,color:Color){
   const tried=d.evidence.tried??[],gain=s.gain?` Il guadagno concreto arriva alla semimossa ${s.gain.ply}: ${s.gain.san.join(' ')}.`:''
   let text=''
   switch(s.kind){
     case 'forcing':text=`${s.san} è ${s.forcing?.includes('check')?'uno scacco':s.forcing?.includes('capture')?'una cattura':'una promozione'}: una mossa forzante.${gain}`;break
-    case 'quiet_threat':text=`${s.san} non dà scacco e non cattura, ma minaccia ${s.threat!.san} (${formatEvaluation(s.threat!.evaluation)} se l’avversario non reagisse): l’avversario deve rispondere a quella minaccia.${gain}`;break
-    case 'prophylaxis':text=`${s.san} toglie all’avversario ${s.stopped!.san}: con una mossa libera la valutazione scenderebbe a ${formatEvaluation(s.stopped!.before)}, dopo ${s.san} resta ${formatEvaluation(s.stopped!.after)}.${gain}`;break
+    case 'quiet_threat':text=`${s.san} non dà scacco e non cattura, ma minaccia ${s.threat!.san} (${objectiveScore(s.threat!.evaluation,color)} se l’avversario non reagisse): l’avversario deve rispondere a quella minaccia.${gain}`;break
+    case 'prophylaxis':text=`${s.san} toglie all’avversario ${s.stopped!.san}: con una mossa libera la valutazione passerebbe a ${objectiveScore(s.stopped!.before,color)}, dopo ${s.san} resta ${objectiveScore(s.stopped!.after,color)}.${gain}`;break
     case 'improvement':{const f=s.facts!,more=[f.reach[1]-f.reach[0]>=3?`la portata dei tuoi pezzi passa da ${f.reach[0]} a ${f.reach[1]} case`:'',f.openRooks?.length?`torre su colonna aperta (${f.openRooks.join(', ')})`:'',f.center?.length?`controllo del centro (${f.center.join(', ')})`:''].filter(Boolean)
       text=`${s.san} sposta ${pieceNames[f.piece]??'un pezzo'} senza scacchi, catture o minacce immediate${more.length?`: ${more.join('; ')}`:''}.${gain||` Nella variante di Stockfish (${s.line.slice(0,6).join(' ')}) non c’è guadagno di materiale a breve: il vantaggio è nella posizione.`}`}
   }
@@ -75,16 +73,16 @@ function describeSolution(d:Diagnosis,s:Solution){
   return text
 }
 
-function Result({diagnosis}:{diagnosis:Diagnosis}){
+function Result({diagnosis,color}:{diagnosis:Diagnosis;color:Color}){
   const s=diagnosis.evidence.solution
   // A correct reading leaves the search: the default advice about calculation fits only forcing solutions.
   const practice=(label:string)=>label==='accurate'&&s&&s.kind!=='forcing'?'Valutazione e minacce erano giuste: ti è sfuggito il tipo di mossa, vedi sotto.':diagnosisLabels[label].practice
   return <div className="diagnosis-result">
     <h3>La tua diagnosi</h3>
     <ul className="diagnosis-list">{[diagnosis.search,...diagnosis.reading].map(label=><li key={label} className={`diagnosis-${label}`}>
-      <strong>{diagnosisLabels[label].title}</strong><p>{explain(diagnosis,label)}</p><p className="muted">{practice(label)}</p></li>)}
-      {s&&<li className={`diagnosis-solution solution-${s.kind}`}><strong>La soluzione: {solutionLabels[s.kind].title.toLowerCase()}</strong><p>{describeSolution(diagnosis,s)}</p><p className="muted">{solutionLabels[s.kind].practice}</p></li>}</ul>
-    <p className="footnote">Confronto con Stockfish a budget limitato. La minaccia si misura dando la mossa all’avversario; le fasce sono convenzioni didattiche (equilibrio fra −1 e +1, forte vantaggio da ±3). La diagnosi è salvata e non cambia rating né ripassi.</p>
+      <strong>{diagnosisLabels[label].title}</strong><p>{explain(diagnosis,label,color)}</p><p className="muted">{practice(label)}</p></li>)}
+      {s&&<li className={`diagnosis-solution solution-${s.kind}`}><strong>La soluzione: {solutionLabels[s.kind].title.toLowerCase()}</strong><p>{describeSolution(diagnosis,s,color)}</p><p className="muted">{solutionLabels[s.kind].practice}</p></li>}</ul>
+    <p className="footnote">{SCORE_NOTE} Confronto con Stockfish a budget limitato. La minaccia si misura dando la mossa all’avversario; le fasce sono convenzioni didattiche (equilibrio fra −1 e +1, forte vantaggio da ±3). La diagnosi è salvata e non cambia rating né ripassi.</p>
   </div>
 }
 
@@ -114,7 +112,7 @@ export default function FailureDiagnosis({kind,targetId,sessionId,onReveal,onCan
     finally{setBusy(false)}
   }
 
-  if(saved)return <section className="panel failure-diagnosis" aria-label="Diagnosi dell’errore"><span className="eyebrow">PRIMA DELLA SOLUZIONE</span><Result diagnosis={saved}/></section>
+  if(saved)return <section className="panel failure-diagnosis" aria-label="Diagnosi dell’errore"><span className="eyebrow">PRIMA DELLA SOLUZIONE</span><Result diagnosis={saved} color={context?.color??'w'}/></section>
   const opponent=context?.color==='w'?'il Nero':'il Bianco'
   const tried=context?.tried??[]
   // Moves already tried count as candidates on their own: the picker offers only the others.

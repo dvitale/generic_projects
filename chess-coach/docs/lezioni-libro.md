@@ -22,12 +22,16 @@ ha un suo ripasso. Va valutato con l'uso prima di estendere la raccolta.
 - Dopo la mossa compaiono due pannelli **distinti**:
   - **L'idea**: la mossa della partita, una spiegazione originale e, in breve, il ragionamento che il libro propone,
     con partita e pagina;
-  - **Stockfish**: la valutazione della tua mossa (dal punto di vista di chi muove), la migliore per il motore, le
+  - **Stockfish**: la valutazione della tua mossa (punteggio oggettivo, come in tutta l’app: positivo se è avanti il
+    Bianco, negativo se è avanti il Nero), la migliore per il motore, le
     prime linee e una tabella con tutte le mosse previste dalla lezione, ciascuna con giudizio, nota e valutazione.
     Il giudizio del motore usa le regole comuni del progetto (`review_loss`, franchigia di ±600, «Matto mancato»; vedi
     [giudizio-mosse.md](giudizio-mosse.md)). Quando libro e motore non coincidono la lezione lo dice: in
     von Scheve–Teichmann il libro loda 4…Qe7, Stockfish preferisce 4…Nf6 (circa 0,8 pedoni di differenza).
-- Sulla scacchiera, frecce per la tua mossa, la mossa della partita e la prima scelta del motore.
+- Sulla scacchiera la mossa della partita viene giocata; le frecce mostrano la tua mossa e la prima scelta del motore,
+  quando sono diverse da quella della partita.
+- Nelle lezioni della partita 1 (lc-01…lc-05), **Continua la partita →** apre «Segui la partita» alla mossa successiva
+  da indovinare, senza ripartire da 1.e4.
 
 ## Segui la partita
 
@@ -44,6 +48,8 @@ nulla.
 - Dopo la risposta la scacchiera mostra la mossa della partita, che si gioca comunque: la partita prosegue sempre.
   Gli stessi due pannelli delle lezioni: l'idea (nota originale e, in breve, l'argomento del libro) e Stockfish
   (la tua mossa, quella della partita, la migliore).
+- Si parte da 1.e4 oppure da una lezione con **Continua la partita →**: in quel caso il punteggio conta solo le mosse
+  da lì alla fine, e il migliore resta quello dei percorsi completi.
 - **Punteggio**: conta solo la prima risposta a ogni mossa; *trovata* se è la mossa della partita o un'alternativa
   valida, *senza indizi* se non ne hai chiesti. **Riprova questa mossa** è pratica. Un percorso interrotto si
   riprende dall'elenco; **Ricomincia** ne apre uno nuovo. I percorsi non toccano il ripasso delle lezioni.
@@ -132,17 +138,18 @@ pedone e6») indica 10…Nd8, e le mosse successive di quella partita non sono s
   conteggi e `intervalHours`.
 - `GET /api/lessons/{id}`: posizione, mosse precedenti, domanda, indizi, mosse legali, partita con citazione e se la
   risposta conterà per il ripasso (`counts`). Non contiene la soluzione.
-- `POST /api/lessons/{id}/answer` con `{"move": "d8e7", "hints": 1}`: esito, giudizio e nota, mossa della partita,
+- `POST /api/lessons/{id}/answer` con `{"move": "d8e7", "hints": 1}`: posizione dopo la mossa della partita
+  (`fenAfter`, `playedUci`), la partita da seguire che prosegue da lì (`walk`: id e mossa), esito, giudizio e nota, mossa della partita,
   spiegazione, idea del libro, mosse previste con valutazioni, analisi del motore e nuovo stato del ripasso. 422 per
   una mossa illegale, 404 per una lezione sconosciuta.
 - `GET /api/lesson-walks`: partite da seguire, con percorso in corso, ultimo e migliore.
-- `POST /api/lesson-walks/{id}/start`: nuovo percorso; risponde con la prima mossa da indovinare: posizione, mosse
+- `POST /api/lesson-walks/{id}/start`, facoltativo `{"ply": 9}` per partire da quella mossa: nuovo percorso; risponde con la prima mossa da indovinare: posizione, mosse
   precedenti, mosse dell'avversario appena giocate (nota e giudizio del motore), domanda, indizi. Senza soluzione.
 - `GET /api/lesson-walks/{id}/runs/{run}[?ply=N]`: la mossa successiva del percorso, o quella indicata. 409 se il
   percorso è concluso e non si indica la mossa.
 - `POST /api/lesson-walks/{id}/answer` con `{"run": …, "ply": 1, "move": "e7e5", "hints": 0}`: esito, mossa della
   partita, nota, analisi, posizione dopo la mossa, punteggio; all'ultima mossa anche risultato e nota finale. 422 per
   una mossa illegale o che non tocca al giocatore.
-- Tabelle: `lesson_walk_runs` (percorsi: prossima mossa, risposte, trovate, senza indizi) e `lesson_walk_answers`.
+- Tabelle: `lesson_walk_runs` (percorsi: mossa di partenza `first_ply`, prossima mossa, risposte, trovate, senza indizi) e `lesson_walk_answers`.
 - Tabelle: `lesson_progress` (passo, scadenza, tentativi) e `lesson_attempts` (ogni risposta, con indizi e se è
   contata).

@@ -39,7 +39,7 @@ for(const c of cases)test(`wrong ${c.name} is visible before a slow, complete un
 test('an explanation can be opened, hidden and reopened without another provider request',async({page})=>{
   await page.route('**/api/prevention',route=>route.fulfill({json:{positions:[{id:'explain',fen:'r6k/8/5KQ1/8/8/8/8/8 w - - 0 1',turn:'w',legalMoves:['g6g7'],title:'Posizione',moveNumber:1}],stats:{firstAttempts:1,firstSuccesses:0},rule:{description:'Test'}}}))
   await page.route('**/api/prevention/explain/sessions',route=>route.fulfill({json:{id:'session',version:1,exposure:'new'}}))
-  await page.route('**/api/training/prevention/explain/mistakes',route=>route.fulfill({json:[{id:1,san:'Qg8+',createdAt:'2026-09-30T10:00:00Z',lossCp:400,reference:{cp:80,mate:null},actual:{cp:-320,mate:null,san:['Qg8+','Kxg8']}}]}))
+  await page.route('**/api/training/prevention/explain/mistakes',route=>route.fulfill({json:[{id:1,fen:'r6k/8/5KQ1/8/8/8/8/8 w - - 0 1',san:'Qg8+',createdAt:'2026-09-30T10:00:00Z',lossCp:400,reference:{cp:80,mate:null},actual:{cp:-320,mate:null,san:['Qg8+','Kxg8']}}]}))
   let calls=0
   await page.route('**/api/training/prevention/explain/mistakes/1/explain',route=>{calls++;return route.fulfill({json:{explanation:{reason:'La donna rimane in presa.',continuation:'Il re può catturarla.',lesson:'Controlla le catture avversarie.'},provider:'DeepSeek',cached:false}})})
   await page.goto('/');await page.getByRole('button',{name:'Blunder prevention',exact:false}).click()
@@ -60,7 +60,7 @@ test('comparison replays why Qh2 is mate after Qb1 but only check after Rg1',asy
   const actual=line(['c1b1','h7h2'],-99999,-1),best=line(['f1g1','f2d3'],0,null),same=line(['f1g1','h7h2','g2f1'],260,null)
   await page.route('**/api/prevention',route=>route.fulfill({json:{positions:[{id:'contrast',fen,turn:'w',legalMoves:['f1g1'],title:'Rg1',moveNumber:28}],stats:{firstAttempts:1,firstSuccesses:0},rule:{description:'Test'}}}))
   await page.route('**/api/prevention/contrast/sessions',route=>route.fulfill({json:{id:'s',version:1,exposure:'new'}}))
-  await page.route('**/api/training/prevention/contrast/mistakes',route=>route.fulfill({json:[{id:1,san:'Qb1',createdAt:'2026-10-13T14:00:00Z',lossCp:null,reference:{cp:0,mate:null},actual}]}))
+  await page.route('**/api/training/prevention/contrast/mistakes',route=>route.fulfill({json:[{id:1,fen,san:'Qb1',createdAt:'2026-10-13T14:00:00Z',lossCp:null,reference:{cp:0,mate:null},actual}]}))
   let calls=0
   await page.route('**/api/training/prevention/contrast/mistakes/1/explain',route=>{
     calls++;return route.fulfill({json:{cached:false,provider:'DeepSeek',explanation:{reason:'Qb1 permette Qh2 matto.',sharedIdea:'Sono mosse senza scacco.',difference:'Rg1 libera f1 per il re.',alternative:'Dopo Qh2+ esiste Kf1.',continuation:'Confronta la stessa risposta.',lesson:'Prima cerca le minacce di matto.'},comparison:{fen,turn:'w',actual,best,lossCp:null,criterion:'Mantieni almeno −1,00.',verification:{acceptedNow:false,note:'Ricerca limitata.'},sameReply:{attemptReply:'Qh2#',alternativeReply:'Qh2+',legalAfterAlternative:true,line:same}}}})
@@ -69,8 +69,8 @@ test('comparison replays why Qh2 is mate after Qb1 but only check after Rg1',asy
   await page.getByRole('button',{name:'Spiega motivo',exact:true}).click()
   await expect(page.getByText('Rg1 libera f1 per il re.',{exact:false})).toBeVisible()
   const comparison=page.getByRole('region',{name:'Confronto verificato delle mosse'})
-  await expect(comparison.getByText('Matto contro in 1',{exact:true})).toBeVisible()
-  await expect(comparison.getByText('+0.00',{exact:true})).toBeVisible()
+  await expect(comparison.getByText('matto del Nero in 1',{exact:true})).toBeVisible()
+  await expect(comparison.getByText('+0,00',{exact:true})).toBeVisible()
   await comparison.getByText('Rivedi le due idee sulla scacchiera',{exact:true}).click()
   await comparison.getByRole('button',{name:'Passo successivo del confronto'}).click()
   await comparison.getByRole('button',{name:'Passo successivo del confronto'}).click()

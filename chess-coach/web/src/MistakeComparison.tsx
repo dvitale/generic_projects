@@ -1,6 +1,7 @@
 import {useState} from 'react'
 import Board from './Board'
 import type {Color,Evaluation} from './types'
+import {SCORE_NOTE,objectiveScore} from './evalText'
 
 interface Step {uci:string;san:string;side:Color;number:number;fen:string;checkmate:boolean}
 interface Line extends Evaluation {steps:Step[]}
@@ -9,7 +10,6 @@ export interface Comparison {
   verification:{acceptedNow:boolean;note:string};
   sameReply?:{attemptReply:string;legalAfterAlternative:boolean;alternativeReply?:string;line?:Line}
 }
-function score(e:Evaluation){return e.mate!==null?(e.mate>0?`Matto a favore in ${e.mate}`:`Matto contro in ${Math.abs(e.mate)}`):`${e.cp>=0?'+':''}${(e.cp/100).toFixed(2)}`}
 const labels={actual:'Il tuo tentativo',best:'Alternativa Stockfish',reply:'Stessa risposta avversaria'}
 
 export default function MistakeComparison({value:c}:{value:Comparison}){
@@ -23,9 +23,9 @@ export default function MistakeComparison({value:c}:{value:Comparison}){
       ?'La verifica più approfondita non conferma il rifiuto: questa mossa ora rientra nel criterio dell’esercizio. Il tentativo storico resta registrato.'
       :'La verifica più approfondita conferma che il tentativo non soddisfa il criterio dell’esercizio.'}</p>
     <div className="comparison-lines">
-      {(['actual','best'] as const).map(key=><article key={key}><h4>{labels[key]} · {c[key].steps[0]?.san}</h4><strong>{score(c[key])}</strong><p className="variation">{c[key].steps.map(s=>`${s.number}${s.side==='w'?'.':'…'} ${s.san}`).join(' ')}</p><small>Profondità {c[key].depth} · {c[key].nodes.toLocaleString('it-IT')} nodi</small></article>)}
+      {(['actual','best'] as const).map(key=><article key={key}><h4>{labels[key]} · {c[key].steps[0]?.san}</h4><strong>{objectiveScore(c[key],c.turn)}</strong><p className="variation">{c[key].steps.map(s=>`${s.number}${s.side==='w'?'.':'…'} ${s.san}`).join(' ')}</p><small>Profondità {c[key].depth} · {c[key].nodes.toLocaleString('it-IT')} nodi</small></article>)}
     </div>
-    <p className="footnote">Valutazioni della scelta iniziale dal tuo punto di vista. {c.criterion} Un punteggio 0,00 può indicare una difesa che salva la partita; un calo non equivale a materiale perso.</p>
+    <p className="footnote">{SCORE_NOTE} {c.criterion} Un punteggio 0,00 può indicare una difesa che salva la partita; un calo non equivale a materiale perso.</p>
     {c.sameReply&&<p><strong>La stessa risposta cambia effetto? </strong>{c.sameReply.legalAfterAlternative
       ?`Dopo il tentativo: ${c.sameReply.attemptReply}. Dopo l’alternativa: ${c.sameReply.alternativeReply}. Puoi rivedere anche questo confronto sulla scacchiera.`
       :`${c.sameReply.attemptReply}, presente dopo il tentativo, non è legale dopo l’alternativa.`}</p>}

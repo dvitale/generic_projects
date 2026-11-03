@@ -2,13 +2,13 @@ import InfoNote from './InfoNote'
 import {useEffect,useState} from 'react'
 import {api} from './api'
 import type {Evaluation} from './types'
+import {SCORE_NOTE,moverOf,objectiveScore} from './evalText'
 import ChessInsights,{ReasoningSections,type Insight,type Reasoning} from './ChessInsights'
 import MistakeComparison,{type Comparison} from './MistakeComparison'
 import FloatingPanel from './FloatingPanel'
 
 export interface Mistake {id:number;fen:string;move:string;san:string;createdAt:string;lossCp:number|null;actual:Evaluation;reference:Pick<Evaluation,'cp'|'mate'>;insight?:Insight}
 interface Explanation {explanation:{reason:string;continuation:string;lesson:string;sharedIdea?:string;difference?:string;alternative?:string}&Reasoning;comparison?:Comparison;explanationSource?:string;cached:boolean;provider:string}
-const score=(e:Pick<Evaluation,'cp'|'mate'>)=>e.mate!==null?e.mate>0?`Matto a favore in ${e.mate}`:`Matto contro in ${Math.abs(e.mate)}`:`${e.cp>=0?'+':''}${(e.cp/100).toFixed(2)}`
 
 function MistakeRow({mistake:m,path,onPlay}:{mistake:Mistake;path:string;onPlay?:(mistake:Mistake)=>void}){
   const [response,setResponse]=useState<Explanation|null>(null)
@@ -25,7 +25,7 @@ function MistakeRow({mistake:m,path,onPlay}:{mistake:Mistake;path:string;onPlay?
   }
   return <li className="mistake-row">
     <div className="mistake-heading"><strong>{m.san}</strong><span>{m.lossCp===null?'Confronto con matto: perdita non esprimibile in pedoni':`Calo ${(m.lossCp/100).toFixed(2)} punti`}</span><button disabled={busy} aria-expanded={expanded} onClick={()=>void explain()}>{busy?'Sto preparando…':expanded?'Nascondi spiegazione':'Spiega motivo'}</button></div>
-    <small>Migliore alternativa: {score(m.reference)} → tua scelta: {score(m.actual)}</small><small>{new Date(m.createdAt).toLocaleString('it-IT')}</small>
+    <small>Migliore alternativa: {objectiveScore(m.reference,moverOf(m.fen))} → tua scelta: {objectiveScore(m.actual,moverOf(m.fen))}</small><small>{new Date(m.createdAt).toLocaleString('it-IT')}</small>
     <details><summary>Variante Stockfish</summary><p className="variation">{m.actual.san.join(' ')}</p></details>
     <ChessInsights insight={m.insight} compact/>
     {onPlay&&<button className="play-refutation" onClick={()=>onPlay(m)} title="Nuova partita da questa posizione, dopo la tua mossa: Stockfish a piena forza cerca la confutazione"><span aria-hidden="true">⚔</span> Gioca {m.san} contro Stockfish</button>}
@@ -53,7 +53,7 @@ export default function MistakeHistory({kind,targetId,revision,onPlay}:{kind:'pr
   return <section className="panel mistake-history" aria-label="Tentativi sbagliati"><span className="eyebrow">IMPARA DAI TENTATIVI</span><h3>Tentativi sbagliati ({items.length})</h3>
     {error&&<p role="alert">{error} <button onClick={()=>setRetry(n=>n+1)}>Ricarica tentativi</button></p>}
     {!items.length?<p className="muted">Qui ritroverai gli errori di questa posizione, anche nelle prossime sessioni.</p>:<>
-      <InfoNote summary="Come leggere i tentativi">Calo registrato rispetto alla migliore alternativa, dal tuo punto di vista: non equivale a materiale perso. “Spiega motivo” approfondisce la verifica Stockfish e confronta le varianti. Nei casi di matto direttamente verificabili usa le risposte legali; negli altri casi invia a DeepSeek questa posizione e le varianti da confrontare. La spiegazione può svelare una mossa migliore e viene conservata. “Gioca contro Stockfish” apre una partita dopo il tuo tentativo: difendilo e guarda come il motore lo punisce.</InfoNote>
+      <InfoNote summary="Come leggere i tentativi">Calo registrato rispetto alla migliore alternativa: non equivale a materiale perso. {SCORE_NOTE} “Spiega motivo” approfondisce la verifica Stockfish e confronta le varianti. Nei casi di matto direttamente verificabili usa le risposte legali; negli altri casi invia a DeepSeek questa posizione e le varianti da confrontare. La spiegazione può svelare una mossa migliore e viene conservata. “Gioca contro Stockfish” apre una partita dopo il tuo tentativo: difendilo e guarda come il motore lo punisce.</InfoNote>
       <ol className="mistake-list">{items.map(m=><MistakeRow key={m.id} mistake={m} path={path} onPlay={onPlay}/>)}</ol></>}
   </section>
 }

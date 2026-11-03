@@ -30,7 +30,7 @@ test('review, progress and training distinguish tactical evidence from positiona
 test('DeepSeek explanations show tactics, position, plan and uncertainty separately',async({page})=>{
   await page.route('**/api/prevention',route=>route.fulfill({json:{positions:[{id:'explain',fen:'r6k/8/5KQ1/8/8/8/8/8 w - - 0 1',turn:'w',legalMoves:['g6g7'],title:'Posizione',moveNumber:1}],stats:{firstAttempts:1,firstSuccesses:0},rule:{description:'Test'}}}))
   await page.route('**/api/prevention/explain/sessions',route=>route.fulfill({json:{id:'s',version:1,exposure:'new'}}))
-  await page.route('**/api/training/prevention/explain/mistakes',route=>route.fulfill({json:[{id:1,san:'Qg8+',createdAt:'2026-09-30T10:00:00Z',lossCp:400,reference:{cp:80,mate:null},actual:{cp:-320,mate:null,san:['Qg8+','Kxg8']}}]}))
+  await page.route('**/api/training/prevention/explain/mistakes',route=>route.fulfill({json:[{id:1,fen:'r6k/8/5KQ1/8/8/8/8/8 w - - 0 1',san:'Qg8+',createdAt:'2026-09-30T10:00:00Z',lossCp:400,reference:{cp:80,mate:null},actual:{cp:-320,mate:null,san:['Qg8+','Kxg8']}}]}))
   await page.route('**/api/training/prevention/explain/mistakes/1/explain',route=>route.fulfill({json:{explanation:{reason:'La scelta perde la donna.',continuation:'Segue la cattura del re.',lesson:'Controlla le risposte.',tactical:'Il re può catturare la donna.',positional:'Il re rimane esposto: osservazione da verificare.',strategicPlan:'Metti al sicuro la donna prima di attaccare.',uncertainty:'La linea non esaurisce tutte le possibilità.'}}}))
   await page.goto('/');await page.getByRole('button',{name:'Blunder prevention',exact:true}).click()
   await page.getByRole('button',{name:'Spiega motivo',exact:true}).click()

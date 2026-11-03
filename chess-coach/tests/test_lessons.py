@@ -150,3 +150,26 @@ def test_following_a_game_plays_the_other_side_and_scores_first_answers(client):
     assert client.get(f'/api/lesson-walks/partita-1/runs/{run}').status_code == 409
     overview = client.get('/api/lesson-walks').json()['walks'][0]
     assert overview['current'] is None and overview['best']['found'] == last['run']['found']
+
+
+def test_a_lesson_answer_plays_the_game_move_and_leads_into_the_followed_game(client):
+    answer = client.post('/api/lessons/lc-01-nf3/answer', json={'move': 'b1c3', 'hints': 0}).json()
+    assert answer['playedUci'] == 'g1f3' and answer['fenAfter'].startswith('rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/')
+    assert answer['walk'] == {'id': 'partita-1', 'ply': 3, 'number': 2}
+    assert client.post('/api/lessons/lc-05-qe7/answer', json={'move': 'd8e7', 'hints': 0}).json()['walk']['ply'] == 9
+    # The lessons of other games have no game to follow yet.
+    assert client.post('/api/lessons/lc-08-c3/answer', json={'move': 'c2c3', 'hints': 0}).json()['walk'] is None
+
+    # A run started from the lesson begins at that move; it scores only the moves from there to the end.
+    assert client.post('/api/lesson-walks/partita-1/start', json={'ply': 8}).status_code == 422
+    step = client.post('/api/lesson-walks/partita-1/start', json={'ply': 9}).json()
+    assert step['ply'] == 9 and step['number'] == 5 and [r['san'] for r in step['replies']] == ['O-O']
+    assert step['run']['total'] == 13 and step['run']['fromNumber'] == 5 and step['line'].endswith('4.c3 Qe7 5.O-O')
+    walk = lessons.walk_by_id('partita-1')
+    for ply in [p for p in lessons.walk_plies(walk) if p >= 9]:
+        board = lessons.replay([m['san'] for m in walk['moves'][:ply]])
+        last = client.post('/api/lesson-walks/partita-1/answer', json={'run': step['run']['id'], 'ply': ply,
+                                                                       'move': board.parse_san(walk['moves'][ply]['san']).uci(), 'hints': 0}).json()
+    assert last['finished'] and last['run']['answered'] == 13 and last['run']['found'] == 13
+    # Only runs from the first move compete for the best score.
+    assert client.get('/api/lesson-walks').json()['walks'][0]['best'] is None
