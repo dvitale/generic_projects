@@ -9,7 +9,9 @@ book's diagram before using it (see docs/lezioni-libro.md) — a wrong piece can
 Main-line moves are the short lines that start with the expected move number; variations inside the prose are skipped.
 
 Needs PyMuPDF, not in the project requirements: pip install --target <scratch dir> pymupdf, then PYTHONPATH=<that dir>.
-Usage: python scripts/extract_book_games.py book.pdf out_dir
+Usage: python scripts/extract_book_games.py book.pdf out_dir [fixes.json]
+fixes.json gives, per game, the SAN of moves the OCR cannot resolve, read by hand in book.txt:
+{"2": {"4": "c3", "9...": "Bg4"}} (white's 4th move, black's 9th). A fixed move is played when due, whatever the OCR line says.
 Writes out_dir/book.txt (text by page) and out_dir/games.json (per game: header, moves with SAN, UCI, printed page,
 OCR token, diagram mark, and flags).
 """
@@ -127,16 +129,29 @@ def blocks(lines, start, end):
         i += 1
 
 
-def rebuild(lines, stats):
+def rebuild(lines, stats, fixes=None):
     starts = [i for i, (_, line) in enumerate(lines) if re.match(r'^Game \d[\d ]*$', line)]
     games = []
     for n, start in enumerate(starts):
         end = starts[n + 1] if n + 1 < len(starts) else len(lines)
         board, moves, flags = chess.Board(), [], []
+        fixed = (fixes or {}).get(re.sub(r'\s', '', lines[start][1][5:]), {})
+        skip = None
         for page, line, index in blocks(lines, start + 4, end):
+            # A fixed move is played as soon as it is due, even when the OCR has no line for it.
+            while (key := f'{board.fullmove_number}' + ('' if board.turn == chess.WHITE else '...')) in fixed:
+                move = board.parse_san(fixed[key])
+                moves.append({'san': board.san(move), 'uci': move.uci(), 'page': page, 'token': None, 'line': index,
+                              'diagram': False, 'guess': 'fix'})
+                skip = board.fullmove_number if board.turn == chess.WHITE else skip
+                board.push(move)
             m = MAIN.match(line)
             if not m or int(m.group(1).replace(' ', '')) != board.fullmove_number or (m.group(2) and board.turn == chess.WHITE):
                 continue
+            if skip == board.fullmove_number and not m.group(2):
+                continue  # the OCR line of a fixed white move
+            if re.fullmatch(r'[\d\\]+', m.group(3)):
+                continue  # diagram rank labels ('5', '4 3')
             tokens = [m.group(3)] + ([m.group(4)] if m.group(4) and m.group(4) != '(D)' and not re.match(r'^[!?]+$', m.group(4)) else [])
             for token in tokens:
                 found, kind = resolve(board, token, stats)
@@ -176,9 +191,10 @@ def main():
     text = ''.join(f'\n=====PAGE {i}=====\n' + page.get_text() for i, page in enumerate(pymupdf.open(source)))
     (out / 'book.txt').write_text(text, encoding='utf-8')
     lines = page_lines(text)
-    games = rebuild(lines, {})
+    fixes = json.loads(Path(sys.argv[3]).read_text(encoding='utf-8')) if len(sys.argv) > 3 else {}
+    games = rebuild(lines, {}, fixes)
     for _ in range(PASSES - 1):
-        games = rebuild(lines, learn(games))
+        games = rebuild(lines, learn(games), fixes)
     (out / 'games.json').write_text(json.dumps(games, ensure_ascii=False, indent=1), encoding='utf-8')
     for game in games:
         print(f"{game['game']:>3} {game['players']:<35} {len(game['moves']):>3} semimosse",

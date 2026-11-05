@@ -79,14 +79,20 @@ def test_lessons_answer_keep_book_and_engine_apart_and_schedule_reviews(client):
 def test_the_followed_game_replays_and_says_where_book_and_engine_disagree():
     data = lessons.load()
     assert lessons.validate_walks(data) == []
+    assert [w['id'] for w in data['walks']] == ['partita-1', 'partita-2', 'partita-10', 'partita-14', 'partita-24']
     walk = lessons.walk_by_id('partita-1')
     assert walk['side'] == 'b' and len(lessons.walk_plies(walk)) == 17
     assert lessons.replay([m['san'] for m in walk['moves']]).fen().startswith('r3k2r/1pp2ppp/p2p4/P7/2B1P1n1/2P2Nq1/1P3b2/R1BQ1R1K w')
-    for ply in lessons.walk_plies(walk):
-        entry, lesson, *_ = lessons.walk_step(walk, ply)
-        analysis = entry['engine']
-        if not lesson and lessons.review_loss(analysis['lines'][0], analysis['moves'][entry['san']]) >= INACCURACY_CP:
-            assert entry.get('engineNote'), entry['san']
+    for followed in data['walks']:
+        assert followed['summary'] and followed['result'] in ('1-0', '0-1') and followed['game'] in data['games']
+        for ply in lessons.walk_plies(followed):
+            entry, lesson, *_ = lessons.walk_step(followed, ply)
+            analysis = entry['engine']
+            if not lesson and lessons.review_loss(analysis['lines'][0], analysis['moves'][entry['san']]) >= INACCURACY_CP:
+                assert entry.get('engineNote'), (followed['id'], entry['san'])
+    # Every lesson of a followed game is one of its moves: the book games 2, 10, 14 and 24 carry the other lessons.
+    linked = {m['lesson'] for w in data['walks'] for m in w['moves'] if m.get('lesson')}
+    assert linked == {l['id'] for l in data['lessons']} - {'lc-01-nf3', 'lc-03-bc4'}
     # The lesson moves of the game are the lessons themselves.
     assert [lessons.walk_step(walk, p)[1]['id'] for p in (3, 5, 7)] == ['lc-02-nc6', 'lc-04-bc5', 'lc-05-qe7']
 
@@ -152,13 +158,26 @@ def test_following_a_game_plays_the_other_side_and_scores_first_answers(client):
     assert overview['current'] is None and overview['best']['found'] == last['run']['found']
 
 
+def test_following_a_game_as_white_starts_with_your_move(client):
+    step = client.post('/api/lesson-walks/partita-24/start').json()
+    run = step['run']['id']
+    assert step['ply'] == 0 and step['turn'] == 'w' and step['replies'] == [] and step['line'] == '' and step['run']['total'] == 20
+    answer = client.post('/api/lesson-walks/partita-24/answer', json={'run': run, 'ply': 0, 'move': 'e2e4', 'hints': 0}).json()
+    assert answer['success'] and answer['verdict'] == 'good' and answer['played'] == 'd4' and answer['nextPly'] == 2
+    step = client.get(f'/api/lesson-walks/partita-24/runs/{run}').json()
+    assert step['ply'] == 2 and [r['san'] for r in step['replies']] == ['Nf6'] and not step['replies'][0]['white']
+    # 12.Rab1 is lesson lc-10: the walk asks the lesson's question.
+    walk = lessons.walk_by_id('partita-24')
+    assert lessons.walk_step(walk, 22)[1]['id'] == 'lc-10-rab1'
+
+
 def test_a_lesson_answer_plays_the_game_move_and_leads_into_the_followed_game(client):
     answer = client.post('/api/lessons/lc-01-nf3/answer', json={'move': 'b1c3', 'hints': 0}).json()
     assert answer['playedUci'] == 'g1f3' and answer['fenAfter'].startswith('rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/')
     assert answer['walk'] == {'id': 'partita-1', 'ply': 3, 'number': 2}
     assert client.post('/api/lessons/lc-05-qe7/answer', json={'move': 'd8e7', 'hints': 0}).json()['walk']['ply'] == 9
-    # The lessons of other games have no game to follow yet.
-    assert client.post('/api/lessons/lc-08-c3/answer', json={'move': 'c2c3', 'hints': 0}).json()['walk'] is None
+    # A white lesson leads into a game followed as White.
+    assert client.post('/api/lessons/lc-08-c3/answer', json={'move': 'c2c3', 'hints': 0}).json()['walk'] == {'id': 'partita-10', 'ply': 12, 'number': 7}
 
     # A run started from the lesson begins at that move; it scores only the moves from there to the end.
     assert client.post('/api/lesson-walks/partita-1/start', json={'ply': 8}).status_code == 422

@@ -57,3 +57,20 @@ test('following a book game: guess the black moves, white answers with a note',a
   await expect(page.getByRole('button',{name:'Ricomincia la partita'})).toBeVisible()
   await page.screenshot({path:'test-results/lesson-walk-end.png',fullPage:true})
 })
+
+test('following a book game as White: your move comes first',async({page})=>{
+  await page.goto('/?section=lessons')
+  await expect(page.locator('.walk-card')).toHaveCount(5)
+  const card=page.locator('.walk-card').filter({hasText:'Capablanca–Mattison'})
+  await expect(card).toContainText('giochi con il Bianco, 20 mosse')
+  await card.getByRole('button',{name:'Segui la partita →'}).click()
+
+  const panel=page.getByRole('region',{name:'Segui la partita'})
+  await expect(panel.locator('.eyebrow')).toContainText('MOSSA 1 DI 20')
+  await expect(panel.locator('.walk-reply')).toHaveCount(0)
+  await page.locator('[data-square="d2"]').click();await page.locator('[data-square="d4"]').click()
+  await expect(panel.getByRole('status')).toContainText('✓ d4: La mossa della partita.')
+  await page.getByRole('button',{name:'Continua →'}).click()
+  await expect(panel.locator('.eyebrow')).toContainText('MOSSA 2 DI 20')
+  await expect(panel.locator('.walk-reply')).toContainText('Il Nero gioca 1…Nf6.')
+})

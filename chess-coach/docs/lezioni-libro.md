@@ -1,9 +1,10 @@
 # Ragionamento mossa per mossa
 
 La sezione **Mossa per mossa** è una raccolta di lezioni guidate tratte da partite commentate in un libro:
-*Logical Chess: Move by Move* di Irving Chernev (Batsford, edizione in notazione algebrica). È un campione di prova di
-10 posizioni, **separato** dagli esercizi generati dalle tue partite: non entra nella coda di Allenamento di oggi e
-ha un suo ripasso. Va valutato con l'uso prima di estendere la raccolta.
+*Logical Chess: Move by Move* di Irving Chernev (Batsford, edizione in notazione algebrica). Comprende 10 lezioni su
+singole posizioni e 5 partite da seguire per intero, **separate** dagli esercizi generati dalle tue partite: non
+entrano nella coda di Allenamento di oggi e hanno un ripasso proprio. Il formato è stato provato sulla prima partita e
+sulle lezioni, poi esteso a blocchi di partite intere.
 
 ## Come funziona una lezione
 
@@ -30,21 +31,30 @@ ha un suo ripasso. Va valutato con l'uso prima di estendere la raccolta.
     von Scheve–Teichmann il libro loda 4…Qe7, Stockfish preferisce 4…Nf6 (circa 0,8 pedoni di differenza).
 - Sulla scacchiera la mossa della partita viene giocata; le frecce mostrano la tua mossa e la prima scelta del motore,
   quando sono diverse da quella della partita.
-- Nelle lezioni della partita 1 (lc-01…lc-05), **Continua la partita →** apre «Segui la partita» alla mossa successiva
-  da indovinare, senza ripartire da 1.e4.
+- Dopo ogni lezione, **Continua la partita →** apre «Segui la partita» nella stessa partita, alla mossa successiva
+  da indovinare, senza ripartire dalla prima mossa.
 
 ## Segui la partita
 
-Il libro commenta ogni mossa di partite intere: questa modalità la ripercorre dall'inizio alla fine. Per ora c'è la
-**partita 1**, von Scheve–Teichmann (Berlino 1907), giocata col **Nero**: il Nero vince con mosse logiche, mentre
-molte mosse del Bianco sono proprio quelle che il libro critica (7.a4, 9.h3, 11.Nxe5), e indovinarle non insegnerebbe
-nulla.
+Il libro commenta ogni mossa di partite intere: questa modalità le ripercorre dall'inizio alla fine. Si gioca sempre
+dalla parte di chi vince, perché molte mosse del perdente sono proprio quelle che il libro critica e indovinarle non
+insegnerebbe nulla.
 
-- Indovini ogni mossa del Nero (17 in tutto). Le mosse del Bianco si giocano da sole, ciascuna con una nota e il
-  giudizio di Stockfish (per esempio 12.Nd2: errore, meglio Qd3 o Qf3).
+| Partita | Colore | Mosse da indovinare | Lezioni collegate | Tema |
+|---|---|---|---|---|
+| 1 · von Scheve–Teichmann, Berlino 1907 | Nero | 17 | lc-02, lc-04, lc-05 | Sviluppo rapido e attacco contro un arrocco indebolito |
+| 2 · Liubarski–Soultanbeieff, Liegi 1928 | Nero | 16 | lc-06, lc-07 | Pedoni all'assalto contro h3 e colonna g aperta |
+| 10 · Tarrasch–Eckart, Norimberga 1889 | Bianco | 17 | lc-08 | La catena d4–e5 e il sacrificio in g6 |
+| 14 · Tarrasch–Mieses, Berlino 1916 | Bianco | 20 | lc-09 | La coppia degli alfieri e l'inchiodatura del cavallo f6 |
+| 24 · Capablanca–Mattison, Karlsbad 1929 | Bianco | 20 | lc-10 | Sviluppo completo, poi le combinazioni |
+
+- Indovini ogni mossa del tuo colore. Quelle dell'avversario si giocano da sole, ciascuna con una nota e il
+  giudizio di Stockfish (per esempio, nella partita 1, 12.Nd2: errore, meglio Qd3 o Qf3).
 - Per ogni mossa: una domanda e due indizi; alternative previste con lo stesso giudizio delle lezioni (*Partita*,
-  *Valida*, *Sensata*, *Debole*, *Fuori lista*). Le mosse 2…Nc6, 3…Bc5 e 4…Qe7 sono le lezioni lc-02, lc-04 e lc-05,
-  con le loro domande e i loro tre indizi.
+  *Valida*, *Sensata*, *Debole*, *Fuori lista*). Le mosse che sono anche lezioni (tabella sopra) usano la domanda e i
+  tre indizi della lezione.
+- Le partite che non finiscono con il matto sulla scacchiera (abbandono) hanno una nota finale con la minaccia che
+  ha deciso.
 - Dopo la risposta la scacchiera mostra la mossa della partita, che si gioca comunque: la partita prosegue sempre.
   Gli stessi due pannelli delle lezioni: l'idea (nota originale e, in breve, l'argomento del libro) e Stockfish
   (la tua mossa, quella della partita, la migliore).
@@ -54,7 +64,7 @@ nulla.
   valida, *senza indizi* se non ne hai chiesti. **Riprova questa mossa** è pratica. Un percorso interrotto si
   riprende dall'elenco; **Ricomincia** ne apre uno nuovo. I percorsi non toccano il ripasso delle lezioni.
 
-Dove libro e motore non coincidono, la mossa lo dice (analisi verificata anche a profondità 30 circa):
+Dove libro e motore non coincidono, la mossa lo dice. Nella partita 1 (analisi verificata anche a profondità 30 circa):
 
 - **8…Ba7**: il libro loda il Nero che non prende a5, temendo 9.Rxa5 Bxa5 10.Qa4+. Per Stockfish 8…Nxa5 vinceva un
   pedone: dopo 10.Qa4+ b5! 11.Qxa5 bxc4 il Nero sta meglio. Ha ragione il libro su 8…Bxa5, che perde un pezzo (9.d5).
@@ -63,8 +73,18 @@ Dove libro e motore non coincidono, la mossa lo dice (analisi verificata anche a
   posizione all'incirca in parità. Il Bianco abbandonò senza vederla. Per Stockfish era decisiva 17…Qh3+, accettata
   come *Valida*.
 
-Tutte le posizioni della partita sono state confrontate con i sei diagrammi del libro (dopo 7.a4, 9.h3, 10…Nxe5,
-11…Qxe5, 15…Ng4, 17.Kh1).
+Nelle altre partite:
+
+- **5…Qe7** (partita 2): il libro la loda perché difende e5 sviluppando; per Stockfish 5…exd4 e 5…d6 erano un po'
+  più precise (circa mezzo pedone).
+- **16.Qh3** (partita 14): per il libro è la mossa vincente; Stockfish preferisce 16.Qg3, di circa un pedone, ma il
+  Bianco resta in netto vantaggio in entrambi i casi.
+- Le mosse dell'avversario hanno la nota nel testo e il giudizio del motore accanto: per esempio 12.hxg4 nella
+  partita 2, quasi obbligata per il libro, mentre per Stockfish 12.g3 o 12.a4 tenevano la parità.
+
+Tutte le posizioni delle partite sono state confrontate con i diagrammi del libro: per la partita 1 i sei diagrammi
+(dopo 7.a4, 9.h3, 10…Nxe5, 11…Qxe5, 15…Ng4, 17.Kh1), per le partite 2, 10, 14 e 24 tutti quelli che la pagina
+riporta, da 4 a 12 per partita.
 
 ## Ripasso
 
@@ -107,7 +127,8 @@ ripassi in scadenza, poi le lezioni nuove nell'ordine del libro, che parte dalle
   SAN, pagina, nota; per le mosse da indovinare domanda, due indizi, alternative, idea del libro, nota sul disaccordo,
   oppure il riferimento a una lezione (`lesson`), che deve avere la stessa posizione e la stessa mossa.
   `scripts/build_lessons.py` vi scrive l'analisi di ogni mossa: profondità 20, al massimo 8 secondi per ricerca
-  (vicino a un matto Stockfish può non raggiungere la profondità). `validate_walks` controlla legalità, SAN canonica,
+  (vicino a un matto Stockfish può non raggiungere la profondità). `--only-walks` salta le lezioni; `--walk <id>`
+  (ripetibile) analizza solo le partite indicate e lascia invariata l'analisi delle altre: circa un quarto d'ora a partita. `validate_walks` controlla legalità, SAN canonica,
   coerenza con le lezioni e analisi.
 
 ## Come sono state ricostruite le posizioni
@@ -116,18 +137,24 @@ Il PDF è una scansione con testo OCR in cui le figurine dei pezzi sono lette ma
 `scripts/extract_book_games.py book.pdf cartella` (richiede PyMuPDF, fuori dai requisiti del progetto) estrae il
 testo per pagina e ricostruisce la linea principale di ogni partita: per ogni riga che inizia con il numero di mossa
 atteso, python-chess sceglie l'unica mossa legale compatibile con casa d'arrivo, tipo di pezzo e cattura; le forme
-OCR delle figurine si imparano dalle mosse non ambigue. La partita si ferma alla prima mossa che resta ambigua.
+OCR delle figurine si imparano dalle mosse non ambigue. Le mosse che restano ambigue o illeggibili sono elencate
+come `flags`, e la partita si ferma lì; le etichette delle traverse dei diagrammi (`5`, `4 3`) vengono ignorate.
 
-Il risultato è una bozza. Ogni posizione del campione è stata confrontata con un diagramma del libro (pezzi, turno,
-arrocchi) e il commento è stato riletto: in Tarrasch–Eckart lo script aveva scelto 10…Rd8 dove il testo («protegge il
-pedone e6») indica 10…Nd8, e le mosse successive di quella partita non sono state usate.
+Le mosse che l'OCR non risolve si leggono a mano nel testo (`book.txt`) e si passano come terzo argomento, un file
+JSON per partita: `{"10": {"10...": "Nd8", "14": "Bxg6"}}` (mossa 14 del Bianco, mossa 10 del Nero). Una mossa
+corretta viene giocata quando tocca a lei, anche se l'OCR non ha una riga per quella mossa.
+
+Il risultato è una bozza. Ogni posizione è stata confrontata con i diagrammi del libro (pezzi, turno, arrocchi) e il
+commento è stato riletto. Le correzioni servite finora: in Tarrasch–Eckart 10…Nd8 (lo script aveva scelto 10…Rd8,
+ma il testo dice «protegge il pedone e6») e 12…Nxf6 (non Rxf6), più 14.Bxg6 e 15.Qxg6+ illeggibili; in
+Tarrasch–Mieses 18.Qh6 (l'OCR legge «b6») e 19.Re3; in Capablanca–Mattison 12…Qa3, 18…e5 e 19…Na6, mancanti nel
+testo e lette sui diagrammi.
 
 ## Limiti e prossimi passi
 
-- Per ora una sola partita da seguire; le altre richiedono la ricostruzione completa e il confronto con tutti i
-  diagrammi.
-- Da valutare con l'uso: se domande, indizi e spiegazioni aiutano davvero, e se le lezioni più avanzate (lc-09,
-  lc-10) sono alla portata. Solo dopo, estendere la raccolta.
+- Cinque partite su 33. Le altre si aggiungono a blocchi di 4–5: ricostruzione con `scripts/extract_book_games.py`
+  e `fixes.json`, confronto con tutti i diagrammi, testi originali, poi `scripts/build_lessons.py --only-walks --walk
+  <id>`.
 - Le alternative accettate sono scelte a mano: una mossa buona per il motore ma estranea all'idea resta «Sensata».
 - Diritti: la prova è per uso personale con riferimenti al libro e testi originali. Per un rilascio pubblico vanno
   verificati i diritti su testo e diagrammi.

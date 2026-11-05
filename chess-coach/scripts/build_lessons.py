@@ -4,7 +4,8 @@ Each position is replayed from its moves and compared with the stored FEN; every
 Stockfish, at a fixed depth, gives its best lines (MultiPV) and an evaluation of each move the lesson lists, from the
 side to move. The book's idea and these numbers are shown apart in the app: they do not always agree.
 The same is done for every move of the «Segui la partita» games (walks), with the moves each one accepts.
-Usage: python scripts/build_lessons.py [--depth 22] [--walk-depth 20] [--only-walks]
+Usage: python scripts/build_lessons.py [--depth 22] [--walk-depth 20] [--only-walks] [--walk partita-2 ...]
+--walk limits the walk analysis to the given games (repeatable); the others keep their stored analysis.
 Walk searches stop at the depth or after WALK_SECONDS, whichever comes first: the stored depth is the one reached.
 """
 import argparse
@@ -49,6 +50,7 @@ def main():
     parser.add_argument('--depth', type=int, default=22)
     parser.add_argument('--walk-depth', type=int, default=20)
     parser.add_argument('--only-walks', action='store_true')
+    parser.add_argument('--walk', action='append', help='analyse only these walks (id, repeatable)')
     args = parser.parse_args()
     data = json.loads(DATA.read_text(encoding='utf-8'))
     errors = validate(data, engine=False) + validate_walks(data, engine=False)
@@ -63,7 +65,7 @@ def main():
             print(lesson['id'], 'migliore', lines[0]['san'], lines[0]['cp'], '·',
                   ', '.join(f"{s} {m['cp']}" for s, m in moves.items()))
         lessons = {l['id']: l for l in data['lessons']}
-        for walk in data.get('walks', []):
+        for walk in [w for w in data.get('walks', []) if not args.walk or w['id'] in args.walk]:
             board = chess.Board()
             for ply, entry in enumerate(walk['moves']):
                 entry['engine'] = analyse(engine, board, walk_step_moves(walk, ply, lessons), args.walk_depth, 3, WALK_SECONDS)

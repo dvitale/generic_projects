@@ -60,5 +60,5 @@ test('a lesson from game 1 continues into the followed game from the next move',
   await page.locator('[data-square="b8"]').click();await page.locator('[data-square="c6"]').click()
   await expect(page.getByLabel('Punteggio')).toHaveText('1 su 1 trovate')
   await page.getByRole('button',{name:'Tutte le lezioni'}).click()
-  await expect(page.locator('.walk-card')).toContainText('In corso dalla mossa 2: 1 di 16 mosse, 1 trovate.')
+  await expect(page.locator('.walk-card').filter({hasText:'von Scheve–Teichmann'})).toContainText('In corso dalla mossa 2: 1 di 16 mosse, 1 trovate.')
 })
