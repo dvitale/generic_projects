@@ -79,7 +79,7 @@ def test_lessons_answer_keep_book_and_engine_apart_and_schedule_reviews(client):
 def test_the_followed_game_replays_and_says_where_book_and_engine_disagree():
     data = lessons.load()
     assert lessons.validate_walks(data) == []
-    assert [w['id'] for w in data['walks']] == ['partita-1', 'partita-2', 'partita-10', 'partita-14', 'partita-24']
+    assert [w['id'] for w in data['walks']] == ['partita-1', 'partita-2', 'partita-3', 'partita-6', 'partita-7', 'partita-10', 'partita-12', 'partita-14', 'partita-24']
     walk = lessons.walk_by_id('partita-1')
     assert walk['side'] == 'b' and len(lessons.walk_plies(walk)) == 17
     assert lessons.replay([m['san'] for m in walk['moves']]).fen().startswith('r3k2r/1pp2ppp/p2p4/P7/2B1P1n1/2P2Nq1/1P3b2/R1BQ1R1K w')

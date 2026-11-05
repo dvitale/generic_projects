@@ -60,7 +60,7 @@ test('following a book game: guess the black moves, white answers with a note',a
 
 test('following a book game as White: your move comes first',async({page})=>{
   await page.goto('/?section=lessons')
-  await expect(page.locator('.walk-card')).toHaveCount(5)
+  await expect(page.locator('.walk-card')).toHaveCount(9)
   const card=page.locator('.walk-card').filter({hasText:'Capablanca–Mattison'})
   await expect(card).toContainText('giochi con il Bianco, 20 mosse')
   await card.getByRole('button',{name:'Segui la partita →'}).click()

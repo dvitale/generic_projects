@@ -2,7 +2,7 @@
 
 La sezione **Mossa per mossa** è una raccolta di lezioni guidate tratte da partite commentate in un libro:
 *Logical Chess: Move by Move* di Irving Chernev (Batsford, edizione in notazione algebrica). Comprende 10 lezioni su
-singole posizioni e 5 partite da seguire per intero, **separate** dagli esercizi generati dalle tue partite: non
+singole posizioni e 9 partite da seguire per intero, **separate** dagli esercizi generati dalle tue partite: non
 entrano nella coda di Allenamento di oggi e hanno un ripasso proprio. Il formato è stato provato sulla prima partita e
 sulle lezioni, poi esteso a blocchi di partite intere.
 
@@ -44,7 +44,11 @@ insegnerebbe nulla.
 |---|---|---|---|---|
 | 1 · von Scheve–Teichmann, Berlino 1907 | Nero | 17 | lc-02, lc-04, lc-05 | Sviluppo rapido e attacco contro un arrocco indebolito |
 | 2 · Liubarski–Soultanbeieff, Liegi 1928 | Nero | 16 | lc-06, lc-07 | Pedoni all'assalto contro h3 e colonna g aperta |
+| 3 · Colle–Delvaux, Gand–Terneuzen 1929 | Bianco | 22 | — | Il Sistema Colle: la spinta e4 e il sacrificio in e6 |
+| 6 · Zeissl–Walthoffen, Vienna 1899 | Nero | 17 | — | Penetrazione sulle case chiare dopo g3 |
+| 7 · Spielmann–Wahle, Vienna 1926 | Bianco | 17 | — | Il sacrificio Rxe7 e il cavallo inchiodato |
 | 10 · Tarrasch–Eckart, Norimberga 1889 | Bianco | 17 | lc-08 | La catena d4–e5 e il sacrificio in g6 |
+| 12 · Pitschak–Flohr, Liebwerda 1934 | Nero | 19 | — | Contro l'Inglese: h3 indebolisce l'arrocco, poi …f5–f4 |
 | 14 · Tarrasch–Mieses, Berlino 1916 | Bianco | 20 | lc-09 | La coppia degli alfieri e l'inchiodatura del cavallo f6 |
 | 24 · Capablanca–Mattison, Karlsbad 1929 | Bianco | 20 | lc-10 | Sviluppo completo, poi le combinazioni |
 
@@ -83,7 +87,7 @@ Nelle altre partite:
   partita 2, quasi obbligata per il libro, mentre per Stockfish 12.g3 o 12.a4 tenevano la parità.
 
 Tutte le posizioni delle partite sono state confrontate con i diagrammi del libro: per la partita 1 i sei diagrammi
-(dopo 7.a4, 9.h3, 10…Nxe5, 11…Qxe5, 15…Ng4, 17.Kh1), per le partite 2, 10, 14 e 24 tutti quelli che la pagina
+(dopo 7.a4, 9.h3, 10…Nxe5, 11…Qxe5, 15…Ng4, 17.Kh1), per le altre tutti quelli che la pagina
 riporta, da 4 a 12 per partita.
 
 ## Ripasso
@@ -150,9 +154,14 @@ ma il testo dice «protegge il pedone e6») e 12…Nxf6 (non Rxf6), più 14.Bxg6
 Tarrasch–Mieses 18.Qh6 (l'OCR legge «b6») e 19.Re3; in Capablanca–Mattison 12…Qa3, 18…e5 e 19…Na6, mancanti nel
 testo e lette sui diagrammi.
 
+Per le partite 3, 6, 7 e 12 le mosse sono state trascritte direttamente da `book.txt`, controllate con python-chess e
+confrontate con tutti i diagrammi: con partite brevi si fa prima che correggere la bozza mossa per mossa. Due
+trappole dell'OCR: le figurine mancano anche nel commento («5…e6» della partita 12 è 5…Be6, perché il pedone e è già
+in e5); l'intestazione della partita 8 è letta «Game S», quindi lo script la unisce alla partita 7.
+
 ## Limiti e prossimi passi
 
-- Cinque partite su 33. Le altre si aggiungono a blocchi di 4–5: ricostruzione con `scripts/extract_book_games.py`
+- Nove partite su 33. Le altre si aggiungono a blocchi di 4–5: ricostruzione con `scripts/extract_book_games.py`
   e `fixes.json`, confronto con tutti i diagrammi, testi originali, poi `scripts/build_lessons.py --only-walks --walk
   <id>`.
 - Le alternative accettate sono scelte a mano: una mossa buona per il motore ma estranea all'idea resta «Sensata».
