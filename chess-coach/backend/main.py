@@ -553,15 +553,25 @@ def engine_move(game_id: str, body: UndoInput):
     return get_game(game_id)
 
 
-# The bot offers to resign a clearly lost game, as a human would: Stockfish gives it RESIGN_CP or worse (or a
-# mate against) at RESIGN_TURNS consecutive turns of its own, and the game is past the opening. The game ends
-# only if the player accepts; a declined offer is not repeated for RESIGN_RETRY_PLIES.
+# The bot offers to resign a clearly lost game, as a human would: Stockfish gives it the level's threshold or worse
+# (or a mate against) at the level's number of consecutive turns of its own, past the level's minimum ply. Weak
+# players play on much longer than strong ones, so the rule runs from RESIGN_*_WEAK at RESIGN_WEAK_ELO and below to
+# RESIGN_* at RESIGN_STRONG_ELO and above. The game ends only if the player accepts; a declined offer is not
+# repeated for RESIGN_RETRY_PLIES.
 ENGINE_RESIGN = 'engine_resign'
-RESIGN_CP = -700
-RESIGN_TURNS = 3
-RESIGN_MIN_PLY = 20
+RESIGN_CP, RESIGN_CP_WEAK = -700, -1500
+RESIGN_TURNS, RESIGN_TURNS_WEAK = 3, 5
+RESIGN_MIN_PLY, RESIGN_MIN_PLY_WEAK = 20, 40
+RESIGN_STRONG_ELO, RESIGN_WEAK_ELO = 2000, 600
 RESIGN_RETRY_PLIES = 20
 RESIGN_NODES = 30000
+
+
+def resign_rule(elo):
+    """Threshold, consecutive lost turns and minimum ply for a bot of this level to offer resignation."""
+    t = min(1, max(0, (elo - RESIGN_WEAK_ELO) / (RESIGN_STRONG_ELO - RESIGN_WEAK_ELO)))
+    mix = lambda weak, strong: round(weak + (strong - weak) * t)
+    return mix(RESIGN_CP_WEAK, RESIGN_CP), mix(RESIGN_TURNS_WEAK, RESIGN_TURNS), mix(RESIGN_MIN_PLY_WEAK, RESIGN_MIN_PLY)
 
 
 def resign_pending(row, moves):
@@ -571,12 +581,13 @@ def resign_pending(row, moves):
 
 def bot_resigns(row, moves):
     """Whether the bot, about to move after `moves`, should offer to resign instead (Maia and experimental games)."""
-    if row['source'] != 'maia' or row['termination'] or len(moves) < RESIGN_MIN_PLY:
+    threshold, turns, min_ply = resign_rule(row['elo'])
+    if row['source'] != 'maia' or row['termination'] or len(moves) < min_ply:
         return False
     declined = row['resign_declined']
     if declined is not None and declined <= len(moves) < declined + RESIGN_RETRY_PLIES:
         return False
-    for back in range(RESIGN_TURNS):
+    for back in range(turns):
         if len(moves) - 2 * back < 0:
             return False
         board = reconstruct(row['initial_fen'], moves[:len(moves) - 2 * back])
@@ -584,7 +595,7 @@ def bot_resigns(row, moves):
             return False
         e = evaluator.evaluate(board, nodes=RESIGN_NODES)
         # Checked from the latest position back: a single position that is not lost keeps the game going.
-        if not (e['mate'] is not None and e['mate'] < 0 or e['mate'] is None and e['cp'] <= RESIGN_CP):
+        if not (e['mate'] is not None and e['mate'] < 0 or e['mate'] is None and e['cp'] <= threshold):
             return False
     return True
 

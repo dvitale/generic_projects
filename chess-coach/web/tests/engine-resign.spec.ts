@@ -1,8 +1,8 @@
 import {test,expect} from '@playwright/test'
 
 async function lostGame(request:import('@playwright/test').APIRequestContext){
-  // Queen and rook against a lone king, 21 quiet plies: Maia's next turn is the third lost one past move 20.
-  let game=await(await request.post('/api/games',{data:{color:'w',elo:600,fen:'7k/8/8/8/8/8/8/2QRK3 w - - 0 1'}})).json()
+  // Queen and rook against a lone king, 21 quiet plies: a 2000 Maia's next turn is the third lost one past move 20.
+  let game=await(await request.post('/api/games',{data:{color:'w',elo:2000,fen:'7k/8/8/8/8/8/8/2QRK3 w - - 0 1'}})).json()
   const king=['e1e2','e2e3','e3e4','e4d4','d4d5','d5c5','c5c4','c4b4','b4b3','b3a3','a3a4']
   for(const [i,human] of king.entries()){
     game=await(await request.post(`/api/games/${game.id}/moves`,{data:{move:human,actor:'human',version:game.version,revision:game.revision}})).json()

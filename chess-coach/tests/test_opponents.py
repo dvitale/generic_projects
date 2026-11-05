@@ -128,7 +128,8 @@ def test_experimental_game_ignores_the_maia_selection(client, policy):
 
 
 def test_experimental_engine_offers_to_resign_a_lost_game_instead_of_asking_the_service(client, policy, monkeypatch):
-    monkeypatch.setattr(main, 'RESIGN_MIN_PLY', 0)
+    # The strong players' rule at once, whatever the level: the test is about the service, not the thresholds.
+    monkeypatch.setattr(main, 'resign_rule', lambda elo: (main.RESIGN_CP, main.RESIGN_TURNS, 0))
     g = client.post('/api/games', json={'engine': 'experimental', 'elo': 1300, 'fen': '7k/8/8/8/8/8/8/2QRK3 w - - 0 1'}).json()
     for human in ['e1e2', 'e2e3', 'e3e4']:
         g = client.post(f"/api/games/{g['id']}/moves", json={'move': human, 'version': g['version'], 'revision': g['revision'], 'actor': 'human'}).json()

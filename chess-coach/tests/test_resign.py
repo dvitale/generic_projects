@@ -59,9 +59,9 @@ def answer(client,g,accept):
     return r.json()
 
 
-def lost_game(client,monkeypatch):
-    """Queen and rook against a lone king after quiet king moves: the bot's third lost turn is due."""
-    g=client.post('/api/games',json={'fen':'7k/8/8/8/8/8/8/2QRK3 w - - 0 1'}).json()
+def lost_game(client,monkeypatch,elo=2000):
+    """Queen and rook against a lone king after quiet king moves: a strong bot's third lost turn is due."""
+    g=client.post('/api/games',json={'fen':'7k/8/8/8/8/8/8/2QRK3 w - - 0 1','elo':elo}).json()
     plies=[('e1e2','h8g8'),('e2e3','g8h8'),('e3e4','h8g8')]
     # Past the default minimum of 20 plies only: this short game never offers to resign.
     for human,bot in plies[:2]:
@@ -101,6 +101,25 @@ def test_declined_offer_lets_the_bot_play_and_is_not_repeated_at_once(client,mon
     monkeypatch.setattr(main,'RESIGN_RETRY_PLIES',4)
     g=move(client,g,'d4d5','human')
     assert move(client,g,'h8g8','maia')['resignOffer']
+
+
+def test_weak_bots_resign_later_and_less_easily_than_strong_ones():
+    assert main.resign_rule(2000)==main.resign_rule(2600)==(-700,3,20)
+    assert main.resign_rule(600)==(-1500,5,40)
+    assert main.resign_rule(1300)==(-1100,4,30)
+
+
+def test_a_weak_bot_plays_on_until_its_fifth_lost_turn(client,monkeypatch):
+    g=lost_game(client,monkeypatch,elo=600)
+    monkeypatch.setattr(main,'RESIGN_MIN_PLY_WEAK',0)
+    # The third lost turn is enough for a strong bot, not for a 600 one.
+    g=move(client,g,'h8g8','maia')
+    assert not g['resignOffer']
+    g=move(client,g,'e4d4','human');g=move(client,g,'g8h8','maia')
+    assert not g['resignOffer']
+    g=move(client,g,'d4d5','human')
+    offered=move(client,g,'h8g8','maia')
+    assert offered['resignOffer'] and len(offered['moves'])==9
 
 
 def test_undo_withdraws_a_pending_offer(client,monkeypatch):
