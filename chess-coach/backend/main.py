@@ -1062,9 +1062,15 @@ def job_status(job_id: str):
         return dict(jobs[job_id])
 
 
+def puzzle_code(game_number, board):
+    """Short visible name of a puzzle: game number, move number and side to move ('35-20N'), unique by UNIQUE(game_id, ply)."""
+    return None if game_number is None else f"{game_number}-{board.fullmove_number}{'B' if board.turn else 'N'}"
+
+
 def exercise_view(row):
     board = reconstruct(row["initial_fen"], json.loads(row["history"]))
-    return {"id": row["id"], "gameId": row["game_id"], "ply": row["ply"], "theme": row["theme"],
+    number = row['game_number'] if 'game_number' in row.keys() else None
+    return {"id": row["id"], "gameId": row["game_id"], "ply": row["ply"], "theme": row["theme"], "code": puzzle_code(number, board),
             "gameTitle": row['game_title'] if 'game_title' in row.keys() else None,
             "gameCreatedAt": row['game_created_at'] if 'game_created_at' in row.keys() else None,
             "gameNumber": row['game_number'] if 'game_number' in row.keys() else None,

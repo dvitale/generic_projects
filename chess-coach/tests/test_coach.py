@@ -195,3 +195,18 @@ def test_a_puzzle_shows_the_opponent_move_that_led_to_it(client):
     exercises = {e['id']: e for e in client.get('/api/exercises').json()}
     assert exercises['ex-ep']['lastMove'] == 'e7e5' and 'd5e6' in exercises['ex-ep']['legalMoves']
     assert exercises['ex']['lastMove'] is None
+
+
+def test_a_puzzle_has_a_short_code_from_game_number_move_and_side(client):
+    fen = '4k3/4p3/8/3P4/8/8/8/4K3 b - - 0 1'
+    with main.database() as con:
+        con.execute('INSERT INTO games(id,initial_fen,moves,player_color,elo,title,created_at,analysis,analysis_version,source) VALUES(?,?,?,?,?,?,?,?,?,?)', ('ep',fen,'["e7e5"]','w',1500,'Test',main.now(),None,None,'pgn'))
+        con.execute('INSERT INTO exercises(id,game_id,ply,initial_fen,history,theme,best_move,loss,due_at) VALUES(?,?,?,?,?,?,?,?,?)',
+                    ('ex-ep','ep',1,fen,'["e7e5"]','Presa en passant','d5e6',300,main.now()))
+        con.execute('INSERT INTO exercises(id,game_id,ply,initial_fen,history,theme,best_move,loss,due_at) VALUES(?,?,?,?,?,?,?,?,?)',
+                    ('ex-ep0','ep',0,fen,'[]','Prima mossa','e7e6',300,main.now()))
+        number = con.execute("SELECT number FROM games WHERE id='ep'").fetchone()[0]
+    codes = {e['id']: e['code'] for e in client.get('/api/exercises').json()}
+    # After 1...e5 White is to move at move 2; before it, Black at move 1.
+    assert codes['ex-ep'] == f'{number}-2B' and codes['ex-ep0'] == f'{number}-1N'
+    assert client.get('/api/exercises/ex-ep').json()['code'] == f'{number}-2B'

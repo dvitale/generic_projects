@@ -4,7 +4,8 @@ import {api} from './api'
 import {maia} from './engine/maia'
 import type {Exercise,Game} from './types'
 
-type Comparison={key:string;played?:string;maia?:string;elo?:number;error?:string;loading:boolean}
+type Score={cp:number;mate:number|null}
+type Comparison={key:string;played?:string;playedScore?:Score;maia?:string;elo?:number;error?:string;loading:boolean}
 
 /** Predictions are requested only after success, on the original decision position. */
 export function usePuzzleComparison(exercise:Exercise|null,sessionId:string|undefined,solved:boolean){
@@ -25,9 +26,12 @@ export function usePuzzleComparison(exercise:Exercise|null,sessionId:string|unde
       for(const move of game.moves.slice(0,exercise.ply))board.move(move)
       const played=game.moves[exercise.ply]
       if(board.fen()!==exercise.fen||!played||!exercise.legalMoves.includes(played))throw new Error('Mossa originale non disponibile per questa posizione.')
-      setData({key,played,elo:game.elo,loading:true})
+      // Stockfish's score of the game move, from the game's analysis of the same position.
+      const analysis=game.analysis,decision=[...(analysis?.decisions??[]),...(analysis?.moves??[]),...(analysis?.critical??[])].find(d=>d.ply===exercise.ply&&d.played===played)
+      const playedScore=decision?.actual?{cp:decision.actual.cp,mate:decision.actual.mate}:undefined
+      setData({key,played,playedScore,elo:game.elo,loading:true})
       const prediction=await maia.predict(exercise.fen,game.elo,game.elo,controller.signal)
-      if(!stale)setData({key,played,elo:game.elo,maia:prediction.moves[0]?.uci,loading:false})
+      if(!stale)setData({key,played,playedScore,elo:game.elo,maia:prediction.moves[0]?.uci,loading:false})
     })().catch(error=>{if(!stale)setData(current=>({...current,key,loading:false,error:error instanceof Error?error.message:'Confronto non disponibile.'}))})
     return()=>{stale=true;controller.abort();window.clearTimeout(timer)}
   },[key,solved,retry])
