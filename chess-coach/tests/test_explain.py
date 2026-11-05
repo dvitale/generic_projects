@@ -55,6 +55,16 @@ def test_no_material_loss_is_described_as_positional_or_left_to_the_engine_line(
     assert quiet['text'] == 'Linea di Stockfish: 1. Kb1 Kg8 2. Kc2.' and quiet['line'] == ['a1b1', 'h8g8', 'b1c2']
 
 
+def test_a_move_that_loses_nothing_but_misses_a_won_piece_is_a_missed_gain():
+    # Game 102, 5. Nf3?: 5. d3 wins the e4 knight (it cannot move because of Ng6+), the move played only keeps equality.
+    fen = 'rnb1kb1r/pppp1ppp/8/4N3/4n2q/8/PPPPQPPP/RNB1KB1R w KQkq - 2 5'
+    result = why(fen, ['d2d3', 'h4f2', 'e2f2', 'e4f2', 'e1f2', 'f8c5', 'c1e3', 'c5e3', 'f2e3', 'd7d5'],
+                 ['e5f3', 'h4e7', 'b1c3', 'e4c3', 'd2c3', 'e7e2', 'f1e2', 'b8c6'], best_cp=634, actual_cp=30)
+    assert result['motif'] == 'missed_gain' and result['title'] == 'Occasione mancata'
+    assert result['text'] == 'Nf3 non perde materiale, ma lascia sfuggire un’occasione: c’era una mossa che vinceva un cavallo.'
+    assert result['better'].startswith('Con d3 vincevi un cavallo, in cambio di un pedone: 5. d3 Qxf2+') and result['bestWins']
+
+
 def test_small_losses_and_best_moves_have_no_explanation():
     b = chess.Board()
     assert why(b.fen(), ['e2e4'], ['e2e3'], best_cp=30, actual_cp=0) is None
@@ -64,7 +74,7 @@ def test_small_losses_and_best_moves_have_no_explanation():
 def test_insights_carry_the_explanation():
     b = chess.Board('4r1k1/5ppp/8/4B3/8/8/5PPP/6K1 w - - 0 1')
     result = insights.public(insights.compare(b.fen(), 'h2h3', value(b, ['e5c3', 'e8e2'], 0), value(b, ['h2h3', 'e8e5'], -400)))
-    assert insights.VERSION == 7 and result['explanation']['motif'] == 'ignored_threat'
+    assert insights.VERSION == 9 and result['explanation']['motif'] == 'ignored_threat'
 
 
 def test_a_line_cut_in_the_middle_of_an_exchange_does_not_hide_a_lost_piece():
@@ -120,3 +130,13 @@ def test_the_better_move_is_the_point_only_when_no_other_move_comes_close():
     assert explain.explain(fen, 'h2h3', best, actual, [best, far])['better'] == 'Con Rxa8+ vincevi una torre: 1. Rxa8+.'
     # The move played is never its own rival.
     assert explain.explain(fen, 'h2h3', best, actual, [best, actual])['better'] == 'Con Rxa8+ vincevi una torre: 1. Rxa8+.'
+
+
+def test_a_recapture_that_opens_the_file_to_the_rook_is_not_a_trapped_knight():
+    # Game 106: 7. b4? Bxb4 pins the knight, but the loss is the rook: 8. axb4 opens the a-file for Qxa1.
+    fen = 'r1b1kb1r/ppp2ppp/2n1pn2/q7/3P4/P1N2N2/1PP2PPP/R1BQKB1R w KQkq - 1 7'
+    result = why(fen, ['c1d2', 'a7a6', 'f1d3', 'a5b6'], ['b2b4', 'f8b4', 'a3b4', 'a5a1', 'c3b5', 'e8g8', 'b5c7', 'a8b8'],
+                 best_cp=164, actual_cp=-356)
+    assert result['motif'] == 'opened_line' and result['focus'] == ['a3', 'a1']
+    assert result['text'] == ('Dopo b4, 7… Bxb4 prende un pedone: se lo riprendi con 8. axb4 liberi la linea a5–a1 '
+                              'e 8… Qxa1 cattura la torre.')

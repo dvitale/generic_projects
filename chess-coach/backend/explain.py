@@ -17,7 +17,7 @@ TITLES = {'mate': 'Matto contro', 'missed_mate': 'Matto non visto', 'hanging': '
           'undefended': 'Difesa tolta', 'ignored_threat': 'Minaccia non parata', 'opened_line': 'Linea aperta',
           'skewer': 'Infilata', 'fork': 'Attacco doppio', 'trapped': 'Pezzo intrappolato',
           'discovered': 'Attacco di scoperta', 'pin': 'Inchiodatura', 'promotion': 'Promozione avversaria',
-          'material': 'Perdita di materiale', 'king': 'Re esposto', 'positional': 'Svantaggio di posizione',
+          'material': 'Perdita di materiale', 'missed_gain': 'Occasione mancata', 'king': 'Re esposto', 'positional': 'Svantaggio di posizione',
           'engine': 'Deriva dalla linea di Stockfish'}
 MIN_LOSS = 80
 # Queen paper (arXiv 2610.03695): the better move is presented as the point only when it beats every other choice by
@@ -249,6 +249,9 @@ def refutation(board, played, positions, pv, lost):
     lost_kinds = {p.piece_type for p in lost}
     candidates = sorted((s for s in chess.SquareSet(answer.occupied_co[me]) if value(answer.piece_at(s)) >= 3 and answer.piece_at(s).piece_type != chess.KING),
                         key=lambda s: (answer.piece_at(s).piece_type not in lost_kinds, s != move.to_square, -value(answer.piece_at(s))))
+    # When the line does lose a piece, a pinned or cornered piece it never loses is not the reason.
+    if any(value(p) >= 3 for p in lost):
+        candidates = [s for s in candidates if answer.piece_at(s).piece_type in lost_kinds]
     for square in candidates:
         if trapped(answer, square):
             piece = answer.piece_at(square)
@@ -263,6 +266,16 @@ def refutation(board, played, positions, pv, lost):
         if answer.is_pinned(me, square) and unsafe(answer, square):
             return 'pin', (f"{lead} {reply_text} inchioda {the(piece)} in {chess.square_name(square)} al re: non può spostarsi "
                            f"e viene {agree(piece, 'pers')}."), [chess.square_name(square)]
+    if len(positions) >= 5:
+        # The natural recapture moves a piece off a line and the opponent's slider takes what stood behind it.
+        recapture, closing = chess.Move.from_uci(pv[2]), chess.Move.from_uci(pv[3])
+        prize, slider = positions[3].piece_at(closing.to_square), positions[3].piece_at(closing.from_square)
+        if (target and recapture.to_square == reply.to_square and prize and prize.color == me and value(prize) >= 3
+                and slider.piece_type in (chess.BISHOP, chess.ROOK, chess.QUEEN)
+                and recapture.from_square in chess.SquareSet(chess.between(closing.from_square, closing.to_square))):
+            return 'opened_line', (f"Dopo {san}, {reply_text} prende {one(target)}: se {pronoun(target)} riprendi con {label(positions[2], recapture)} "
+                                   f"liberi la linea {chess.square_name(closing.from_square)}–{chess.square_name(closing.to_square)} e "
+                                   f"{label(positions[3], closing)} cattura {the(prize)}."), [chess.square_name(recapture.from_square), chess.square_name(closing.to_square)]
     # Slow traps: the piece is cut off first and attacked only by the opponent's next move.
     if len(positions) >= 5:
         later, closing = positions[4], chess.Move.from_uci(pv[3])
@@ -339,6 +352,9 @@ def explain(fen, played, best, actual, choices=None):
             lost, won = balance(taken[not me], taken[me])
             won = f", in cambio di {pieces_text(won)}" if won else ''
             motif, text = 'material', f"Dopo {san} la risposta più forte {articled('del', opponent)} ({line_text}) ti costa {pieces_text(lost or taken[not me])}{won}."
+    elif net >= 0 and best_net - net >= 2 and (gained := balance(best_taken[me], best_taken[not me])[0]):
+        # The move loses nothing: the point is the material the better move would have won, not a positional trend.
+        motif, text = 'missed_gain', f"{san} non perde materiale, ma lascia sfuggire un’occasione: c’era una mossa che vinceva {pieces_text(gained)}."
     else:
         # Checks that trade or win pieces are an exchange, not an attack on the king.
         checks = [i for i in range(1, len(positions) - 1) if positions[i].turn != me and positions[i + 1].is_check()

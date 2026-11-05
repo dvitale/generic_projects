@@ -111,3 +111,32 @@ test('without a verified motif the Stockfish line is named as the source and pla
   await panel.getByRole('button',{name:'Chiudi spiegazione'}).click()
   await expect(panel).toHaveCount(0)
 })
+
+test('a move that loses nothing but misses a won piece opens the board on the better line',async({page,request})=>{
+  const game=await(await request.post('/api/import',{data:{pgn:'1. e4 e5 2. Qh5 Nc6 3. Qxe5+ Nxe5 *',color:'w'}})).json()
+  const job=await(await request.post(`/api/games/${game.id}/analysis`,{data:{}})).json()
+  await expect.poll(async()=>(await(await request.get('/api/jobs/'+job.jobId)).json()).status,{timeout:30000}).toBe('complete')
+  // Turn the verified motif into a missed gain, so the test does not depend on a real one.
+  await page.route(`**/api/games/${game.id}`,async route=>{
+    const json=await(await route.fetch()).json()
+    const rewrite=(value:unknown):void=>{
+      if(!value||typeof value!=='object')return
+      const item=value as Record<string,unknown>
+      if(typeof item.motif==='string'&&Array.isArray(item.line))Object.assign(item,{motif:'missed_gain',title:'Occasione mancata',text:'Qxe5+ non perde materiale, ma lascia sfuggire un’occasione: c’era una mossa che vinceva un cavallo.',bestWins:true})
+      Object.values(item).forEach(rewrite)
+    }
+    rewrite(json);await route.fulfill({json})
+  })
+  await page.goto('/')
+  await page.getByRole('button',{name:'Partite',exact:true}).click()
+  await page.locator('.game-list button').filter({hasText:game.title}).first().click()
+  const summary=page.getByRole('region',{name:'Riepilogo della partita'})
+  await summary.getByRole('button',{name:/^Vai a 3\. Qxe5\+/}).click()
+  const why=summary.getByLabel('Perché è un errore')
+  await expect(why).toContainText('Occasione mancata')
+  await expect(why).toContainText('c’era una mossa che vinceva un cavallo')
+  await why.getByRole('button',{name:'Guarda la variante sulla scacchiera'}).click()
+  await expect(why.getByRole('button',{name:/^Mossa migliore \(\S+\)$/})).toHaveAttribute('aria-pressed','true')
+  await why.getByRole('button',{name:'Dopo la tua mossa (Qxe5+)'}).click()
+  await expect(why.getByRole('status')).toContainText(/^1\/\d+ · Qxe5\+$/)
+})

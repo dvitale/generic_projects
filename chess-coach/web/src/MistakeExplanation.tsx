@@ -18,8 +18,8 @@ function replay(fen:string,line:string[]){
 
 /** The two Stockfish lines on a small board, stepped by hand or played back on their own. */
 function LineReplay({explanation,autoplay=false}:{explanation:Explanation;autoplay?:boolean}){
-  // In the window, start where the gain is: the better line when it wins material.
-  const [which,setWhich]=useState<'line'|'bestLine'>(autoplay&&explanation.bestWins?'bestLine':'line'),[step,setStep]=useState(autoplay?0:1)
+  // In the window, and for a missed gain, start where the gain is: the better line when it wins material.
+  const [which,setWhich]=useState<'line'|'bestLine'>((autoplay||explanation.motif==='missed_gain')&&explanation.bestWins?'bestLine':'line'),[step,setStep]=useState(autoplay?0:1)
   const [playing,setPlaying]=useState(autoplay),[back,setBack]=useState(false)
   const steps=useMemo(()=>replay(explanation.fen,explanation[which]),[explanation,which])
   const at=Math.min(step,steps.length-1),current=steps[at],last=steps.length-1
