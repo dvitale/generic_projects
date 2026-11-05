@@ -182,3 +182,16 @@ def test_forced_moves_are_in_step_review_but_not_personal_weaknesses(client):
     assert analysis['moves'][0]['label'] == 'Mossa obbligata'
     assert len(analysis['moves'][0]['stockfishCandidates']) == 1
     assert analysis['decisions'] == [] and analysis['critical'] == []
+
+
+def test_a_puzzle_shows_the_opponent_move_that_led_to_it(client):
+    # After 1...e5 the en passant capture dxe6 only makes sense if the double step is visible.
+    fen = '4k3/4p3/8/3P4/8/8/8/4K3 b - - 0 1'
+    with main.database() as con:
+        con.execute('INSERT INTO games(id,initial_fen,moves,player_color,elo,title,created_at,analysis,analysis_version,source) VALUES(?,?,?,?,?,?,?,?,?,?)', ('ep',fen,'["e7e5"]','w',1500,'Test',main.now(),None,None,'pgn'))
+        con.execute('INSERT INTO exercises(id,game_id,ply,initial_fen,history,theme,best_move,loss,due_at) VALUES(?,?,?,?,?,?,?,?,?)',
+                    ('ex-ep','ep',1,fen,'["e7e5"]','Presa en passant','d5e6',300,main.now()))
+    seed_exercise()
+    exercises = {e['id']: e for e in client.get('/api/exercises').json()}
+    assert exercises['ex-ep']['lastMove'] == 'e7e5' and 'd5e6' in exercises['ex-ep']['legalMoves']
+    assert exercises['ex']['lastMove'] is None

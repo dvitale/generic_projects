@@ -1058,7 +1058,9 @@ def exercise_view(row):
             "gameCreatedAt": row['game_created_at'] if 'game_created_at' in row.keys() else None,
             "gameNumber": row['game_number'] if 'game_number' in row.keys() else None,
             "fen": board.fen(), "turn": "w" if board.turn else "b", "dueAt": row["due_at"],
-            "streak": row["streak"], "legalMoves": [m.uci() for m in board.legal_moves]}
+            "streak": row["streak"], "legalMoves": [m.uci() for m in board.legal_moves],
+            # The opponent's move that led here: some puzzles make no sense without it (en passant).
+            "lastMove": board.peek().uci() if board.move_stack else None}
 
 
 def find_exercise(con, exercise_id):
