@@ -145,6 +145,7 @@ def init_db():
             if row['analysis_version'] == len(json.loads(row['moves'])):
                 # Startup stays fast: Maia judges unassessed positions afterwards, on the analysis worker.
                 prevention.seed_game(con, row, json.loads(row['analysis']), now(), reach=False)
+        retire_obsolete_exercises(con)
 
 
 @asynccontextmanager
@@ -1074,7 +1075,7 @@ def migrate_exercise_positions(con):
     if 'position_key' in {r[1] for r in con.execute('PRAGMA table_info(exercises)')}:
         return
     con.execute('ALTER TABLE exercises ADD COLUMN position_key TEXT')
-    con.execute('ALTER TABLE exercises ADD COLUMN retired TEXT')  # NULL active, 'mastered' or 'duplicate'
+    con.execute('ALTER TABLE exercises ADD COLUMN retired TEXT')  # NULL active, 'mastered', 'duplicate' or 'obsolete'
     con.execute('CREATE INDEX IF NOT EXISTS exercises_position ON exercises(position_key)')
     first = {}
     for row in con.execute('SELECT rowid,* FROM exercises ORDER BY rowid').fetchall():
@@ -1084,6 +1085,21 @@ def migrate_exercise_positions(con):
                     (key, None if primary == row['id'] else 'duplicate', row['id']))
         con.execute('INSERT OR IGNORE INTO exercise_sources VALUES(?,?,?,?)', (primary, row['game_id'], row['ply'], row['due_at']))
     con.execute("UPDATE exercises SET retired='mastered' WHERE retired IS NULL AND streak>=?", (MASTERED_STREAK,))
+
+
+def retire_obsolete_exercises(con):
+    """Puzzles whose game decisions no longer count as mistakes under the current rule (load_analysis rescores them,
+    e.g. both moves beyond the outcome cap) leave the rotation; a mistake there in a later game brings them back."""
+    verdicts = {}
+    for row in con.execute("""SELECT g.id,g.analysis FROM games g WHERE g.analysis IS NOT NULL
+                              AND g.id IN (SELECT s.game_id FROM exercise_sources s JOIN exercises e ON e.id=s.exercise_id WHERE e.retired IS NULL)"""):
+        for d in load_analysis(row['analysis']).get('decisions', []):
+            verdicts[(row['id'], d['ply'])] = flagged(d)
+    for ex in con.execute('SELECT id FROM exercises WHERE retired IS NULL').fetchall():
+        judged = [verdicts.get((s['game_id'], s['ply'])) for s in con.execute('SELECT game_id,ply FROM exercise_sources WHERE exercise_id=?', (ex['id'],))]
+        # Only a puzzle whose every known occurrence is judged, and none a mistake any more.
+        if judged and None not in judged and not any(judged):
+            con.execute("UPDATE exercises SET retired='obsolete' WHERE id=?", (ex['id'],))
 
 
 def store_exercise(con, snapshot, moves, item, timestamp):

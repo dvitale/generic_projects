@@ -73,3 +73,20 @@ def test_migration_keeps_the_first_copy_and_retires_learnt_puzzles():
     main.migrate_exercise_positions(con)
     assert {r['id']: r['retired'] for r in con.execute('SELECT * FROM exercises')} == {'x': None, 'y': 'duplicate', 'z': 'mastered'}
     assert {(r['game_id'], r['exercise_id']) for r in con.execute('SELECT * FROM exercise_sources')} == {('a', 'x'), ('b', 'x'), ('c', 'z')}
+
+
+def test_puzzles_that_are_no_mistake_under_the_current_rule_leave_the_rotation(client):
+    # Game #50, 10.Qe4: Qf1 -7.08, Qe4 -9.11. Before the outcome cap it was a 2.03 loss; now both are lost, loss 0.
+    def decision(ply, best, actual, played):
+        return {'ply': ply, 'played': played, 'best': {'cp': best, 'mate': None, 'pv': ['f1c4']}, 'actual': {'cp': actual, 'mate': None, 'pv': [played]}, 'loss': 203}
+    moves = ['e2e4', 'e7e5', 'g1f3', 'b8c6']
+    analysis = {'decisions': [decision(2, -708, -911, 'g1f3'), decision(0, 359, -609, 'e2e4')]}
+    with main.database() as con:
+        g = game(con, 'old', moves)
+        con.execute('UPDATE games SET analysis=?,analysis_version=? WHERE id=?', (json.dumps(analysis), len(moves), 'old'))
+        stale = main.store_exercise(con, g, moves, item(2), main.now())
+        real = main.store_exercise(con, g, moves, item(0), main.now())
+        main.retire_obsolete_exercises(con)
+        retired = {r['id']: r['retired'] for r in con.execute('SELECT * FROM exercises')}
+    assert retired == {stale: 'obsolete', real: None}
+    assert [e['id'] for e in client.get('/api/exercises').json()] == [real]

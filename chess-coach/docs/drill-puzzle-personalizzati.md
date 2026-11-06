@@ -60,6 +60,7 @@ Maia3 è basato su Transformer/Chessformer. Il riferimento iniziale a una CNN ri
 - Ripasso dopo 4 ore, 1, 3, 7, 14, 30, 90 e 180 giorni in base ai successi indipendenti consecutivi (`INTERVAL_HOURS` in `backend/training_schedule.py`). Errori o aiuti nella prima prova azzerano la serie e la nuova verifica indipendente attende quattro ore. La pratica anticipata non aumenta la serie né rinvia il ripasso.
 - Un puzzle per posizione (`store_exercise` in `backend/main.py`, chiave EPD senza contatori): lo stesso errore in un'altra partita riporta in scadenza il puzzle esistente e azzera la serie, invece di crearne una copia; le occorrenze stanno in `exercise_sources`.
 - Dopo 3 successi indipendenti di fila (`MASTERED_STREAK`) il puzzle è imparato (`retired = 'mastered'`) ed esce dalla rotazione finché l'errore non si ripete in partita.
+- A ogni avvio `retire_obsolete_exercises` ritira (`retired = 'obsolete'`) i puzzle le cui occorrenze, rigiudicate da `load_analysis` con la regola attuale, non sono più errori (`flagged`).
 - Le sessioni aperte vengono riprese per impedire che una ricarica azzeri il primo tentativo.
 - A puzzle chiuso, **Gioca da qui** avvia una partita contro Maia dalla posizione del puzzle; prima della chiusura non è disponibile, per non anticipare il tentativo.
 - A puzzle chiuso, **↺ Riprova da capo** riporta la scacchiera alla posizione iniziale per rigiocarla: `POST /api/exercises/{id}/practice` applica lo stesso criterio del tentativo senza registrare nulla (né tentativi né ripassi) e risponde 409 finché la sessione è aperta.
