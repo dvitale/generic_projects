@@ -26,7 +26,7 @@ test('a puzzle highlights the opponent move that led to the position, also after
   // The short code names the game, the move and the side to move, in the panel and in the list.
   const {number}=await(await request.get(`/api/games/${game.id}`)).json()
   await expect(page.locator('.puzzle-panel .puzzle-code')).toHaveText(`PUZZLE #${number}-2B`)
-  await expect(page.locator('.exercise-link.chosen')).toContainText(`#${number}-2B · Mossa 2`)
+  await expect(page.locator('.exercise-link.chosen')).toContainText(`#${number}-2B · Finale · Mossa 2`)
   await expect(page.locator('[data-square="g8"]')).toHaveClass(/last-square/)
   await expect(page.locator('[data-square="h8"]')).toHaveClass(/last-square/)
   // A wrong try shows its own move, then the board goes back and the opponent's move is highlighted again.

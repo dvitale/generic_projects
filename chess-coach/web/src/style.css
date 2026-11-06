@@ -975,3 +975,4 @@ details.panel>summary{font-weight:650;font-size:var(--fs-lg)}
 .walk-reply{border-left:3px solid var(--accent);padding:4px 10px;margin:8px 0}
 .walk-reply small{display:block;color:var(--muted);margin-top:2px}
 .walk-score{font-size:.9rem;color:var(--muted)}
+.puzzle-filters{margin:4px 0 10px;gap:10px}

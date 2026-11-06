@@ -90,3 +90,43 @@ def test_puzzles_that_are_no_mistake_under_the_current_rule_leave_the_rotation(c
         retired = {r['id']: r['retired'] for r in con.execute('SELECT * FROM exercises')}
     assert retired == {stale: 'obsolete', real: None}
     assert [e['id'] for e in client.get('/api/exercises').json()] == [real]
+
+
+def test_only_errors_make_puzzles_and_old_inaccuracies_leave_the_rotation(client):
+    assert main.puzzle_worthy({'loss': 180, 'missedMate': False}) and not main.puzzle_worthy({'loss': 179, 'missedMate': False})
+    assert main.puzzle_worthy({'loss': 0, 'missedMate': True})
+    moves = ['e2e4', 'e7e5', 'g1f3', 'b8c6']
+    decision = {'ply': 2, 'played': 'g1f3', 'best': {'cp': 50, 'mate': None, 'pv': ['f1c4']}, 'actual': {'cp': -70, 'mate': None, 'pv': ['g1f3']}}
+    with main.database() as con:
+        g = game(con, 'minor', moves)
+        con.execute('UPDATE games SET analysis=? WHERE id=?', (json.dumps({'decisions': [decision]}), 'minor'))
+        ex = main.store_exercise(con, g, moves, item(2), main.now())
+        main.retire_obsolete_exercises(con)
+        assert con.execute('SELECT retired FROM exercises WHERE id=?', (ex,)).fetchone()[0] == 'obsolete'
+
+
+def test_new_puzzles_enter_the_list_a_few_a_day_the_costliest_first(client, monkeypatch):
+    monkeypatch.delenv('CHESS_COACH_NEW_PUZZLE_LIMIT')
+    with main.database() as con:
+        con.execute('UPDATE training_settings SET new_limit=2')
+        for n, loss in enumerate((200, 900, 500, 300)):
+            moves = ['e2e4', 'e7e5', 'g1f3', 'b8c6', 'f1c4', 'g8f6'][:n + 2]
+            main.store_exercise(con, game(con, f'g{n}', moves), moves, {**item(n + 2), 'loss': loss}, main.now())
+    listed = lambda: [(e['gameId'], e['phase']) for e in client.get('/api/exercises').json()]
+    assert sorted(listed()) == [('g1', 'opening'), ('g2', 'opening')]
+    assert client.get('/api/profile').json()['due'] == 2 and client.get('/api/profile').json()['newWaiting'] == 2
+    # Trying one uses a place of today's quota: it stays, as a reviewed puzzle, and no other new one enters.
+    ex = next(e['id'] for e in client.get('/api/exercises').json() if e['gameId'] == 'g1')
+    s = client.post(f'/api/exercises/{ex}/sessions').json()
+    client.post(f'/api/exercises/{ex}/reveal', json={'session_id': s['id']})
+    assert sorted(listed()) == [('g1', 'opening'), ('g2', 'opening')]
+    tomorrow = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
+    monkeypatch.setattr(main, 'now', lambda: tomorrow)
+    assert sorted(listed()) == [('g1', 'opening'), ('g2', 'opening'), ('g3', 'opening')]
+
+
+def test_a_puzzle_is_filed_under_its_phase():
+    import chess
+    assert main.phase(chess.Board()) == 'opening'
+    assert main.phase(chess.Board('r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 13')) == 'middlegame'
+    assert main.phase(chess.Board('8/5k2/8/3R4/8/2B5/5K2/8 w - - 0 5')) == 'endgame'

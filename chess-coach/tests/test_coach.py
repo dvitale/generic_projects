@@ -10,6 +10,8 @@ from backend.engine import evaluator
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     monkeypatch.setattr(main, 'DB_PATH', tmp_path / 'coach.sqlite3')
+    # Tests create many puzzles: no daily release limit unless a test sets one.
+    monkeypatch.setenv('CHESS_COACH_NEW_PUZZLE_LIMIT', '1000')
     with TestClient(main.app) as c:
         yield c
 

@@ -1,5 +1,6 @@
 """Transparent spaced review, shared by puzzles and blunder prevention."""
 import json
+import os
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from fastapi import HTTPException
@@ -29,6 +30,23 @@ def init_schema(con):
     CREATE TABLE IF NOT EXISTS training_memory(kind TEXT NOT NULL,target_id TEXT NOT NULL,
       review_after TEXT NOT NULL,PRIMARY KEY(kind,target_id));
     ''')
+
+
+def day_start(con, timestamp):
+    """Midnight of the player's day (training timezone), as a UTC timestamp."""
+    zone = ZoneInfo(con.execute('SELECT timezone FROM training_settings WHERE id=1').fetchone()[0])
+    today = datetime.fromisoformat(timestamp).astimezone(zone).date()
+    return datetime.combine(today, datetime.min.time(), zone).astimezone(timezone.utc).isoformat()
+
+
+def new_puzzle_quota(con, timestamp):
+    """New puzzles still to release today: the daily limit of new positions minus the puzzles first tried today.
+    CHESS_COACH_NEW_PUZZLE_LIMIT overrides the setting (the test servers create many puzzles a day)."""
+    override = os.environ.get('CHESS_COACH_NEW_PUZZLE_LIMIT')
+    limit = int(override) if override else con.execute('SELECT new_limit FROM training_settings WHERE id=1').fetchone()[0]
+    started = con.execute('''SELECT count(*) FROM (SELECT min(created_at) AS first FROM attempts GROUP BY exercise_id)
+                             WHERE first>=?''', (day_start(con, timestamp),)).fetchone()[0]
+    return max(0, limit - started)
 
 
 def eligible(con, kind, target_id, timestamp):

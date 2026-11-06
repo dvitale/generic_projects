@@ -20,7 +20,7 @@ from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, FiniteFloat
 
-from .engine import ROOT, SHORT_MATE, critical, evaluator, flagged, load_analysis, missed_mate, rescore, severity
+from .engine import ERROR_CP, ROOT, SHORT_MATE, critical, evaluator, flagged, load_analysis, missed_mate, rescore, severity
 from .drills import CATALOG, materialize, decisions_played
 from . import tutor, final_review
 from . import prevention
@@ -1020,7 +1020,7 @@ def analyze_game(job_id, snapshot):
             if snapshot['source'] != 'stockfish':
                 prevention.seed_game(con, snapshot, analysis, now())
             for item in analysis['critical'] if snapshot['source'] != 'stockfish' else []:
-                if item["best"]["pv"]:
+                if item["best"]["pv"] and puzzle_worthy(item):
                     store_exercise(con, snapshot, moves, item, now())
         update_job(job_id, status="complete", progress=100, result=analysis)
     except Exception as exc:
@@ -1060,6 +1060,17 @@ def job_status(job_id: str):
 
 
 MASTERED_STREAK = 3  # consecutive independent successes after which a puzzle leaves the rotation
+OPENING_MOVES = 12  # puzzles up to this move number, not yet an endgame, are filed under the opening
+
+
+def puzzle_worthy(d):
+    """A decision that becomes a puzzle: an error (1.80 or more) or a missed mate. Inaccuracies stay in Review."""
+    return flagged(d) and severity(d) >= ERROR_CP
+
+
+def phase(board):
+    """Coarse phase of a puzzle, for filtering: endgame by material (as in the gap analysis), opening by move number."""
+    return 'endgame' if gaps.endgame(board) else 'opening' if board.fullmove_number <= OPENING_MOVES else 'middlegame'
 
 
 def position_key(board):
@@ -1088,13 +1099,13 @@ def migrate_exercise_positions(con):
 
 
 def retire_obsolete_exercises(con):
-    """Puzzles whose game decisions no longer count as mistakes under the current rule (load_analysis rescores them,
-    e.g. both moves beyond the outcome cap) leave the rotation; a mistake there in a later game brings them back."""
+    """Puzzles whose game decisions no longer make a puzzle under the current rule (load_analysis rescores them:
+    both moves beyond the outcome cap, or only an inaccuracy) leave the rotation; a mistake there in a later game brings them back."""
     verdicts = {}
     for row in con.execute("""SELECT g.id,g.analysis FROM games g WHERE g.analysis IS NOT NULL
                               AND g.id IN (SELECT s.game_id FROM exercise_sources s JOIN exercises e ON e.id=s.exercise_id WHERE e.retired IS NULL)"""):
         for d in load_analysis(row['analysis']).get('decisions', []):
-            verdicts[(row['id'], d['ply'])] = flagged(d)
+            verdicts[(row['id'], d['ply'])] = puzzle_worthy(d)
     for ex in con.execute('SELECT id FROM exercises WHERE retired IS NULL').fetchall():
         judged = [verdicts.get((s['game_id'], s['ply'])) for s in con.execute('SELECT game_id,ply FROM exercise_sources WHERE exercise_id=?', (ex['id'],))]
         # Only a puzzle whose every known occurrence is judged, and none a mistake any more.
@@ -1140,7 +1151,7 @@ def exercise_view(row):
             "gameCreatedAt": row['game_created_at'] if 'game_created_at' in row.keys() else None,
             "gameNumber": row['game_number'] if 'game_number' in row.keys() else None,
             "fen": board.fen(), "turn": "w" if board.turn else "b", "dueAt": row["due_at"],
-            "streak": row["streak"], "retired": row['retired'] if 'retired' in row.keys() else None,
+            "streak": row["streak"], "phase": phase(board), "retired": row['retired'] if 'retired' in row.keys() else None,
             # Other games in which the same position came back with a mistake (see store_exercise).
             "repeats": max(0, row['occurrences'] - 1) if 'occurrences' in row.keys() else 0,
             "legalMoves": [m.uci() for m in board.legal_moves],
@@ -1158,11 +1169,23 @@ def find_exercise(con, exercise_id):
 @app.get("/api/exercises")
 def exercises():
     with database() as con:
-        # Due puzzles rotate: never shown first, then the least recently shown. Opening a puzzle without
-        # answering leaves its due date unchanged, so ordering by due date alone always started with the same few.
-        return [exercise_view(r) for r in con.execute('''SELECT e.*,g.title AS game_title,g.created_at AS game_created_at,g.number AS game_number,(SELECT count(*) FROM exercise_sources s WHERE s.exercise_id=e.id) AS occurrences
-            FROM exercises e JOIN games g ON g.id=e.game_id WHERE e.retired IS NULL
-            ORDER BY e.due_at<=? DESC, e.last_shown_at IS NOT NULL, e.last_shown_at, e.due_at LIMIT 100''', (now(),))]
+        return [exercise_view(r) for r in listed_exercises(con, now())[0][:100]]
+
+
+def listed_exercises(con, timestamp):
+    """The puzzles in rotation and the number of new ones held back: puzzles never tried enter a few a day
+    (new_puzzle_quota), the costliest first, so a backlog of new puzzles does not swamp the reviews."""
+    # Due puzzles rotate: never shown first, then the least recently shown. Opening a puzzle without
+    # answering leaves its due date unchanged, so ordering by due date alone always started with the same few.
+    rows = con.execute('''SELECT e.*,g.title AS game_title,g.created_at AS game_created_at,g.number AS game_number,
+        (SELECT count(*) FROM exercise_sources s WHERE s.exercise_id=e.id) AS occurrences,
+        EXISTS(SELECT 1 FROM attempts a WHERE a.exercise_id=e.id) AS tried
+        FROM exercises e JOIN games g ON g.id=e.game_id WHERE e.retired IS NULL
+        ORDER BY e.due_at<=? DESC, e.last_shown_at IS NOT NULL, e.last_shown_at, e.due_at''', (timestamp,)).fetchall()
+    # A new puzzle already opened keeps its place, then the costliest.
+    fresh = sorted((r for r in rows if not r['tried']), key=lambda r: (r['last_shown_at'] is None, -r['loss']))
+    released = {r['id'] for r in fresh[:training_schedule.new_puzzle_quota(con, timestamp)]}
+    return [r for r in rows if r['tried'] or r['id'] in released], len(fresh) - len(released)
 
 
 @app.get("/api/exercises/{exercise_id}")
@@ -1453,7 +1476,8 @@ def profile():
         attempts_count = con.execute("SELECT count(*) FROM attempts").fetchone()[0]
         unaided = con.execute("SELECT count(*) FROM attempts WHERE success=1 AND assisted=0 AND is_first=1 AND exposure IN ('new','review')").fetchone()[0]
         independent = con.execute("SELECT count(*) FROM attempts WHERE assisted=0 AND is_first=1 AND exposure IN ('new','review')").fetchone()[0]
-        due = con.execute("SELECT count(*) FROM exercises WHERE due_at<=? AND retired IS NULL", (now(),)).fetchone()[0]
+        listed, waiting = listed_exercises(con, now())
+        due = sum(r['due_at'] <= now() for r in listed)
         themes = [dict(r) for r in con.execute("SELECT theme,count(*) AS examples FROM exercises WHERE retired IS NOT 'duplicate' GROUP BY theme ORDER BY examples DESC")]
         domains = {key:0 for key in ('tactical','positional','mixed','unclear')}
         seen = set()
@@ -1465,7 +1489,7 @@ def profile():
                 saved=d.get('insight')
                 kind=(saved if saved and saved.get('version')==insights.VERSION else insights.compare(d['fen'],d['played'],d['best'],d['actual'],d.get('stockfishCandidates')))['kind']
                 if kind in domains:domains[kind]+=1
-    return {"games": game_count, "attempts": attempts_count, "independentAttempts": independent, "unaidedSuccesses": unaided, "due": due,
+    return {"games": game_count, "attempts": attempts_count, "independentAttempts": independent, "unaidedSuccesses": unaided, "due": due, "newWaiting": waiting,
             "themes": themes, "domains": [{'kind':key,'label':insights.LABELS[key],'examples':value} for key,value in domains.items()], "confidence": "Dati raccolti finora",
             "plan": [{"title": "Ripassa i puzzle in scadenza", "minutes": 5, "description": f"{due} esercizi pronti per il ripasso."},
                      {"title": "Un drill e una partita", "minutes": 15, "description": "Gioca un drill da una tua posizione critica, poi una partita contro Maia controllando scacchi, catture e minacce a ogni mossa."},
