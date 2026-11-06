@@ -1,7 +1,7 @@
 import {test,expect} from '@playwright/test'
 
 test('A rejected puzzle move can be defended against Stockfish and the puzzle resumed',async({page,request})=>{
-  const game=await(await request.post('/api/games',{data:{elo:600,fen:'7k/8/5KQ1/8/8/8/8/8 w - - 0 1'}})).json()
+  const game=await(await request.post('/api/games',{data:{elo:600,fen:'7k/8/5KQ1/8/8/P7/8/8 w - - 0 1'}})).json()
   await request.post(`/api/games/${game.id}/moves`,{data:{move:'g6g8',version:0,revision:0,actor:'human'}})
   const job=await(await request.post(`/api/games/${game.id}/analysis`,{data:{}})).json()
   await expect.poll(async()=>(await(await request.get('/api/jobs/'+job.jobId)).json()).status,{timeout:30000}).toBe('complete')
@@ -34,7 +34,7 @@ test('A rejected puzzle move can be defended against Stockfish and the puzzle re
 })
 
 test('The mistake explanation stays beside the board while the page scrolls and can be moved',async({page})=>{
-  const fen='7k/8/5KQ1/8/8/8/8/8 w - - 0 1'
+  const fen='7k/8/5KQ1/8/8/P7/8/8 w - - 0 1'
   const actual={pv:['g6g8','h8g8'],cp:-99999,mate:null,san:['Qg8+','Kxg8'],depth:18,nodes:1000,perspective:'w'}
   await page.route('**/api/prevention',route=>route.fulfill({json:{positions:[{id:'p',fen,turn:'w',legalMoves:['g6g7'],title:'Qg7',moveNumber:1}],stats:{firstAttempts:1,firstSuccesses:0},rule:{description:'Test'}}}))
   await page.route('**/api/prevention/p/sessions',route=>route.fulfill({json:{id:'s',version:1,exposure:'new'}}))

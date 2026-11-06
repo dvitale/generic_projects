@@ -123,6 +123,7 @@ def init_db():
             con.execute('ALTER TABLE puzzle_sessions ADD COLUMN solution TEXT')
         if 'last_shown_at' not in {r[1] for r in con.execute('PRAGMA table_info(exercises)')}:
             con.execute('ALTER TABLE exercises ADD COLUMN last_shown_at TEXT')
+        migrate_exercise_positions(con)
         columns = {r[1] for r in con.execute("PRAGMA table_info(attempts)")}
         for name, declaration in {"session_id": "TEXT", "is_first": "INTEGER NOT NULL DEFAULT 0", "exposure": "TEXT NOT NULL DEFAULT 'legacy'"}.items():
             if name not in columns:
@@ -784,6 +785,7 @@ def preserve_review(con, row, session):
         con.execute('INSERT INTO drill_sessions VALUES(?,?,?,?,?,?,?)',
                     (archive_id, session['template_id'], session['template_name'], session['theme'], session['goal'], session['start_ply'], session['target']))
     con.execute('UPDATE exercises SET game_id=? WHERE game_id=?', (archive_id, row['id']))
+    con.execute('UPDATE exercise_sources SET game_id=? WHERE game_id=?', (archive_id, row['id']))
     con.execute('UPDATE tutor_reviews SET game_id=? WHERE game_id=?', (archive_id, row['id']))
     con.execute('UPDATE final_reviews SET game_id=? WHERE game_id=?', (archive_id, row['id']))
     con.execute('UPDATE game_ratings SET game_id=? WHERE game_id=?', (archive_id, row['id']))
@@ -1017,14 +1019,8 @@ def analyze_game(job_id, snapshot):
             if snapshot['source'] != 'stockfish':
                 prevention.seed_game(con, snapshot, analysis, now())
             for item in analysis['critical'] if snapshot['source'] != 'stockfish' else []:
-                if not item["best"]["pv"]:
-                    continue
-                ex_id = f"{snapshot['id']}:{snapshot['revision']}:{item['ply']}"
-                con.execute("""INSERT INTO exercises(id,game_id,ply,initial_fen,history,theme,best_move,loss,due_at)
-                  VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(game_id,ply) DO UPDATE SET
-                  best_move=excluded.best_move,loss=excluded.loss,theme=excluded.theme""",
-                            (ex_id, snapshot["id"], item["ply"], snapshot["initial_fen"],
-                             json.dumps(moves[:item["ply"]]), item["theme"], item["best"]["pv"][0], item["loss"], now()))
+                if item["best"]["pv"]:
+                    store_exercise(con, snapshot, moves, item, now())
         update_job(job_id, status="complete", progress=100, result=analysis)
     except Exception as exc:
         update_job(job_id, status="failed", error=str(exc))
@@ -1062,6 +1058,59 @@ def job_status(job_id: str):
         return dict(jobs[job_id])
 
 
+MASTERED_STREAK = 3  # consecutive independent successes after which a puzzle leaves the rotation
+
+
+def position_key(board):
+    """Same position whatever the move order or move counters: the identity of a puzzle across games."""
+    return board.epd()
+
+
+def migrate_exercise_positions(con):
+    """Give every puzzle its position key and occurrences; later copies of one position become duplicates of the first."""
+    con.execute('''CREATE TABLE IF NOT EXISTS exercise_sources(
+      exercise_id TEXT NOT NULL REFERENCES exercises(id), game_id TEXT NOT NULL, ply INTEGER NOT NULL,
+      created_at TEXT NOT NULL, PRIMARY KEY(game_id, ply))''')
+    if 'position_key' in {r[1] for r in con.execute('PRAGMA table_info(exercises)')}:
+        return
+    con.execute('ALTER TABLE exercises ADD COLUMN position_key TEXT')
+    con.execute('ALTER TABLE exercises ADD COLUMN retired TEXT')  # NULL active, 'mastered' or 'duplicate'
+    con.execute('CREATE INDEX IF NOT EXISTS exercises_position ON exercises(position_key)')
+    first = {}
+    for row in con.execute('SELECT rowid,* FROM exercises ORDER BY rowid').fetchall():
+        key = position_key(reconstruct(row['initial_fen'], json.loads(row['history'])))
+        primary = first.setdefault(key, row['id'])
+        con.execute('UPDATE exercises SET position_key=?,retired=? WHERE id=?',
+                    (key, None if primary == row['id'] else 'duplicate', row['id']))
+        con.execute('INSERT OR IGNORE INTO exercise_sources VALUES(?,?,?,?)', (primary, row['game_id'], row['ply'], row['due_at']))
+    con.execute("UPDATE exercises SET retired='mastered' WHERE retired IS NULL AND streak>=?", (MASTERED_STREAK,))
+
+
+def store_exercise(con, snapshot, moves, item, timestamp):
+    """One puzzle per position: the same mistake in another game brings the existing puzzle back instead of a copy."""
+    history = moves[:item['ply']]
+    key = position_key(reconstruct(snapshot['initial_fen'], history))
+    values = (item['best']['pv'][0], item['loss'], item['theme'])
+    existing = con.execute("SELECT * FROM exercises WHERE position_key=? AND retired IS NOT 'duplicate' ORDER BY rowid LIMIT 1", (key,)).fetchone()
+    if existing is None:
+        con.execute("""INSERT INTO exercises(id,game_id,ply,initial_fen,history,theme,best_move,loss,due_at,position_key)
+          VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(game_id,ply) DO UPDATE SET
+          best_move=excluded.best_move,loss=excluded.loss,theme=excluded.theme,position_key=excluded.position_key""",
+                    (f"{snapshot['id']}:{snapshot['revision']}:{item['ply']}", snapshot['id'], item['ply'], snapshot['initial_fen'],
+                     json.dumps(history), item['theme'], *values[:2], timestamp, key))
+        ex_id = con.execute('SELECT id FROM exercises WHERE game_id=? AND ply=?', (snapshot['id'], item['ply'])).fetchone()[0]
+        con.execute('INSERT OR REPLACE INTO exercise_sources VALUES(?,?,?,?)', (ex_id, snapshot['id'], item['ply'], timestamp))
+        return ex_id
+    known = con.execute('SELECT exercise_id FROM exercise_sources WHERE game_id=? AND ply=?', (snapshot['id'], item['ply'])).fetchone()
+    con.execute('UPDATE exercises SET best_move=?,loss=?,theme=? WHERE id=?', (*values, existing['id']))
+    if known is None or known[0] != existing['id']:
+        # A repeated mistake: the puzzle was not learnt, even if it had left the rotation.
+        con.execute('INSERT OR REPLACE INTO exercise_sources VALUES(?,?,?,?)', (existing['id'], snapshot['id'], item['ply'], timestamp))
+        con.execute('UPDATE exercises SET retired=NULL,streak=0,due_at=min(due_at,?) WHERE id=?', (timestamp, existing['id']))
+        con.execute("DELETE FROM training_memory WHERE kind='puzzle' AND target_id=?", (existing['id'],))
+    return existing['id']
+
+
 def puzzle_code(game_number, board):
     """Short visible name of a puzzle: game number, move number and side to move ('35-20N'), unique by UNIQUE(game_id, ply)."""
     return None if game_number is None else f"{game_number}-{board.fullmove_number}{'B' if board.turn else 'N'}"
@@ -1075,7 +1124,10 @@ def exercise_view(row):
             "gameCreatedAt": row['game_created_at'] if 'game_created_at' in row.keys() else None,
             "gameNumber": row['game_number'] if 'game_number' in row.keys() else None,
             "fen": board.fen(), "turn": "w" if board.turn else "b", "dueAt": row["due_at"],
-            "streak": row["streak"], "legalMoves": [m.uci() for m in board.legal_moves],
+            "streak": row["streak"], "retired": row['retired'] if 'retired' in row.keys() else None,
+            # Other games in which the same position came back with a mistake (see store_exercise).
+            "repeats": max(0, row['occurrences'] - 1) if 'occurrences' in row.keys() else 0,
+            "legalMoves": [m.uci() for m in board.legal_moves],
             # The opponent's move that led here: some puzzles make no sense without it (en passant).
             "lastMove": board.peek().uci() if board.move_stack else None}
 
@@ -1092,15 +1144,15 @@ def exercises():
     with database() as con:
         # Due puzzles rotate: never shown first, then the least recently shown. Opening a puzzle without
         # answering leaves its due date unchanged, so ordering by due date alone always started with the same few.
-        return [exercise_view(r) for r in con.execute('''SELECT e.*,g.title AS game_title,g.created_at AS game_created_at,g.number AS game_number
-            FROM exercises e JOIN games g ON g.id=e.game_id
+        return [exercise_view(r) for r in con.execute('''SELECT e.*,g.title AS game_title,g.created_at AS game_created_at,g.number AS game_number,(SELECT count(*) FROM exercise_sources s WHERE s.exercise_id=e.id) AS occurrences
+            FROM exercises e JOIN games g ON g.id=e.game_id WHERE e.retired IS NULL
             ORDER BY e.due_at<=? DESC, e.last_shown_at IS NOT NULL, e.last_shown_at, e.due_at LIMIT 100''', (now(),))]
 
 
 @app.get("/api/exercises/{exercise_id}")
 def exercise_detail(exercise_id: str):
     with database() as con:
-        row = con.execute("SELECT e.*,g.title AS game_title,g.created_at AS game_created_at,g.number AS game_number FROM exercises e JOIN games g ON g.id=e.game_id WHERE e.id=?", (exercise_id,)).fetchone()
+        row = con.execute("SELECT e.*,g.title AS game_title,g.created_at AS game_created_at,g.number AS game_number,(SELECT count(*) FROM exercise_sources s WHERE s.exercise_id=e.id) AS occurrences FROM exercises e JOIN games g ON g.id=e.game_id WHERE e.id=?", (exercise_id,)).fetchone()
         if row is None:
             raise HTTPException(404, "Esercizio non trovato")
         return exercise_view(row)
@@ -1224,6 +1276,9 @@ def attempt(exercise_id: str, body: AttemptInput):
         first = session["guesses"] == 0
         due = current["due_at"]
         scheduled = training_schedule.record(con,"puzzle",current,session,success,assisted,now())
+        if scheduled and current["streak"] + 1 >= MASTERED_STREAK:
+            # Learnt: out of the rotation until the same position comes back with a mistake in a game.
+            con.execute("UPDATE exercises SET retired='mastered' WHERE id=?", (exercise_id,))
         due = find_exercise(con,exercise_id)["due_at"]
         inserted = con.execute("INSERT INTO attempts(exercise_id,move,success,assisted,created_at,session_id,is_first,exposure) VALUES(?,?,?,?,?,?,?,?)",
                     (exercise_id, body.move, int(success), int(assisted), now(), body.session_id, int(first), session["exposure"]))
@@ -1323,7 +1378,7 @@ def drill_catalog():
     with database() as con:
         history = [json.loads(r[0]) for r in con.execute("SELECT moves FROM games WHERE source IN ('maia','pgn')")]
         personal = con.execute("""SELECT e.*, g.title AS game_title, g.number AS game_number FROM exercises e JOIN games g ON g.id=e.game_id
-                                  ORDER BY e.due_at,e.loss DESC LIMIT 10""").fetchall()
+                                  WHERE e.retired IS NULL ORDER BY e.due_at,e.loss DESC LIMIT 10""").fetchall()
     result = []
     for template in CATALOG:
         _, moves, fen = materialize(template)
@@ -1382,8 +1437,8 @@ def profile():
         attempts_count = con.execute("SELECT count(*) FROM attempts").fetchone()[0]
         unaided = con.execute("SELECT count(*) FROM attempts WHERE success=1 AND assisted=0 AND is_first=1 AND exposure IN ('new','review')").fetchone()[0]
         independent = con.execute("SELECT count(*) FROM attempts WHERE assisted=0 AND is_first=1 AND exposure IN ('new','review')").fetchone()[0]
-        due = con.execute("SELECT count(*) FROM exercises WHERE due_at<=?", (now(),)).fetchone()[0]
-        themes = [dict(r) for r in con.execute("SELECT theme,count(*) AS examples FROM exercises GROUP BY theme ORDER BY examples DESC")]
+        due = con.execute("SELECT count(*) FROM exercises WHERE due_at<=? AND retired IS NULL", (now(),)).fetchone()[0]
+        themes = [dict(r) for r in con.execute("SELECT theme,count(*) AS examples FROM exercises WHERE retired IS NOT 'duplicate' GROUP BY theme ORDER BY examples DESC")]
         domains = {key:0 for key in ('tactical','positional','mixed','unclear')}
         seen = set()
         for row in con.execute("SELECT analysis FROM games WHERE analysis IS NOT NULL AND source NOT IN ('snapshot','stockfish')"):
@@ -1440,7 +1495,7 @@ def request_tutor(game_id: str, body: TutorInput):
             if not decisions:
                 raise HTTPException(422, 'Non ci sono decisioni analizzate da discutere.')
             selected_plies = {d['ply'] for d in decisions}
-            exercise_rows = [dict(r) for r in con.execute('SELECT id,ply,theme,due_at FROM exercises WHERE game_id=?', (game_id,)) if r['ply'] in selected_plies]
+            exercise_rows = [dict(r) for r in con.execute('SELECT e.id,s.ply,e.theme,e.due_at FROM exercise_sources s JOIN exercises e ON e.id=s.exercise_id WHERE s.game_id=?', (game_id,)) if r['ply'] in selected_plies]
             decision_summary = learning.game_quality(con, row)
             judgments = [learning.public_judgment(r) for r in con.execute(
                 'SELECT * FROM position_judgments WHERE game_id=? AND answer IS NOT NULL', (game_id,)) if r['ply'] in selected_plies]

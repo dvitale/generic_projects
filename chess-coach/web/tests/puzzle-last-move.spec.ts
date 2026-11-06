@@ -10,7 +10,7 @@ test.afterEach(async({page})=>{await page.unrouteAll({behavior:'ignoreErrors'})}
 
 test('a puzzle highlights the opponent move that led to the position, also after a wrong try',async({page,request})=>{
   // Black has just played 1...Kh8; White's Qg8+ is the mistake the puzzle comes from.
-  const pgn='[FEN "6k1/8/5KQ1/8/8/8/8/8 b - - 0 1"]\n[SetUp "1"]\n\n1... Kh8 2. Qg8+ *'
+  const pgn='[FEN "6k1/8/5KQ1/8/8/8/6P1/8 b - - 0 1"]\n[SetUp "1"]\n\n1... Kh8 2. Qg8+ *'
   const game=await(await request.post('/api/import',{data:{pgn,color:'w'}})).json()
   const job=await(await request.post(`/api/games/${game.id}/analysis`,{data:{}})).json()
   await expect.poll(async()=>(await(await request.get('/api/jobs/'+job.jobId)).json()).status,{timeout:30000}).toBe('complete')
@@ -39,5 +39,5 @@ test('a puzzle highlights the opponent move that led to the position, also after
   await page.locator('[data-square="g6"]').click();await page.locator('[data-square="g7"]').click()
   const comparison=page.locator('[aria-label="Confronto del puzzle"]')
   await expect(comparison).toContainText('La tua soluzione · verde · Stockfish matto del Bianco')
-  await expect(comparison).toContainText('Giocata in partita · bianco · Stockfish +0,00')
+  await expect(comparison).toContainText(/Giocata in partita · bianco · Stockfish [+−-]\d/)
 })

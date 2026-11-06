@@ -12,7 +12,7 @@ test('Puzzle feedback distinguishes retry, success and reveal and advances witho
   })
   const ids:string[]=[]
   for(let i=0;i<2;i++){
-    const game=await(await request.post('/api/games',{data:{elo:600,fen:'7k/8/5KQ1/8/8/8/8/8 w - - 0 1'}})).json()
+    const game=await(await request.post('/api/games',{data:{elo:600,fen:`7k/8/5KQ1/8/8/8/${['P7','1P6'][i]}/8 w - - 0 1`}})).json()
     await request.post(`/api/games/${game.id}/moves`,{data:{move:'g6g8',version:0,revision:0,actor:'human'}})
     const job=await(await request.post(`/api/games/${game.id}/analysis`,{data:{}})).json()
     await expect.poll(async()=>(await(await request.get('/api/jobs/'+job.jobId)).json()).status,{timeout:30000}).toBe('complete')
@@ -95,7 +95,7 @@ test('Puzzle feedback distinguishes retry, success and reveal and advances witho
 })
 
 test('Play from here starts a Maia game from the puzzle position once it is solved',async({page,request})=>{
-  const game=await(await request.post('/api/games',{data:{elo:600,fen:'7k/8/5KQ1/8/8/8/8/8 w - - 0 1'}})).json()
+  const game=await(await request.post('/api/games',{data:{elo:600,fen:'7k/8/5KQ1/8/8/8/2P5/8 w - - 0 1'}})).json()
   await request.post(`/api/games/${game.id}/moves`,{data:{move:'g6g8',version:0,revision:0,actor:'human'}})
   const job=await(await request.post(`/api/games/${game.id}/analysis`,{data:{}})).json()
   await expect.poll(async()=>(await(await request.get('/api/jobs/'+job.jobId)).json()).status,{timeout:30000}).toBe('complete')
@@ -120,14 +120,14 @@ test('Play from here starts a Maia game from the puzzle position once it is solv
   await expect(replay).toHaveCount(0)
   await feedback.getByRole('button',{name:'Gioca da qui col Bianco',exact:true}).click()
   await expect(page.getByRole('heading',{name:'Gioca contro Maia',exact:true})).toBeVisible()
-  expect(created).toMatchObject({fen:'7k/8/5KQ1/8/8/8/8/8 w - - 0 1',color:'w'})
+  expect(created).toMatchObject({fen:'7k/8/5KQ1/8/8/8/2P5/8 w - - 0 1',color:'w'})
   expect(String(created!.title)).toMatch(/^Puzzle dalla partita #\d+, mossa 1 del Bianco$/)
   await expect(page.locator('[data-square="g6"] img')).toBeVisible()
   await expect(page.getByText('Tocca a te · trascina un pezzo o usa due clic')).toBeVisible()
 })
 
 test('the diagnosis before the solution counts the failed attempts as candidates',async({page,request})=>{
-  const game=await(await request.post('/api/games',{data:{elo:600,fen:'7k/8/5KQ1/8/8/8/8/8 w - - 0 1'}})).json()
+  const game=await(await request.post('/api/games',{data:{elo:600,fen:'7k/8/5KQ1/8/8/8/3P4/8 w - - 0 1'}})).json()
   await request.post(`/api/games/${game.id}/moves`,{data:{move:'g6g8',version:0,revision:0,actor:'human'}})
   const job=await(await request.post(`/api/games/${game.id}/analysis`,{data:{}})).json()
   await expect.poll(async()=>(await(await request.get('/api/jobs/'+job.jobId)).json()).status,{timeout:30000}).toBe('complete')
@@ -153,7 +153,7 @@ test('the diagnosis before the solution counts the failed attempts as candidates
 })
 
 test('a closed puzzle can be retried from the start without recording the moves',async({page,request})=>{
-  const game=await(await request.post('/api/games',{data:{elo:600,fen:'7k/8/5KQ1/8/8/8/8/8 w - - 0 1'}})).json()
+  const game=await(await request.post('/api/games',{data:{elo:600,fen:'7k/8/5KQ1/8/8/8/4P3/8 w - - 0 1'}})).json()
   await request.post(`/api/games/${game.id}/moves`,{data:{move:'g6g8',version:0,revision:0,actor:'human'}})
   const job=await(await request.post(`/api/games/${game.id}/analysis`,{data:{}})).json()
   await expect.poll(async()=>(await(await request.get('/api/jobs/'+job.jobId)).json()).status,{timeout:30000}).toBe('complete')
@@ -184,7 +184,7 @@ test('a closed puzzle can be retried from the start without recording the moves'
 })
 
 test('hints name the kind of move first, then highlight the piece that plays it',async({page,request})=>{
-  const game=await(await request.post('/api/games',{data:{elo:600,fen:'7k/8/5KQ1/8/8/8/8/8 w - - 0 1'}})).json()
+  const game=await(await request.post('/api/games',{data:{elo:600,fen:'7k/8/5KQ1/8/8/8/5P2/8 w - - 0 1'}})).json()
   await request.post(`/api/games/${game.id}/moves`,{data:{move:'g6g8',version:0,revision:0,actor:'human'}})
   const job=await(await request.post(`/api/games/${game.id}/analysis`,{data:{}})).json()
   await expect.poll(async()=>(await(await request.get('/api/jobs/'+job.jobId)).json()).status,{timeout:30000}).toBe('complete')

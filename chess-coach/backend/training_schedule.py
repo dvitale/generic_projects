@@ -78,7 +78,7 @@ def plan(con, timestamp):
     seen_today = {(r['kind'],r['target_id']) for r in independent}
     rows=[]
     for kind,table in TABLES.items():
-        where='WHERE '+PREVENTION_LISTED.format('e.') if kind=='prevention' else ''
+        where='WHERE '+PREVENTION_LISTED.format('e.') if kind=='prevention' else 'WHERE e.retired IS NULL'
         for r in con.execute(f'''SELECT e.*,g.title AS game_title,g.number AS game_number,g.pgn_headers AS headers,
           m.review_after,(SELECT count(*) FROM training_reviews v WHERE v.kind=? AND v.target_id=e.id AND v.independent=1) AS reviews
           FROM {table} e JOIN games g ON g.id=e.game_id

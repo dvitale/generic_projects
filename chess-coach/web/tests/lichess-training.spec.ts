@@ -1,7 +1,7 @@
 import {test,expect,type Page} from '@playwright/test'
 import {Chess} from 'chess.js'
 
-const fen='7k/8/5KQ1/8/8/8/8/8 w - - 0 1'
+const fen='7k/8/5KQ1/8/8/2P5/8/8 w - - 0 1'
 async function checkLink(page:Page,expected:string){
   await page.getByRole('button',{name:/Analizza con Lichess/}).click()
   const href=await page.getByRole('link',{name:'apri Lichess in una nuova scheda'}).getAttribute('href')

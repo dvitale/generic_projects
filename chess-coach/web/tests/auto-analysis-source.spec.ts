@@ -1,7 +1,7 @@
 import {test,expect} from '@playwright/test'
 
 test('finishing a game starts analysis without leaving play or requesting it twice',async({page,request})=>{
-  const game=await(await request.post('/api/games',{data:{fen:'7k/8/5KQ1/8/8/8/8/8 w - - 0 1',color:'w'}})).json()
+  const game=await(await request.post('/api/games',{data:{fen:'7k/8/5KQ1/8/8/3P4/8/8 w - - 0 1',color:'w'}})).json()
   await page.addInitScript(id=>localStorage.setItem('chess-coach-game',id),game.id)
   let manualRequests=0
   page.on('request',r=>{if(r.method()==='POST'&&r.url().endsWith('/analysis'))manualRequests++})

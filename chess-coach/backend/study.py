@@ -313,7 +313,7 @@ def pick_exam_items(con, size, timestamp):
     """Interleave themes and prefer positions not practised recently: a test of transfer, not of memory."""
     recent = (datetime.fromisoformat(timestamp) - timedelta(days=EXAM_RECENT_DAYS)).isoformat()
     rows = con.execute('''SELECT e.*, (SELECT max(a.created_at) FROM attempts a WHERE a.exercise_id=e.id) AS last_seen
-        FROM exercises e ORDER BY e.id''').fetchall()
+        FROM exercises e WHERE e.retired IS NOT 'duplicate' ORDER BY e.id''').fetchall()
     if len(rows) < 3:
         raise HTTPException(422, 'Servono almeno 3 puzzle dalle tue partite per un esame di prova: analizza qualche partita.')
     rng = random.Random(timestamp)
@@ -733,7 +733,7 @@ def install(app, database, find_game, now, lock):
     def game_pack(game_id: str):
         with database() as con:
             row, start = analysed(con, game_id)
-            exercises = {r['ply']: r['id'] for r in con.execute('SELECT id,ply FROM exercises WHERE game_id=?', (game_id,))}
+            exercises = {r['ply']: r['exercise_id'] for r in con.execute('SELECT exercise_id,ply FROM exercise_sources WHERE game_id=?', (game_id,))}
             positions = {r['ply']: r['id'] for r in con.execute('SELECT id,ply FROM prevention_positions WHERE game_id=? AND '+training_schedule.PREVENTION_LISTED.format(''), (game_id,))}
             cards = {}
             for r in con.execute('SELECT ply FROM study_cards WHERE game_id=? AND archived=0', (game_id,)):

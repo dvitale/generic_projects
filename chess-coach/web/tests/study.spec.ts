@@ -72,7 +72,7 @@ test('A game pack leads to a lesson card, the recall quiz and the position tutor
 })
 
 test('The mock exam gives no feedback until it is handed in',async({page})=>{
-  const fen='7k/8/5KQ1/8/8/8/8/8 w - - 0 1'
+  const fen='7k/8/5KQ1/8/8/1P6/8/8 w - - 0 1'
   const item={fen,turn:'w',legalMoves:['g6g7','g6g8','g6h6'],answered:false}
   const exam={id:'e',createdAt:new Date().toISOString(),deadline:new Date(Date.now()+600000).toISOString(),finishedAt:null,size:2,answered:0,items:[{...item,index:0},{...item,index:1}]}
   const answers:unknown[]=[]

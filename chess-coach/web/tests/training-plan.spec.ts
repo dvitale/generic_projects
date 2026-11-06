@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test'
 
 test('Maia PGN files import once, generate exercises, and a successful review persists in the plan',async({page,request})=>{
   const baseline=(await(await request.get('/api/training-plan')).json()).completed
-  const pgn=(id:string)=>`[ID "${id}"]\n[Site "https://maiachess.com/"]\n[White "TrainingTest"]\n[Black "Maia 600"]\n[SetUp "1"]\n[FEN "7k/8/5KQ1/8/8/8/8/8 w - - 0 1"]\n[Result "*"]\n\n1. Qg8+ *`
+  const pgn=(id:string)=>`[ID "${id}"]\n[Site "https://maiachess.com/"]\n[White "TrainingTest"]\n[Black "Maia 600"]\n[SetUp "1"]\n[FEN "7k/8/5KQ1/8/8/8/7P/8 w - - 0 1"]\n[Result "*"]\n\n1. Qg8+ *`
   await page.goto('/')
   await page.getByRole('button',{name:/Importa PGN/}).click()
   await page.getByLabel('File PGN',{exact:true}).setInputFiles([
