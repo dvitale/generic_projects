@@ -1,5 +1,4 @@
 import type {Color,Evaluation} from './types'
-import type {MaiaScore} from './useMaiaScore'
 
 export type BarValue={cp:number|null;mate:Color|null;mateIn?:number|null}
 
@@ -27,16 +26,3 @@ export default function EvalBar({value,orientation}:{value:BarValue|null;orienta
   </div>
 }
 
-const percent=(x:number)=>`${Math.round(x*100)}%`
-
-/** Second bar: the expected score Maia assigns to White for human players of the given Elo. */
-export function MaiaBar({score,orientation}:{score:MaiaScore|null;orientation:Color}){
-  const white=score?score.white*100:50
-  const leader=score&&score.white<.5?'b':'w'
-  const text=!score?'—':String(Math.round(Math.max(score.white,1-score.white)*100))
-  const description=!score?'Punteggio atteso Maia non disponibile':`Maia ${score.elo}: punteggio atteso del Bianco ${percent(score.white)} (vince il Bianco ${percent(score.outcome.win)}, patta ${percent(score.outcome.draw)}, vince il Nero ${percent(score.outcome.loss)})`
-  return <div className={`eval-bar maia-bar ${orientation==='b'?'flipped':''} ${score?'':'empty'}`} role="img" aria-label={description} title={description}>
-    <span className="eval-white" style={{height:`${white}%`}}/>
-    <small className={`eval-text ${leader==='b'?'on-black':'on-white'}`}>{text}</small>
-  </div>
-}

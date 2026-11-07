@@ -1,6 +1,6 @@
 # Maia sul server
 
-Data: 29 ottobre 2026, aggiornata il 30 ottobre. `backend/maia.py` esegue sul server lo stesso Maia3 del sito ufficiale: stesso file ONNX, stessa codifica della posizione, stessa tabella delle mosse. Dal 30 ottobre 2026 è **l'unico Maia del sito**: le mosse in Gioca e nei Drill, la barra Maia, Suggerisci mossa, Rivedi, Puzzle, Problemi e la somiglianza con i profili Maia chiedono le previsioni al server. Il browser non scarica più modello, worker e runtime WebAssembly.
+Data: 29 ottobre 2026, aggiornata il 30 ottobre. `backend/maia.py` esegue sul server lo stesso Maia3 del sito ufficiale: stesso file ONNX, stessa codifica della posizione, stessa tabella delle mosse. Dal 30 ottobre 2026 è **l'unico Maia del sito**: le mosse in Gioca e nei Drill, Suggerisci mossa, Rivedi, Puzzle, Problemi e la somiglianza con i profili Maia chiedono le previsioni al server. Il browser non scarica più modello, worker e runtime WebAssembly. La barra Maia accanto alla scacchiera (punteggio atteso dalla testa di valore) è stata tolta il 7 novembre 2026: duplicava la barra Stockfish; il server restituisce ancora `whiteExpectedScore` e `whiteOutcome`.
 
 ## Uso
 

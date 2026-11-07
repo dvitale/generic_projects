@@ -36,10 +36,9 @@ import ExerciseSource from './ExerciseSource'
 import {objectiveScore} from './evalText'
 import {useMoveTime} from './useMoveTime'
 import PlayerBar,{material} from './PlayerBar'
-import EvalBar,{MaiaBar,whiteValue,type BarValue} from './EvalBar'
+import EvalBar,{whiteValue,type BarValue} from './EvalBar'
 import {gameOutcome} from './gameOutcome'
 import {usePositionEval} from './usePositionEval'
-import {useMaiaScore,type MaiaScore} from './useMaiaScore'
 import {useBoardSettings} from './boardSettings'
 import {FlipBoardButton,resetBoardFlip,useBoardFlip,useBoardOrientation,useFlipShortcut} from './boardFlip'
 import BoardSettingsMenu from './BoardSettingsMenu'
@@ -284,16 +283,12 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
 
   const series=useMemo(()=>tab==='review'&&game?evaluationSeries(game):null,[tab,game])
   const point=series?.points.find(p=>p.position===cursor)
-  const {evalBar:showEval,maiaBar:showMaia}=useBoardSettings()
+  const {evalBar:showEval}=useBoardSettings()
   const flipped=useBoardFlip(),boardOrientation=useBoardOrientation(orientation)
   useFlipShortcut()
   // Without a saved analysis (live game, unanalysed review) the bar asks Stockfish for a quick evaluation.
   const liveEval=usePositionEval(tab==='play'||tab==='review'?game:null,tab==='review'?cursor:playPly,showEval&&(tab==='play'||tab==='review'&&!point))
   const evalValue:BarValue|null|undefined=!showEval?undefined:tab==='review'?(point?{cp:point.cp,mate:point.mate,mateIn:point.terminal&&point.mate?0:null}:liveEval):tab==='play'&&game?liveEval:tab==='train'&&exercise&&attempt?.closed&&!practicing&&!puzzleComparing?((attempt.success?attempt.actual:attempt.best)?whiteValue((attempt.success?attempt.actual:attempt.best)!,exercise.turn):null):undefined
-  // Maia's value head: White's expected score for two humans of the review level, or of the game level while playing.
-  const maiaPosition=showMaia&&game&&(tab==='play'||tab==='review')
-  const maiaScore=useMaiaScore(maiaPosition?boardFen:null,tab==='review'?reviewElo:game?.elo??1500,!!maiaPosition)
-  const maiaValue:MaiaScore|null|undefined=maiaPosition?maiaScore:undefined
   const moveBadge=tab==='review'&&reviewedMove?.fen===boardFen&&arrowSources.played?{square:reviewedMove.played.slice(2,4),kind:classifyMove(reviewedMove)}:undefined
   const shownGame=tab==='play'||tab==='review'?game:null
   const shownPly=tab==='review'?cursor:playPly
@@ -538,13 +533,12 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
       :<div className={'training-layout layout-'+tab}>
         <section className="board-column">
           {flipped?playerBar:opponentBar}
-          {/* Stockfish bar on the left of the board, Maia bar on the right. */}
-          <div className={`board-stage ${evalValue!==undefined?'with-eval':''} ${maiaValue!==undefined?'with-maia':''}`}>
+          {/* Stockfish bar on the left of the board. */}
+          <div className={`board-stage ${evalValue!==undefined?'with-eval':''}`}>
             {/* Over the middle of the board: Maia waits for the answer and must not stop out of sight. */}
             {tab==='play'&&game?.resignOffer&&!game.result&&<div className="resign-offer" role="alertdialog" aria-labelledby="resign-offer-title"><strong id="resign-offer-title">{opponentName} ha manifestato l’intenzione di abbandonare. Accetti?</strong><span>Secondo Stockfish la sua posizione è persa da tre mosse. Se rifiuti, la partita continua e non te lo richiederà per altre dieci mosse.</span><div><button className="primary" disabled={busy} onClick={()=>void answerResignOffer(true)}>Accetta l’abbandono</button><button disabled={busy} onClick={()=>void answerResignOffer(false)}>Continua a giocare</button></div></div>}
             {evalValue!==undefined&&<div className="eval-bars"><EvalBar value={evalValue} orientation={boardOrientation}/></div>}
             <Board inspect={inspect} badge={moveBadge} analysisArrows={analysisArrows} highlights={tab==='train'&&!attempt?.closed?hints.flatMap(h=>h.squares??[]):undefined} reverseMove={tab==='train'&&puzzleMotion.reverse} animateMove={tab==='train'||tab==='play'&&!browsingHistory&&!!game&&game.turn===game.playerColor} fen={boardFen} orientation={boardOrientation} interactive={canMove} legalMoves={legal} onMove={submitMove} lastMove={tab==='train'?(puzzleComparing?undefined:puzzleMotion.move||puzzleMotion.phase!=='idle'?puzzleMotion.lastMove:exercise?.lastMove??undefined):tab==='play'?game?.moves[playPly-1]:tab==='review'&&game&&cursor>0?game.moves[cursor-1]:undefined}/>
-            {maiaValue!==undefined&&<div className="eval-bars"><MaiaBar score={maiaValue} orientation={boardOrientation}/></div>}
           </div>
           {flipped?opponentBar:playerBar}
           {tab==='play'&&game?.source==='maia'&&<div className="current-opponent" aria-label="Motore della partita">
