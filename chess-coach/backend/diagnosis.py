@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 
 from .engine import evaluator, expected
 from .maia import maia
-from . import explain, insights
+from . import explain, insights, points
 from .learning import category, value
 
 RULE_VERSION = 2
@@ -354,9 +354,10 @@ def classify(board, accepts, answer):
 
 
 def public(row):
+    evidence = json.loads(row['evidence'])
     return {'id': row['id'], 'kind': row['kind'], 'createdAt': row['created_at'], 'answer': json.loads(row['answer']),
-            'evidence': json.loads(row['evidence']), 'search': row['search'], 'reading': json.loads(row['reading']),
-            'ruleVersion': row['rule_version']}
+            'evidence': evidence, 'search': row['search'], 'reading': json.loads(row['reading']),
+            'ruleVersion': row['rule_version'], 'points': points.breakdown(row['fen'], evidence['best']) if evidence.get('best') else None}
 
 
 def summary(con):

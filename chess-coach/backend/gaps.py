@@ -22,7 +22,7 @@ import chess
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
-from . import problems
+from . import problems, puzzle_history
 
 WINDOW = 300
 WATCH_MIN, CONFIRM_MIN, CONFIRM_FAILURES = 3, 6, 3
@@ -314,10 +314,11 @@ def install(app, database, open_store, solution_of, now):
             found, missing = find_gaps(con, store)
             path = view(con, store, active_path(con))
             passed = [dict(r) for r in con.execute("SELECT gap, closed_at FROM study_paths WHERE outcome='passed' ORDER BY closed_at DESC LIMIT 10")]
+            hints, repeats = puzzle_history.hint_outcomes(con), puzzle_history.repeated_errors(con)
         if store is not None:
             store.close()
         fill(missing, solution_of)
-        return {'gaps': found, 'path': path, 'passed': passed, 'problemsAvailable': store is not None, 'unclassified': len(missing),
+        return {'gaps': found, 'path': path, 'passed': passed, 'hints': hints, 'repeats': repeats, 'problemsAvailable': store is not None, 'unclassified': len(missing),
                 'rules': {'watch': WATCH_MIN, 'confirm': CONFIRM_MIN, 'failures': CONFIRM_FAILURES, 'drop': GAP_DROP, 'window': WINDOW}}
 
     @app.get('/api/study-paths/active')

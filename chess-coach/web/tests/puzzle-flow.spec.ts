@@ -150,6 +150,8 @@ test('the diagnosis before the solution counts the failed attempts as candidates
   await diagnosis.getByRole('button',{name:'Non vedo minacce'}).click()
   await diagnosis.getByRole('button',{name:'Confronta e mostra la soluzione'}).click()
   await expect(diagnosis).toContainText('Hai provato Qg8+, che non risolve: la mossa buona non era fra le tue candidate.',{timeout:30000})
+  // Mate in one: the score comes from the king, not from the material.
+  await expect(diagnosis.getByLabel('Da dove vengono i punti')).toContainText('Matto a tuo favore in 1')
 })
 
 test('a closed puzzle can be retried from the start without recording the moves',async({page,request})=>{

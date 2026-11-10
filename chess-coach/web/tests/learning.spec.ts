@@ -29,6 +29,8 @@ test('Decision quality, optional similarity and judgment before feedback persist
   const judgment=await(await reply).json()
   await expect(practice).toContainText('Hai indicato: Forte svantaggio')
   await expect(practice).toContainText('Variante di riferimento:')
+  await expect(page.getByRole('button',{name:'Valuta la posizione',exact:true})).toHaveClass(/active/)
+  await expect(practice.getByLabel('Da dove vengono i punti')).toContainText('Materiale sulla scacchiera')
   await expect(practice.getByRole('button',{name:'Rivedi la partita di origine'})).toBeVisible()
   await page.screenshot({path:'test-results/learning-desktop.png',fullPage:true})
   await page.setViewportSize({width:390,height:844})

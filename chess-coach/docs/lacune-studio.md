@@ -52,9 +52,19 @@ Uno solo alla volta (`study_paths`). Il tema Lichess allenato è il tema stesso 
 - Il motivo tattico degli esercizi dalle tue partite si riconosce solo per i sei temi verificabili sulla scacchiera; deviazione, adescamento e pezzo sovraccarico non sono riconosciuti.
 - La mappatura dei tipi di soluzione sui temi Lichess è un'approssimazione, in particolare profilassi → mossa difensiva.
 
+## Indizi che non bastano ed errori che ripeti
+
+Dal 10 novembre 2026 ogni tentativo di un Puzzle registra quanti indizi avevi visto e l'ultimo (`attempts.hint_level`, `attempts.hint`, `puzzle_sessions.last_hint`; chiavi `kind`, `motif`, `tempting`, `candidates`, `square`). Codice: `backend/puzzle_history.py`.
+
+- **Quando l'indizio non basta** (Progressi, sotto le lacune): per ciascun tipo di indizio, nelle ultime 300 sessioni in cui ne hai chiesto uno, quante volte il primo tentativo dopo quell'indizio ha risolto, quante è stato ancora sbagliato e quante hai chiesto la soluzione senza altri tentativi. Le sessioni precedenti non hanno il dato e non contano.
+- **Errori che ripeti:** la stessa mossa sbagliata nella stessa posizione (`exercises.position_key`, copie della posizione comprese) in due o più sessioni diverse. Nel Puzzle, al tentativo ripetuto compare **Idea già provata**, con la data dell'ultima volta e, a richiesta, la risposta che la confuta (la linea di Stockfish dopo la tua mossa). In Progressi l'elenco riporta mossa, sessioni, data e **Apri il puzzle**. Ripetere la stessa mossa due volte nella stessa sessione non conta.
+- **Ripassi più fitti:** finché una delle ultime 3 sessioni del puzzle contiene una mossa ripetuta, il ripasso non sale oltre il secondo stadio (24 ore) e il puzzle non viene ritirato come imparato. Dopo tre sessioni senza l'idea ripetuta l'avanzamento torna normale.
+
+Un errore ripetuto non è una lacuna con un tasso di riuscita: non ha un atteso con cui confrontarlo, quindi ha un elenco a parte.
+
 ## Verifiche
 
 ```bash
-.venv/bin/python -m pytest tests/test_gaps.py -q
-cd web && npm run build && npx playwright test tests/problems.spec.ts tests/study-path.spec.ts
+.venv/bin/python -m pytest tests/test_gaps.py tests/test_puzzle_history.py -q
+cd web && npm run build && npx playwright test tests/problems.spec.ts tests/study-path.spec.ts tests/puzzle-history.spec.ts
 ```

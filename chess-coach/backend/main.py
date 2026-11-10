@@ -31,6 +31,7 @@ from . import study, openings, visualization, lessons
 from . import problems
 from . import diagnosis
 from . import piece_moves
+from . import puzzle_history
 from . import gaps
 from . import auth
 from .maia import maia as maia_server
@@ -128,6 +129,7 @@ def init_db():
         for name, declaration in {"session_id": "TEXT", "is_first": "INTEGER NOT NULL DEFAULT 0", "exposure": "TEXT NOT NULL DEFAULT 'legacy'"}.items():
             if name not in columns:
                 con.execute(f"ALTER TABLE attempts ADD COLUMN {name} {declaration}")
+        puzzle_history.migrate(con)
         prevention.init_schema(con)
         mistakes.init_schema(con)
         training_schedule.init_schema(con)
@@ -1336,8 +1338,8 @@ def hint(exercise_id: str, body: SessionInput):
         con.execute("BEGIN IMMEDIATE")
         session = active_session(con, exercise_id, body.session_id)
         level = min(session["hints"] + 1, len(given))
-        con.execute("UPDATE puzzle_sessions SET hints=?,solution=COALESCE(solution,?) WHERE id=?",
-                    (level, json.dumps(found) if found else None, body.session_id))
+        con.execute("UPDATE puzzle_sessions SET hints=?,last_hint=?,solution=COALESCE(solution,?) WHERE id=?",
+                    (level, puzzle_history.hint_key(given[level - 1]["title"]), json.dumps(found) if found else None, body.session_id))
     return {"hint": given[level - 1]["text"], "hints": given[:level], "last": level == len(given)}
 
 
@@ -1359,13 +1361,16 @@ def attempt(exercise_id: str, body: AttemptInput):
         assisted = session["hints"] > 0
         first = session["guesses"] == 0
         due = current["due_at"]
-        scheduled = training_schedule.record(con,"puzzle",current,session,success,assisted,now())
-        if scheduled and current["streak"] + 1 >= MASTERED_STREAK:
+        # A wrong idea already played here in an earlier session: said at once, and the puzzle comes back sooner.
+        repeated = None if success else puzzle_history.repeated(con, exercise_id, body.session_id, body.move)
+        cap = puzzle_history.PERSISTENT_STAGE if repeated or puzzle_history.persistent(con, exercise_id) else None
+        scheduled = training_schedule.record(con,"puzzle",current,session,success,assisted,now(),cap)
+        if scheduled and find_exercise(con, exercise_id)["streak"] >= MASTERED_STREAK:
             # Learnt: out of the rotation until the same position comes back with a mistake in a game.
             con.execute("UPDATE exercises SET retired='mastered' WHERE id=?", (exercise_id,))
         due = find_exercise(con,exercise_id)["due_at"]
-        inserted = con.execute("INSERT INTO attempts(exercise_id,move,success,assisted,created_at,session_id,is_first,exposure) VALUES(?,?,?,?,?,?,?,?)",
-                    (exercise_id, body.move, int(success), int(assisted), now(), body.session_id, int(first), session["exposure"]))
+        inserted = con.execute("INSERT INTO attempts(exercise_id,move,success,assisted,created_at,session_id,is_first,exposure,hint_level,hint) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                    (exercise_id, body.move, int(success), int(assisted), now(), body.session_id, int(first), session["exposure"], session["hints"], session["last_hint"]))
         if not success:
             mistakes.record(con, 'puzzle', exercise_id, inserted.lastrowid, board, move, best, actual, now())
         con.execute("UPDATE puzzle_sessions SET guesses=guesses+1,status=? WHERE id=?", ("complete" if success else "active", body.session_id))
@@ -1374,7 +1379,7 @@ def attempt(exercise_id: str, body: AttemptInput):
     return {"success": success, "assisted": assisted, "loss": loss, "best": best if success else None, "actual": actual,
             "insight": insights.public(insights.compare(board.fen(), body.move, best, actual)),
             "dueAt": due, "version": body.version + 1, "closed": success,
-            "firstTry": first, "scheduled": scheduled,
+            "firstTry": first, "scheduled": scheduled, "repeated": repeated and {**repeated, "san": board.san(move)},
             "message": "Mossa valida: mantiene la qualità della posizione." if success else "C'è un'alternativa migliore. Puoi riprovare: il primo tentativo è già registrato."}
 
 

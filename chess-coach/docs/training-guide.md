@@ -20,10 +20,10 @@ In [**Progressi**](http://localhost:8033/?section=progress), confronta partite c
 
 ### Esercitarti a valutare prima di rinunciare
 
-1. Apri [**Allenamento**](http://localhost:8033/?section=schedule), quindi **Valuta la posizione**.
+1. Apri [**Valuta la posizione**](http://localhost:8033/?section=judge) dal menu (oppure **Valuta una posizione** in Allenamento).
 2. Indica se il lato che muove è in vantaggio, equilibrio o svantaggio, senza consultare il motore. Scrivi la minaccia concreta che temi e una risorsa difensiva o offensiva.
 3. Indica quanto sei sicuro e, se è la tua impressione, **Mi sembra già persa**. Se ricordi la posizione o il punteggio, segnala la familiarità: resterà pratica.
-4. Premi **Salva e confronta con Stockfish**. Confronta le risorse della variante con quello che temevi; puoi aprire la partita di origine o approfondire su Lichess.
+4. Premi **Salva e confronta con Stockfish**. Confronta le risorse della variante con quello che temevi e leggi **Da dove vengono i punti**: quanto del punteggio è materiale già sulla scacchiera, quanto viene guadagnato dalla variante e quanto da posizione e iniziativa. Puoi aprire la partita di origine o approfondire su Lichess.
 5. Nei Progressi osserva quando l'impressione di sconfitta non è confermata dal motore. Non devi pensare positivo a tutti i costi: alcune posizioni sono davvero sfavorevoli.
 
 Le posizioni derivano dalle tue partite analizzate e possono essere favorevoli, equilibrate o sfavorevoli. Non sono selezionate soltanto fra i tuoi blunder. Una posizione ricordata non prova un miglioramento del giudizio in una partita nuova. Queste verifiche non incrementano i successi dei puzzle né il calendario dei ripassi.

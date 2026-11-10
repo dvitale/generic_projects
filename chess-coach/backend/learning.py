@@ -8,6 +8,7 @@ import chess
 from fastapi import HTTPException
 
 from .engine import ERROR_CP, INACCURACY_CP, flagged, load_analysis, severity
+from .points import breakdown
 
 
 def init_schema(con):
@@ -103,7 +104,7 @@ def public_judgment(row):
     if row['answer']:
         evidence=json.loads(row['evidence'])
         answer=json.loads(row['answer'])
-        data.update(answer=answer, evidence=evidence, expected=category(evidence), gameId=row['game_id'],
+        data.update(answer=answer, evidence=evidence, expected=category(evidence), gameId=row['game_id'], points=breakdown(row['fen'], evidence),
                     falseAlarm=answer['fearedLost'] and value(evidence)>=-100)
     return data
 

@@ -61,7 +61,12 @@ def test_own_puzzles_reveal_kinds_solved_less_often_than_the_average(client):
     endgame = found['phase:endgame']
     assert (endgame['status'], endgame['family'], endgame['missing']) == ('watch', 'theory', 3)
     assert 'kind:forcing' not in found
-    # A puzzle not classified yet is reported and classified in the background.
+    # A puzzle not classified yet is reported and classified in the background. The seeds lack the motif, so the
+    # first request starts that pass for all of them: wait for it before taking one classification away.
+    for _ in range(100):
+        if not gaps.FILLING.locked() and not client.get('/api/gaps').json()['unclassified']:
+            break
+        time.sleep(0.05)
     with main.database() as con:
         con.execute("UPDATE exercises SET solution=NULL WHERE id='ex0'")
     assert client.get('/api/gaps').json()['unclassified'] == 1

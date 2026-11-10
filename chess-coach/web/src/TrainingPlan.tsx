@@ -1,4 +1,4 @@
-import {useEffect,useState,useRef,type ReactNode} from 'react'
+import {useEffect,useState} from 'react'
 import {api} from './api'
 import InfoNote from './InfoNote'
 
@@ -6,13 +6,10 @@ type Item={kind:'puzzle'|'prevention'|'alternative';id:string;title:string;theme
 type Settings={minutes:number;newLimit:number;weekdays:number[];timezone:string}
 type Plan={settings:Settings;today:string;activeDay:boolean;target:number;completed:number;successful:number;practice:number;ready:number;waiting:number;total:number;queue:Item[];calendar:{date:string;planned:boolean;due:number}[];nextDue:string|null}
 const days=['Lun','Mar','Mer','Gio','Ven','Sab','Dom']
-export default function TrainingPlan({onOpen,onImport,judgment,focusJudgment,onFocused}:{onOpen:(kind:Item['kind'],id:string)=>void;onImport:()=>void;judgment:ReactNode;focusJudgment:boolean;onFocused:()=>void}){
+export default function TrainingPlan({onOpen,onImport,onJudge}:{onOpen:(kind:Item['kind'],id:string)=>void;onImport:()=>void;onJudge:()=>void}){
   const [plan,setPlan]=useState<Plan|null>(null),[settings,setSettings]=useState<Settings|null>(null)
   const [error,setError]=useState(''),[saving,setSaving]=useState(false)
   const [guideOpened,setGuideOpened]=useState(false)
-  const [judgmentOpen,setJudgmentOpen]=useState(false)
-  const judgmentRef=useRef<HTMLDetailsElement>(null)
-  useEffect(()=>{if(focusJudgment){setJudgmentOpen(true);judgmentRef.current?.scrollIntoView({block:'start'});onFocused()}},[focusJudgment])
   function openGuide(){
     window.open('/api/training-guide/html','_blank','popup=yes,width=1120,height=820,resizable=yes,scrollbars=yes,noopener,noreferrer')
     setGuideOpened(true)
@@ -61,11 +58,14 @@ export default function TrainingPlan({onOpen,onImport,judgment,focusJudgment,onF
       <button className="primary" disabled={saving||!settings.weekdays.length} onClick={save}>{saving?'Salvataggio…':'Salva piano'}</button>
       <p className="footnote">Circa due minuti per esercizio, senza conto alla rovescia. Orari in {settings.timezone}. I giorni di pausa non cancellano i ripassi arretrati.</p>
     </div>}</details>
+    <section className="panel guide-card" aria-label="Valuta la posizione, dal piano">
+      <div><h3>Valuta la posizione</h3><p className="muted">Allena il giudizio prima del motore: dai la tua valutazione, poi vedi quella di Stockfish e da dove vengono i punti.</p></div>
+      <div className="row"><button onClick={onJudge}>Valuta una posizione</button></div>
+    </section>
     <section className="panel guide-card" aria-label="Guida di allenamento">
       <div><h3>Guida di allenamento</h3><p className="muted">Come importare da Maia, organizzare i ripassi e usare Aimchess, MoveTrainer e Noctie.</p></div>
       <div className="row"><button onClick={openGuide}>Apri la guida ↗</button><a className="button-link" href="/api/training-guide/html?download=true" download>Scarica HTML</a></div>
       {guideOpened&&<p className="footnote">Se la finestra non si apre, <a href="/api/training-guide/html" target="_blank" rel="noopener noreferrer">apri la guida in una nuova scheda</a>.</p>}
     </section>
-    <details ref={judgmentRef} open={judgmentOpen} className="judgment-entry panel" onToggle={e=>setJudgmentOpen(e.currentTarget.open)}><summary>Valuta la posizione · allena il giudizio prima del motore</summary>{judgmentOpen&&judgment}</details>
   </div>
 }

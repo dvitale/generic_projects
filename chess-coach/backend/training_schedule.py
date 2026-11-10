@@ -54,8 +54,8 @@ def eligible(con, kind, target_id, timestamp):
     return not row or row['review_after'] <= timestamp
 
 
-def record(con, kind, row, session, success, assisted, timestamp):
-    """Record the first answer once. Retries never promote a review stage."""
+def record(con, kind, row, session, success, assisted, timestamp, cap=None):
+    """Record the first answer once. Retries never promote a review stage; cap limits the stage reached."""
     first = session['guesses'] == 0
     independent = first and session['exposure'] != 'practice' and eligible(con,kind,row['id'],timestamp)
     if not first:
@@ -65,7 +65,7 @@ def record(con, kind, row, session, success, assisted, timestamp):
     if not inserted.rowcount or not independent:
         return False
     promoted = success and not assisted
-    stage = min(row['streak']+1,len(INTERVAL_HOURS)) if promoted else 0
+    stage = min(row['streak']+1,len(INTERVAL_HOURS),cap or len(INTERVAL_HOURS)) if promoted else 0
     delay = INTERVAL_HOURS[stage-1] if promoted else 4
     next_review = (datetime.fromisoformat(timestamp)+timedelta(hours=delay)).isoformat()
     # Failed exercises remain in the user's due list; only their independent retest waits.

@@ -1,4 +1,5 @@
 import {useEffect,useState} from 'react'
+import PointsBreakdown,{type Points} from './PointsBreakdown'
 import Board from './Board'
 import {api} from './api'
 import type {Color,Evaluation} from './types'
@@ -14,7 +15,7 @@ type Evidence={best:Evaluation;engineBand:string;bandGap:number;tried?:string[];
   threat:{real:boolean;evaluation:Evaluation;san:string|null}|null;
   statedThreat?:{san:string;evaluation:Evaluation;concrete:boolean};
   candidate?:{san:string;evaluation:Evaluation;sound:boolean};solution?:Solution|null}
-export type Diagnosis={id:string;kind:DiagnosisKind;answer:Answer;evidence:Evidence;search:string;reading:string[];ruleVersion:number}
+export type Diagnosis={id:string;kind:DiagnosisKind;answer:Answer;evidence:Evidence;search:string;reading:string[];ruleVersion:number;points?:Points|null}
 
 export const bands=[['much_worse','Forte svantaggio'],['worse','Svantaggio'],['equal','Circa equilibrio'],['better','Vantaggio'],['much_better','Forte vantaggio']] as const
 export const diagnosisLabels:Record<string,{title:string;practice:string}>={
@@ -82,6 +83,7 @@ function Result({diagnosis,color}:{diagnosis:Diagnosis;color:Color}){
     <ul className="diagnosis-list">{[diagnosis.search,...diagnosis.reading].map(label=><li key={label} className={`diagnosis-${label}`}>
       <strong>{diagnosisLabels[label].title}</strong><p>{explain(diagnosis,label,color)}</p><p className="muted">{practice(label)}</p></li>)}
       {s&&<li className={`diagnosis-solution solution-${s.kind}`}><strong>La soluzione: {solutionLabels[s.kind].title.toLowerCase()}</strong><p>{describeSolution(diagnosis,s,color)}</p><p className="muted">{solutionLabels[s.kind].practice}</p></li>}</ul>
+    <PointsBreakdown points={diagnosis.points}/>
     <p className="footnote">{SCORE_NOTE} Confronto con Stockfish a budget limitato. La minaccia si misura dando la mossa all’avversario; le fasce sono convenzioni didattiche (equilibrio fra −1 e +1, forte vantaggio da ±3). La diagnosi è salvata e non cambia rating né ripassi.</p>
   </div>
 }

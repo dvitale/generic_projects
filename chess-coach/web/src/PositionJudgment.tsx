@@ -3,9 +3,10 @@ import Board from './Board'
 import {ShowLine} from './MistakeExplanation'
 import LichessAnalysis from './LichessAnalysis'
 import {api} from './api'
+import PointsBreakdown,{type Points} from './PointsBreakdown'
 import type {Color,Evaluation} from './types'
 const choices=[['much_worse','Forte svantaggio'],['worse','Svantaggio'],['equal','Circa equilibrio'],['better','Vantaggio'],['much_better','Forte vantaggio']] as const
-type Position={id:string;fen:string;ply:number;color:Color;answer?:{assessment:string;confidence:string;threat:string;fearedLost:boolean;familiar:boolean};evidence?:Evaluation;expected?:string;falseAlarm?:boolean;gameId?:string}
+type Position={id:string;fen:string;ply:number;color:Color;answer?:{assessment:string;confidence:string;threat:string;fearedLost:boolean;familiar:boolean};evidence?:Evaluation;expected?:string;falseAlarm?:boolean;gameId?:string;points?:Points}
 export default function PositionJudgment({onReview}:{onReview:(id:string,ply:number)=>void}){
   const [position,setPosition]=useState<Position|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState('')
   const [assessment,setAssessment]=useState(''),[confidence,setConfidence]=useState('uncertain'),[threat,setThreat]=useState(''),[fearedLost,setFearedLost]=useState(false),[familiar,setFamiliar]=useState(false)
@@ -31,6 +32,7 @@ export default function PositionJudgment({onReview}:{onReview:(id:string,ply:num
     </>:<>
       <h3>Confronto con la tua impressione</h3><p>Hai indicato: <strong>{choices.find(c=>c[0]===position.answer!.assessment)?.[1]}</strong>.</p>
       <p>Stockfish: <strong>{choices.find(c=>c[0]===position.expected)?.[1]}</strong> · {position.evidence?.mate!=null?`Matto ${position.evidence.mate>0?'a favore':'contro'} in ${Math.abs(position.evidence.mate)}`:`${((position.evidence?.cp??0)/100).toFixed(2)} punti dalla tua prospettiva`}.</p>
+      <PointsBreakdown points={position.points}/>
       {position.falseAlarm&&<p className="notice">Ti sembrava già persa, ma questa analisi non lo conferma. Esamina le risorse prima di rinunciare.</p>}
       <p>{position.answer.assessment===position.expected?'La tua fascia coincide con quella del motore.':'Le due valutazioni differiscono: confronta la minaccia che temevi con la variante, senza attribuire subito la differenza a un difetto del tuo ragionamento.'}</p>
       {position.answer.threat&&<p>La tua riflessione: {position.answer.threat}</p>}

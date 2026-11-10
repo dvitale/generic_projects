@@ -977,3 +977,9 @@ details.panel>summary{font-weight:650;font-size:var(--fs-lg)}
 .walk-reply small{display:block;color:var(--muted);margin-top:2px}
 .walk-score{font-size:.9rem;color:var(--muted)}
 .puzzle-filters{margin:4px 0 10px;gap:10px}
+.puzzle-repeated{margin:8px 0;padding:8px 10px;border-left:3px solid var(--accent-ink);background:var(--accent-soft);border-radius:6px}
+.puzzle-repeated p{margin:0 0 6px}.puzzle-repeated details{margin:0 0 4px}
+.repeated-errors{list-style:none;padding:0;margin:0;display:grid;gap:6px}
+.repeated-errors li{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.points-breakdown{margin:10px 0;padding:8px 12px;border:1px solid var(--line,#ddd);border-radius:8px}
+.points-breakdown h4{margin:0 0 4px}.points-breakdown ul{margin:0;padding-left:18px;display:grid;gap:4px}
