@@ -1,7 +1,8 @@
 import {useEffect,useRef,useState} from 'react'
+import Icon from './icons'
 import {boardThemes,updateBoardSettings,useBoardSettings} from './boardSettings'
 
-export default function BoardSettingsMenu(){
+export default function BoardSettingsMenu({engine}:{engine?:{label:string;version:string}}){
   const settings=useBoardSettings()
   const [open,setOpen]=useState(false)
   const root=useRef<HTMLDivElement>(null)
@@ -12,12 +13,14 @@ export default function BoardSettingsMenu(){
     return()=>{document.removeEventListener('pointerdown',close);document.removeEventListener('keydown',close)}
   },[open])
   return <div className="settings-menu" ref={root}>
-    <button className="pill" aria-expanded={open} aria-controls="board-settings" onClick={()=>setOpen(v=>!v)}><span aria-hidden="true">⚙</span> Scacchiera</button>
+    <button className="pill settings-toggle" aria-label="Impostazioni della scacchiera" title="Impostazioni della scacchiera" aria-expanded={open} aria-controls="board-settings" onClick={()=>setOpen(v=>!v)}><Icon name="settings"/></button>
     {open&&<div className="settings-popover" id="board-settings" role="group" aria-label="Impostazioni della scacchiera">
       <span className="eyebrow">TEMA</span>
       <div className="theme-options">{boardThemes.map(t=><button key={t.id} className={`theme-option board-theme-${t.id}`} aria-pressed={settings.theme===t.id} onClick={()=>updateBoardSettings({theme:t.id})}><span className="theme-swatch" aria-hidden="true"/>{t.label}</button>)}</div>
       <label className="switch"><input type="checkbox" checked={settings.sound} onChange={e=>updateBoardSettings({sound:e.target.checked})}/>Suoni delle mosse</label>
       <label className="switch"><input type="checkbox" checked={settings.evalBar} onChange={e=>updateBoardSettings({evalBar:e.target.checked})}/>Barra di valutazione</label>
+      <small className="footnote">In Rivedi la barra resta sempre visibile.</small>
+      {engine&&<div className="settings-engine" aria-label="Versione del motore"><span className="eyebrow">VERSIONE DEL MOTORE</span><small>{engine.label} · <code>{engine.version}</code></small></div>}
     </div>}
   </div>
 }

@@ -142,6 +142,8 @@ footer{font-size:var(--fs-xs);color:var(--muted);display:flex;justify-content:sp
 /* Board settings popover */
 .settings-menu{position:relative}
 .settings-menu>.pill{cursor:pointer}
+.settings-engine{display:grid;gap:4px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border)}.settings-engine code{font-size:var(--fs-xs);word-break:break-all}
+.settings-toggle{width:32px;padding:0;justify-content:center}.settings-toggle .icon{width:18px;height:18px}
 .settings-popover{position:absolute;right:0;top:calc(100% + 8px);z-index:60;width:260px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--shadow-md);padding:14px;color:var(--text)}
 .theme-options{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px}
 .theme-option{flex-direction:column;min-height:auto;padding:6px;font-size:var(--fs-xs);gap:4px}

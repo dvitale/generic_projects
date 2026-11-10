@@ -11,7 +11,10 @@ test('The evaluation bar follows the live game and can be hidden from the board 
   const boardBox=await page.locator('.board-stage').boundingBox(),barBox=await bar.boundingBox()
   expect(barBox!.x).toBeLessThan(boardBox!.x+30)
   await page.screenshot({path:'test-results/eval-bar.png'})
-  await page.getByRole('button',{name:/^\W*Scacchiera$/}).click()
+  await page.getByRole('button',{name:'Impostazioni della scacchiera'}).click()
   await page.getByRole('checkbox',{name:'Barra di valutazione'}).uncheck()
   await expect(bar).toHaveCount(0)
+  // Review keeps the bar even when the setting hides it elsewhere.
+  await page.getByRole('button',{name:'Rivedi',exact:true}).click()
+  await expect(bar).toHaveAttribute('aria-label',/Valutazione Stockfish [+-]\d/,{timeout:30000})
 })

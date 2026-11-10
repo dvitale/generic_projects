@@ -93,8 +93,8 @@ test('the next engine is remembered and never confused with the current game',as
   await expect(page.getByLabel('Motore della partita')).toContainText('Partita attuale: Sperimentale')
   const game=(await(await request.get('/api/games')).json())[0]
   expect(game).toMatchObject({engine:'experimental',engineVersion:'fake-step1-000000000000',plies:1})
-  await page.getByLabel('Motore della partita').getByText('Versione del motore').click()
-  await expect(page.getByLabel('Motore della partita')).toContainText(game.engineVersion)
+  await page.getByRole('button',{name:'Impostazioni della scacchiera'}).click()
+  await expect(page.getByLabel('Versione del motore')).toContainText(game.engineVersion)
   await page.screenshot({path:'/tmp/sparringmate-engine-selector.png',fullPage:true})
 })
 
