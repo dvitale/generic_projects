@@ -180,3 +180,25 @@ def test_reset_returns_to_first_player_move_and_keeps_bot_opening(client):
         g = move(client, g, uci)
     g = reset(client, g).json()
     assert g['moves'] == ['e2e4'] and g['turn'] == 'b'
+
+
+def level(client, g, elo):
+    return client.post(f"/api/games/{g['id']}/level", json={'elo': elo, 'revision': g['revision']})
+
+
+def test_level_changes_mid_game_and_the_whole_game_follows(client):
+    g = client.post('/api/games', json={'elo': 600}).json()
+    g = move(client, g, 'e2e4')
+    changed = level(client, g, 800)
+    assert changed.status_code == 200, changed.text
+    g = changed.json()
+    assert g['elo'] == 800 and g['title'] == 'Allenamento con Maia 800' and g['revision'] == 0 and g['moves'] == ['e2e4']
+    g = move(client, g, 'e7e5')  # a reply prepared at the old level is still accepted
+    assert '[OpponentElo "800"]' in client.get(f"/api/games/{g['id']}/pgn").text
+    assert client.post(f"/api/games/{g['id']}/level", json={'elo': 900, 'revision': 5}).status_code == 409
+    assert level(client, g, 500).status_code == 422
+    assert client.post(f"/api/games/{g['id']}/resign", json={'version': g['version'], 'revision': g['revision']}).status_code == 200
+    assert level(client, g, 900).status_code == 409
+    stockfish = client.post('/api/games', json={'opponent': 'stockfish', 'moves': ['e2e4']})
+    assert stockfish.status_code == 200, stockfish.text
+    assert level(client, stockfish.json(), 900).status_code == 409

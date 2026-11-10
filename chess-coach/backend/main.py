@@ -215,6 +215,11 @@ class MoveInput(BaseModel):
     elapsed_seconds: FiniteFloat | None = Field(default=None, ge=0, le=604800)
 
 
+class LevelInput(BaseModel):
+    elo: int = Field(ge=600, le=2600)
+    revision: int = Field(ge=0)
+
+
 class UndoInput(BaseModel):
     version: int = Field(ge=0, le=600)
     revision: int = Field(ge=0)
@@ -750,6 +755,28 @@ def resign_game(game_id: str, body: UndoInput):
         snapshot = dict(find_game(con, game_id))
     if moves and snapshot['source'] != 'stockfish':
         queue_analysis(snapshot, automatic=True)
+    return get_game(game_id)
+
+
+@app.post('/api/games/{game_id}/level')
+def change_level(game_id: str, body: LevelInput):
+    """Change the bot's level mid-game; the whole game then counts as played at the new level."""
+    with database() as con:
+        con.execute('BEGIN IMMEDIATE')
+        row = find_game(con, game_id)
+        if row['source'] != 'maia' or row['termination'] or reconstruct(row['initial_fen'], json.loads(row['moves'])).is_game_over(claim_draw=True):
+            raise HTTPException(409, 'Il livello si cambia solo durante una partita in corso contro Maia o lo Sperimentale')
+        if row['revision'] != body.revision:
+            raise HTTPException(409, 'La partita è cambiata: ricaricala prima di cambiare livello')
+        if row['engine'] == opponents.EXPERIMENTAL:
+            low, high = opponents.status(ENV_PATH).get('ratingBounds') or (600, 2600)
+            if not low <= body.elo <= high:
+                raise HTTPException(422, f'Il motore sperimentale accetta livelli fra {low} e {high}')
+        title = row['title']
+        if title == f"Allenamento con {opponents.ENGINES[row['engine'] or opponents.MAIA]} {row['elo']}":
+            title = f"Allenamento con {opponents.ENGINES[row['engine'] or opponents.MAIA]} {body.elo}"
+        # The revision stays: no move changes, so a bot reply already on its way is still valid.
+        con.execute('UPDATE games SET elo=?,title=? WHERE id=?', (body.elo, title, game_id))
     return get_game(game_id)
 
 

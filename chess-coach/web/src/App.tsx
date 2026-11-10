@@ -426,6 +426,15 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
       try { const latest = await api<Game>('/games/'+game.id); keepGame(latest); setCursor(latest.version) } catch (e) { fail(e) }
     } finally { setBusy(false) }
   }
+  async function applyLevel() {
+    if(!game||game.source!=='maia'||game.result||game.elo===elo||busy)return
+    setError('')
+    try {
+      const next=await api<Game>(`/games/${game.id}/level`,{elo,revision:game.revision})
+      // Only the level changes: a bot reply may have landed meanwhile, so keep the latest moves.
+      setGame(g=>g&&g.id===next.id?{...g,elo:next.elo,title:next.title}:g); setNotice(`Livello cambiato: ${game.engineLabel??'Maia'} ora gioca a ${next.elo}.`)
+    } catch(e) {fail(e)}
+  }
   async function resign() {
     if(!game||(game.source!=='maia'&&game.source!=='stockfish')||game.result||busy)return
     if(!window.confirm('Vuoi abbandonare la partita? Verrà registrata una sconfitta e, se hai giocato delle mosse, partirà l’analisi automatica.'))return
@@ -583,6 +592,7 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
             {game&&<MoveHistory key={game.id} game={game} ply={playPly} onPosition={showPlayPosition} onReview={analyze} reviewDisabled={!game.version||busy||botThinking||!!jobId}/>}
             <section className="panel play-setup"><span className="eyebrow">IL TUO SPARRING PARTNER</span><h2>{game?'Nuova partita':engine==='experimental'?'Gioca contro lo Sperimentale':'Gioca contro Maia'}</h2><p className="muted">Mosse e imperfezioni ispirate al gioco umano.</p>
               <p className="next-opponent" aria-live="polite">Prossima partita: <strong>{engine==='experimental'?'Sperimentale':'Maia'}</strong> · livello {elo}. La scelta si applica premendo «{game?'Nuova partita':'Inizia partita'}».</p>
+              {game?.source==='maia'&&!game.result&&(game.engine??'maia')===engine&&game.elo!==elo&&<div className="level-change" role="status"><span>La partita in corso è a livello {game.elo}.</span><button disabled={busy} onClick={()=>void applyLevel()}>Applica {elo} a questa partita</button></div>}
               {game?.source==='maia'&&(game.engine??'maia')!==engine&&<p className="engine-change-notice" role="status">La partita sulla scacchiera resta contro {game.engineLabel??'Maia'}. Per usare {engine==='experimental'?'lo Sperimentale':'Maia'}, avvia una nuova partita.</p>}
               {game?.engine==='experimental'&&engine==='experimental'&&opponents.status?.available&&game.engineVersion!==opponents.status.version&&<p className="engine-change-notice" role="status">Il servizio usa una versione diversa da questa partita. Avvia una nuova partita per provare il modello disponibile.</p>}
               <OpponentChoice engine={engine} onEngine={choose=>{setEngine(choose);if(choose==='experimental'){const [low,high]=experimentalRange(opponents.status);setElo(e=>Math.min(high,Math.max(low,e)))}}} status={opponents.status} checking={opponents.checking} onRefresh={opponents.refresh} disabled={busy}/>

@@ -45,7 +45,8 @@ test('Undo while Maia thinks cancels its old reply; a new move can be played and
   expect(game.version).toBe(2);expect(game.moves[0]).toBe('d2d4')
   await undo.click()
   await expect(undo).toBeDisabled()
-  expect((await(await request.get('/api/games/'+id)).json()).moves).toEqual([])
+  // The button is disabled as soon as the request starts: wait for the undo itself.
+  await expect.poll(async()=>(await(await request.get('/api/games/'+id)).json()).moves).toEqual([])
   await expect(page.getByRole('alert')).toHaveCount(0)
 })
 
@@ -107,14 +108,17 @@ test('Real Maia Elo comparison is persisted, reloadable and handles too few deci
 
 test('Reset asks for confirmation and brings the game back to the start',async({page,request})=>{
   await page.goto('/')
+  await page.getByRole('group',{name:'Il tuo colore'}).getByRole('button',{name:'Bianco'}).click()
   await page.getByRole('button',{name:'Inizia partita'}).click()
   const reset=page.getByRole('button',{name:'Ricomincia partita'})
   await expect(reset).toBeDisabled()
-  await play(page,'e2e4')
-  await expect(page.getByText('Maia sta pensando…',{exact:true})).toBeHidden()
-  await play(page,'d2d4')
-  await expect(page.getByText('Maia sta pensando…',{exact:true})).toBeHidden()
   const id=await page.evaluate(()=>localStorage.getItem('chess-coach-game'))
+  const plies=async()=>(await(await request.get('/api/games/'+id)).json()).moves.length
+  await play(page,'e2e4')
+  await expect.poll(plies).toBe(2)
+  await expect(page.getByText('Tocca a te',{exact:false}).first()).toBeVisible()
+  await play(page,'d2d4')
+  await expect.poll(plies).toBe(4)
   page.once('dialog',d=>void d.dismiss())
   await reset.click()
   expect((await(await request.get('/api/games/'+id)).json()).moves).toHaveLength(4)
@@ -123,4 +127,20 @@ test('Reset asks for confirmation and brings the game back to the start',async({
   await expect(page.getByText('Partita riportata alla posizione iniziale. Tocca a te.')).toBeVisible()
   expect((await(await request.get('/api/games/'+id)).json()).moves).toEqual([])
   await expect(reset).toBeDisabled()
+})
+
+test('The level chosen in the panel can be applied to the game in progress',async({page,request})=>{
+  await page.goto('/')
+  await page.getByRole('group',{name:'Il tuo colore'}).getByRole('button',{name:'Bianco'}).click()
+  await page.getByRole('group',{name:'Livelli consigliati'}).getByRole('button',{name:'600',exact:true}).click()
+  await page.getByRole('button',{name:'Inizia partita'}).click()
+  await play(page,'e2e4')
+  await expect(page.getByText('Livello 600 · gioco umano')).toBeVisible()
+  await page.getByRole('group',{name:'Livelli consigliati'}).getByRole('button',{name:'800',exact:true}).click()
+  await page.getByRole('button',{name:'Applica 800 a questa partita'}).click()
+  await expect(page.getByText('Livello 800 · gioco umano')).toBeVisible()
+  await expect(page.getByText('Partita attuale: Maia · livello 800',{exact:false})).toBeVisible()
+  await expect(page.getByRole('button',{name:'Applica 800 a questa partita'})).toHaveCount(0)
+  const id=await page.evaluate(()=>localStorage.getItem('chess-coach-game'))
+  expect((await(await request.get('/api/games/'+id)).json()).elo).toBe(800)
 })
