@@ -843,8 +843,16 @@ def position_evaluation(game_id: str, ply: int):
     return {'ply': ply, 'evaluation': value}
 
 
-@app.post('/api/games/{game_id}/undo')
-def undo_move(game_id: str, body: UndoInput):
+def first_player_ply(row, session=None):
+    """Earliest position of the game where the player is to move: what a reset goes back to."""
+    moves = json.loads(row['moves'])
+    start = session['start_ply'] if session else 1 if row['source'] == 'stockfish' else 0
+    initial_turn = chess.Board(row['initial_fen']).turn
+    return next((ply for ply in range(start, len(moves))
+                 if (initial_turn if ply % 2 == 0 else not initial_turn) == (row['player_color'] == 'w')), None)
+
+
+def rewind_game(game_id, body, target, conflict):
     with database() as con:
         con.execute('BEGIN IMMEDIATE')
         row = find_game(con, game_id)
@@ -852,16 +860,26 @@ def undo_move(game_id: str, body: UndoInput):
             raise HTTPException(409, 'Questa partita è disponibile solo in revisione')
         moves = json.loads(row['moves'])
         session = con.execute('SELECT * FROM drill_sessions WHERE game_id=?', (game_id,)).fetchone()
-        ply = undo_ply(row, session)
+        ply = target(row, session)
         # A bot reply may have arrived after the click. Accept only that one extra reply.
         if row['revision'] != body.revision or len(moves) not in {body.version, body.version + 1} or ply is None or ply >= body.version:
-            raise HTTPException(409, 'Nessuna mossa da annullare in questa posizione: ricarica la partita')
+            raise HTTPException(409, conflict)
         preserve_review(con, row, session)
         con.execute('UPDATE games SET moves=?,move_times=?,move_choices=?,assisted_plies=?,resign_offer=NULL,revision=revision+1,analysis=NULL,analysis_version=NULL WHERE id=?',
                     (json.dumps(moves[:ply]), json.dumps(json.loads(row['move_times'])[:ply]), json.dumps(json.loads(row['move_choices'])[:ply]),
                      json.dumps([p for p in json.loads(row['assisted_plies']) if p < ply]), game_id))
         con.execute('DELETE FROM game_ratings WHERE game_id=?', (game_id,))
     return get_game(game_id)
+
+
+@app.post('/api/games/{game_id}/undo')
+def undo_move(game_id: str, body: UndoInput):
+    return rewind_game(game_id, body, undo_ply, 'Nessuna mossa da annullare in questa posizione: ricarica la partita')
+
+
+@app.post('/api/games/{game_id}/reset')
+def reset_game(game_id: str, body: UndoInput):
+    return rewind_game(game_id, body, first_player_ply, 'Nessuna mossa da azzerare in questa posizione: ricarica la partita')
 
 
 @app.get('/api/games/{game_id}/decision-quality')

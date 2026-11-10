@@ -273,8 +273,9 @@ details.panel>summary{font-weight:650;font-size:var(--fs-lg)}
 .resign-offer strong{font-family:var(--font-display);font-size:var(--fs-lg);line-height:1.25}
 .resign-offer span{font-size:var(--fs-sm);color:var(--text-2)}
 .resign-offer div{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:4px}
-.board-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px}
-.board-actions button{min-height:36px;font-size:var(--fs-sm)}
+.board-actions{display:flex;gap:4px;justify-content:center;flex-wrap:wrap;margin-top:6px}
+.board-actions button{min-height:28px;padding:3px 9px;gap:4px;font-size:var(--fs-xs);font-weight:500}
+@media (pointer:coarse){.board-actions button{min-height:34px}}
 .review-controls{display:flex;justify-content:center;align-items:center;gap:6px;padding:4px 0}
 .review-controls span{font-size:var(--fs-sm);min-width:64px;text-align:center;color:var(--text-2);font-weight:600}
 .review-controls .review-step{display:grid;line-height:1.15;color:var(--text)}.review-step small{font-weight:500;color:var(--text-2)}
@@ -282,8 +283,9 @@ details.panel>summary{font-weight:650;font-size:var(--fs-lg)}
 .board-toolbar{margin-top:10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:6px;box-shadow:var(--shadow-sm)}
 .board-toolbar button{flex:1;border-color:transparent;background:var(--surface-2);font-size:var(--fs-lg)}
 .board-toolbar button:hover:not(:disabled){background:var(--surface-3)}
-.lichess-analysis{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-top:10px}
-.lichess-analysis button{min-height:34px;font-size:var(--fs-sm);padding:6px 12px}
+.lichess-analysis{display:flex;flex-wrap:wrap;justify-content:center;gap:4px;margin-top:6px}
+.lichess-analysis button{min-height:28px;font-size:var(--fs-xs);font-weight:500;padding:3px 9px}
+@media (pointer:coarse){.lichess-analysis button{min-height:34px}}
 .lichess-analysis small{flex-basis:100%;text-align:center;font-size:var(--fs-xs);color:var(--muted)}
 .lichess-analysis textarea{width:100%}
 .suggestion-box{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px 16px;margin-top:10px;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);font-size:var(--fs-sm);box-shadow:var(--shadow-sm)}

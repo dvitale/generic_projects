@@ -160,3 +160,23 @@ def test_existing_database_migrates_without_losing_games(tmp_path, monkeypatch):
     main.init_db()
     main.init_db()
     assert main.get_game('old')['revision'] == 0
+
+
+def reset(client, g):
+    return client.post(f"/api/games/{g['id']}/reset", json={'version': g['version'], 'revision': g['revision']})
+
+
+def test_reset_returns_to_first_player_move_and_keeps_bot_opening(client):
+    g = client.post('/api/games', json={}).json()
+    assert reset(client, g).status_code == 409
+    for uci in ['e2e4', 'e7e5', 'g1f3', 'b8c6']:
+        g = move(client, g, uci)
+    old = dict(g)
+    g = reset(client, g).json()
+    assert g['moves'] == [] and g['fen'] == chess.STARTING_FEN and not g['canUndo']
+    assert reset(client, old).status_code == 409  # duplicate click
+    g = client.post('/api/games', json={'color': 'b'}).json()
+    for uci in ['e2e4', 'e7e5', 'g1f3', 'b8c6', 'f1b5']:
+        g = move(client, g, uci)
+    g = reset(client, g).json()
+    assert g['moves'] == ['e2e4'] and g['turn'] == 'b'
