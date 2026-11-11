@@ -269,7 +269,8 @@ class PracticeInput(SessionInput):
 class DrillInput(BaseModel):
     color: Literal["w", "b"] = "w"
     elo: int = Field(default=1500, ge=600, le=2600)
-    target: int = Field(default=5, ge=3, le=12)
+    # Your decisions after the preset line, as on Maia Chess: 3-20, or 0 for no limit (the drill ends when you choose).
+    target: int = Field(default=10, ge=0, le=20)
 
 
 class TutorInput(BaseModel):
@@ -367,8 +368,8 @@ def game_view(row):
     if session:
         count = decisions_played(row["initial_fen"], moves, session["start_ply"], row["player_color"])
         drill = {"name": session["template_name"], "goal": session["goal"], "theme": session["theme"],
-                 "target": session["target"], "decisions": count, "startPly": session["start_ply"],
-                 "complete": count >= session["target"] or outcome is not None}
+                 "target": session["target"], "decisions": count, "startPly": session["start_ply"], "templateId": session["template_id"],
+                 "complete": drill_done(session, count) or outcome is not None}
     return {"id": row["id"], "number": row["number"], "fen": board.fen(), "initialFen": row["initial_fen"],
             "moves": moves, "version": len(moves), "revision": row['revision'], "playerColor": row["player_color"],
             "canUndo": not row['termination'] and row['source'] in PLAYABLE and undo_ply(row, session) is not None,
@@ -507,7 +508,7 @@ def make_move(game_id: str, body: MoveInput):
             raise HTTPException(409, "La posizione è cambiata: ricarica la partita")
         board = reconstruct(row["initial_fen"], moves)
         session = con.execute("SELECT * FROM drill_sessions WHERE game_id=?", (game_id,)).fetchone()
-        if session and decisions_played(row["initial_fen"], moves, session["start_ply"], row["player_color"]) >= session["target"]:
+        if session and drill_done(session, decisions_played(row["initial_fen"], moves, session["start_ply"], row["player_color"])):
             raise HTTPException(409, "Drill completato: apri la revisione")
         if row['termination'] or board.is_game_over(claim_draw=True) or len(moves) >= 600:
             raise HTTPException(409, "Partita conclusa")
@@ -527,6 +528,9 @@ def make_move(game_id: str, body: MoveInput):
     # Commit the final move before the worker reads it; analysis survives closing the browser.
     board.push(move)
     if board.is_game_over(claim_draw=True) and snapshot['source'] != 'stockfish':
+        queue_analysis(snapshot, automatic=True)
+    elif session and drill_done(session, decisions_played(snapshot["initial_fen"], moves, session["start_ply"], snapshot["player_color"])):
+        # As on Maia Chess, the drill review is ready when the target is reached: Stockfish starts at once.
         queue_analysis(snapshot, automatic=True)
     return get_game(game_id)
 
@@ -708,7 +712,7 @@ def maia_move(game_id: str, body: BotMoveInput):
             raise HTTPException(409, 'La posizione è cambiata: ricarica la partita')
         board = reconstruct(row['initial_fen'], moves)
         session = con.execute('SELECT * FROM drill_sessions WHERE game_id=?', (game_id,)).fetchone()
-        if session and decisions_played(row['initial_fen'], moves, session['start_ply'], row['player_color']) >= session['target']:
+        if session and drill_done(session, decisions_played(row['initial_fen'], moves, session['start_ply'], row['player_color'])):
             raise HTTPException(409, 'Drill completato: apri la revisione')
         if board.is_game_over(claim_draw=True) or len(moves) >= 600:
             raise HTTPException(409, 'Partita conclusa')
@@ -1525,6 +1529,38 @@ def start_drill(template_id: str, body: DrillInput):
         con.execute("INSERT INTO games(id,initial_fen,moves,player_color,elo,title,created_at,analysis,analysis_version,source) VALUES(?,?,?,?,?,?,?,?,?,?)", (game_id, initial, json.dumps(moves), template.get("color", body.color), body.elo,
                     template["name"], now(), None, None, "drill"))
         con.execute("INSERT INTO drill_sessions VALUES(?,?,?,?,?,?,?)", (game_id, template_id, template["name"], template["theme"], template["goal"], len(moves), body.target))
+    return get_game(game_id)
+
+
+def drill_done(session, count):
+    return session["target"] > 0 and count >= session["target"]
+
+
+class DrillTarget(BaseModel):
+    version: int = Field(ge=0, le=600)
+    revision: int = Field(ge=0)
+    # 0 extends the drill with no limit; the current number of decisions ends it now.
+    target: int = Field(ge=0, le=200)
+
+
+@app.post("/api/games/{game_id}/drill/target")
+def drill_target(game_id: str, body: DrillTarget):
+    with database() as con:
+        con.execute("BEGIN IMMEDIATE")
+        row = find_game(con, game_id)
+        session = con.execute("SELECT * FROM drill_sessions WHERE game_id=?", (game_id,)).fetchone()
+        moves = json.loads(row["moves"])
+        if session is None:
+            raise HTTPException(404, "Drill non trovato")
+        if len(moves) != body.version or row["revision"] != body.revision:
+            raise HTTPException(409, "La posizione è cambiata: ricarica il drill")
+        count = decisions_played(row["initial_fen"], moves, session["start_ply"], row["player_color"])
+        if body.target and body.target < max(1, count):
+            raise HTTPException(422, "Il drill ha già più decisioni di così")
+        con.execute("UPDATE drill_sessions SET target=? WHERE game_id=?", (body.target, game_id))
+        snapshot = dict(row)
+    if body.target and count >= body.target:
+        queue_analysis(snapshot, automatic=True)
     return get_game(game_id)
 
 

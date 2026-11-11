@@ -46,7 +46,7 @@ test('Real Maia play, black orientation, drill and mobile layout',async({page,re
     const response=page.waitForResponse(r=>r.url().endsWith('/moves')&&r.request().method()==='POST')
     await boardMove(page,g.legalMoves[0]);await response
   }
-  await expect(page.getByText('Drill completato. Verifica le tue scelte prima di ripartire.')).toBeVisible()
+  await expect(page.getByText('Traguardo raggiunto (3/3 mosse).')).toBeVisible()
   await page.screenshot({path:'test-results/drill-desktop.png',fullPage:true})
   await page.setViewportSize({width:390,height:844})
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
@@ -121,5 +121,5 @@ test('Tutor is explicitly requested and renders a saved explanation',async({page
   await expect(page.getByText('Una decisione da rivedere con attenzione.')).toBeVisible()
   expect(requests).toBe(1)
   await page.getByRole('button',{name:'Avvia il Drill',exact:true}).click()
-  await expect(page.getByText('0 / 5 decisioni')).toBeVisible()
+  await expect(page.getByText('0 / 10 decisioni')).toBeVisible()
 })

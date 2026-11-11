@@ -43,10 +43,10 @@ Maia3 è basato su Transformer/Chessformer. Il riferimento iniziale a una CNN ri
 - Catalogo: sette famiglie di aperture con 63 linee e il finale re e torre contro re. Dall'11 novembre 2026 le aperture hanno anche il ripasso delle mosse di teoria (`backend/opening_lines.py`, vedi [aperture.md](aperture.md#drill-delle-aperture-e-ripasso-delle-linee)). I vecchi drill `italiana`, `siciliana`, `caro-kann` e `gambetto-donna` restano avviabili per identificativo (piani del tutor), ma non compaiono più nel catalogo.
 - Posizioni personali ricavate dagli esercizi creati nelle revisioni. Il colore coincide con chi doveva decidere nella partita originale.
 - **Fine della teoria**: fino a tre drill dall'ultima posizione di teoria della partita più recente di un'apertura del tuo repertorio, prima quelle da curare e poi le più giocate; colore e mosse precedenti sono quelli della tua partita (`opening:<id partita>`, vedi `docs/aperture.md`).
-- Livello Maia, colore dove applicabile e durata da 3 a 12 decisioni del giocatore.
+- Livello Maia, colore dove applicabile e durata da 3 a 20 decisioni del giocatore (10 predefinite, come su Maia Chess) o senza limite (`target` 0).
 - Conservazione della storia precedente alla posizione, utile per ricostruzione, arrocco, en passant e ripetizioni.
 - Risposte campionate dalla distribuzione Maia sulle mosse legali, senza sostituzione silenziosa con un altro motore.
-- Fine al numero previsto di decisioni o al termine della partita; l'ultima decisione può chiudere il drill prima della risposta del bot.
+- Fine al numero previsto di decisioni o al termine della partita; l'ultima decisione può chiudere il drill prima della risposta del bot. Al traguardo il drill si può prolungare senza limite o chiudere con la valutazione; **Termina e valuta** lo chiude anche prima (`POST /api/games/{id}/drill/target`). Alla chiusura l'analisi Stockfish parte da sola e la pagina mostra la **Valutazione del drill** (vedi [aperture.md](aperture.md#la-valutazione-del-drill)).
 - Revisione Stockfish delle sole decisioni effettivamente giocate nel drill: la sequenza preparata non contribuisce ai risultati.
 - Motivazione delle proposte: provenienza da un errore personale oppure presenza della sequenza iniziale nelle partite libere/importate. Il repertorio lo giudicano regole fisse su partite e analisi Stockfish (`docs/aperture.md`), non il tutor.
 

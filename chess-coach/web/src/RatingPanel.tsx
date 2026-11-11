@@ -6,14 +6,17 @@ import type { Game, Rating } from './types'
 const RATING_METHOD='maia3-drill-match-v2'
 interface Plan { version:number; revision:number; positions:{fen:string;move:string;ply:number}[]; levels:number[]; method:string; probabilityFloor:number; opponentMode:string }
 
-export default function RatingPanel({game,disabled,onRated}:{game:Game;disabled:boolean;onRated:(rating:Rating)=>void}) {
+export default function RatingPanel({game,disabled,onRated,auto=false}:{game:Game;disabled:boolean;onRated:(rating:Rating)=>void;auto?:boolean}) {
   const [rating,setRating]=useState<Rating|null>(game.rating?.method===RATING_METHOD?game.rating:null)
   const [busy,setBusy]=useState(false)
   const [progress,setProgress]=useState(0)
   const [error,setError]=useState('')
   const active=useRef<AbortController|null>(null)
+  const [short,setShort]=useState('')
   useEffect(()=>()=>{active.current?.abort()},[])
-  async function estimate(){
+  // In the drill review the comparison starts by itself, as on Maia Chess.
+  useEffect(()=>{if(auto&&!rating&&!disabled)void estimate(true)},[auto,disabled])
+  async function estimate(automatic=false){
     const controller=new AbortController()
     active.current=controller
     setBusy(true);setProgress(0);setError('')
@@ -21,6 +24,7 @@ export default function RatingPanel({game,disabled,onRated}:{game:Game;disabled:
       const plan=await api<Plan>(`/games/${game.id}/rating-positions`)
       if(controller.signal.aborted)return
       if(plan.method!==RATING_METHOD||plan.opponentMode!=='matched-level'||plan.probabilityFloor!==0.001)throw new Error('Il metodo di valutazione è cambiato: ricarica la pagina.')
+      if(plan.positions.length<10&&automatic){setShort(`Servono almeno 10 tue decisioni non obbligate per il confronto: qui sono ${plan.positions.length}. Prolunga il prossimo drill per averlo.`);return}
       if(plan.positions.length<10)throw new Error(game.result
         ? `Partita troppo breve per confrontare i profili Maia: ${plan.positions.length} tue decisioni non obbligate, ne servono almeno 10.`
         : 'Servono almeno 10 tue decisioni non obbligate. Continua la partita e riprova.')
@@ -55,7 +59,8 @@ export default function RatingPanel({game,disabled,onRated}:{game:Game;disabled:
       <details><summary>Come si confrontano i livelli</summary><p className="footnote">Le tre migliori corrispondenze, ordinate dalla probabilità delle tue mosse. Valori vicini indicano che il punteggio può cambiare facilmente. Queste percentuali non sono la probabilità che tu abbia quel rating.</p><table><thead><tr><th>Livello</th><th>Probabilità delle mosse*</th></tr></thead><tbody>{[...(rating.comparisons||[])].sort((a,b)=>b.meanLogLikelihood-a.meanLogLikelihood).slice(0,3).map(c=><tr key={c.level}><td>{c.level}</td><td>{(c.geometricMoveProbability*100).toFixed(2)}%</td></tr>)}</tbody></table><p className="footnote">* Media geometrica delle probabilità, con lo stesso limite minimo del sito Maia. Non aggiungiamo una fascia ±150: sul sito è fissa, non ricavata dalla partita.</p></details>
       <small className="footnote">{new Date(rating.createdAt).toLocaleString('it-IT')} · salvata con questa partita</small>
     </div>}
-    {busy?<div role="status"><p>Confronto delle tue mosse… {progress}%</p><progress value={progress} max={100}/><button className="full" onClick={cancel}>Interrompi confronto</button></div>:<button className="full" disabled={disabled||!game.version} onClick={estimate}>{rating?'Ricalcola somiglianza':'Confronta con i profili Maia'}</button>}
+    {busy?<div role="status"><p>Confronto delle tue mosse… {progress}%</p><progress value={progress} max={100}/><button className="full" onClick={cancel}>Interrompi confronto</button></div>:<button className="full" disabled={disabled||!game.version} onClick={()=>void estimate()}>{rating?'Ricalcola somiglianza':'Confronta con i profili Maia'}</button>}
+    {short&&!rating&&<p className="muted" role="status">{short}</p>}
     {error&&<p className="alert" role="alert">{error}</p>}
     <p className="footnote">Calcolo locale su tutte le tue decisioni non obbligate, almeno 10. Nei Drill escludiamo la sequenza iniziale. Dopo una nuova mossa o un annullamento il punteggio va ricalcolato.</p>
   </section>

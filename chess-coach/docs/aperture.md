@@ -135,8 +135,8 @@ Lo si ricava dal codice (`useOpeningDrillController.ts`):
 ### I due modi in SparringMate
 
 - **Contro Maia** (`POST /api/drills/line:<linea>/start`) fa come Maia Chess. La linea è sulla scacchiera e continui
-  tu, con livello, colore e numero di decisioni delle impostazioni. È un Drill normale: annulla, suggerimento,
-  revisione delle sole decisioni giocate dopo la linea. Le risposte di Maia sono quelle di Gioca: fino alla mossa 5
+  tu, con livello, colore e numero di mosse delle impostazioni. È un Drill normale: annulla, suggerimento,
+  revisione delle sole decisioni giocate dopo la linea, e alla fine la valutazione del drill (sotto). Le risposte di Maia sono quelle di Gioca: fino alla mossa 5
   Maia usa tutta la sua distribuzione, addestrata su partite umane, al posto del libro privato di Maia Chess.
 - **Ripassa la linea** (`/api/opening-lines/sessions`) mette alla prova la memoria della teoria, cosa che Maia Chess
   non fa:
@@ -153,6 +153,44 @@ Lo si ricava dal codice (`useOpeningDrillController.ts`):
   da ripassare o era stata sbagliata. Il ripasso finisce dove finisce la linea, che
   può poi proseguire contro Maia (**Continua contro Maia da qui**). In **Linee del ripasso** scegli quali linee
   l'avversario può giocare. Ci sono solo quelle che nessun'altra linea prolunga: la scelta resta nel browser.
+
+### La valutazione del drill
+
+Dall'11 novembre 2026 il drill segue anche la fine di un drill di Maia Chess (`DrillPerformanceModal.tsx`,
+`useOpeningDrillController.ts`).
+
+- **Durata**: da 3 a 20 tue mosse, 10 predefinite, o **Senza limite** (`target` 0 in `POST /api/drills/{id}/start`).
+  Su Maia Chess è un cursore da 5 a 20 più ∞, con 10 iniziali.
+- **Traguardo**: compare «Traguardo raggiunto (10/10 mosse). Prolunga il drill o termina con la valutazione.».
+  **Prolunga il drill** toglie il limite; **Termina e valuta** chiude il drill e apre la valutazione, ed è disponibile
+  anche prima del traguardo, quando tocca a te (`POST /api/games/{id}/drill/target`: 0 prolunga, il numero attuale
+  di decisioni chiude). Chiudere il drill avvia subito l'analisi Stockfish (`queue_analysis` automatica), come la
+  fine di una partita.
+- **Valutazione del drill** (`web/src/DrillReview.tsx`), sulle sole tue mosse dopo la linea, senza le mosse
+  obbligate e quelle giocate dopo un suggerimento:
+  - **replica** con avanti, indietro e **Riproduci** (una semimossa ogni 0,9 secondi);
+  - **andamento della valutazione**: probabilità di vittoria del Bianco, con un punto per ogni tua mossa colorato
+    secondo la classe; cliccando si va alla posizione. Sotto, la valutazione a inizio e fine drill;
+  - **precisione** (formula di Lichess, come in Rivedi), quota **senza perdite rilevanti** e conteggi per classe,
+    con il giudizio di Maia Chess: da 90% «Ottima prova», da 70% «Buona prova», sotto «Questa apertura va allenata
+    ancora», più il numero di errori gravi e matti mancati;
+  - **decisioni critiche**: fino a 5, in ordine di gioco, fra imprecisioni, errori, errori gravi e matti mancati,
+    con la perdita e la mossa migliore;
+  - **somiglianza con Maia**: il confronto di Rivedi (`RatingPanel`, stesso metodo `maia3-drill-match-v2` del
+    drill ufficiale) parte da solo. Servono almeno 10 tue decisioni non obbligate: con meno, lo dice e non calcola;
+  - **Rigioca la stessa linea** (stessa linea, colore e livello, durata delle impostazioni), **Prossimo drill** e
+    **Rivedi nel dettaglio**.
+
+Differenze rimaste da Maia Chess:
+
+- Le soglie delle classi sono quelle di SparringMate (imprecisione da 0,80, errore da 1,80, errore grave da 3,00 sulla
+  scala con la franchigia), non le loro: là un errore grave è una perdita di almeno 10 punti di probabilità di
+  vittoria e un'imprecisione di 5.
+- La «mossa eccellente» di Maia Chess (rara per Maia e almeno 5 punti sopra la media pesata da Maia) non c'è: qui la
+  classe più alta è la scelta di Stockfish.
+- La loro precisione è la quota di mosse buone o eccellenti; qui è la formula di Lichess. La quota di Maia Chess
+  corrisponde a **Senza perdite rilevanti**.
+- Il loro livello Maia non ha un minimo di mosse; qui servono 10 decisioni.
 
 ### Ripasso dilazionato
 

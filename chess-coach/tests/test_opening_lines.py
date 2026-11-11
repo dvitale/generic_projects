@@ -95,3 +95,38 @@ def test_a_drill_starts_against_maia_from_the_end_of_a_line(client):
     g = client.post('/api/drills/line:russa:damiano-qe2/start', json={'color': 'w', 'target': 3}).json()
     assert g['drill']['startPly'] == 11 and g['title'].startswith('Difesa russa (Petroff): Damiano Variation, 4.Qe2')
     assert client.post('/api/drills/line:russa:nope/start', json={}).status_code == 404
+
+
+def _decide(client, g):
+    """Play the first legal move for whoever is to move, as the player or as Maia."""
+    actor = 'human' if g['turn'] == g['playerColor'] else 'maia'
+    return client.post(f"/api/games/{g['id']}/moves", json={'move': g['legalMoves'][0], 'version': g['version'], 'actor': actor}).json()
+
+
+def test_a_drill_defaults_to_ten_moves_and_reaching_the_target_starts_the_review(client):
+    g = client.post('/api/drills/line:italiana:giuoco-piano/start', json={}).json()
+    assert g['drill']['target'] == 10 and g['drill']['templateId'] == 'line:italiana:giuoco-piano'
+    g = client.post('/api/drills/line:italiana:giuoco-piano/start', json={'target': 3}).json()
+    while not g['drill']['complete']:
+        g = _decide(client, g)
+    # Stockfish starts on its own once the last decision is played.
+    assert g['analysisJobId']
+    assert client.post(f"/api/drills/line:italiana:giuoco-piano/start", json={'target': 21}).status_code == 422
+
+
+def test_a_drill_can_be_extended_without_limit_and_ended_when_the_player_chooses(client):
+    g = client.post('/api/drills/line:russa:damiano-qe2/start', json={'target': 3}).json()
+    while not g['drill']['complete']:
+        g = _decide(client, g)
+    target = lambda t: client.post(f"/api/games/{g['id']}/drill/target", json={'version': g['version'], 'revision': g['revision'], 'target': t})
+    assert target(2).status_code == 422
+    g = target(0).json()
+    assert not g['drill']['complete'] and g['drill']['target'] == 0
+    for _ in range(4):
+        g = _decide(client, g)
+    assert g['drill']['decisions'] == 5 and not g['drill']['complete']
+    if g['turn'] != g['playerColor']:
+        g = _decide(client, g)
+    g = target(g['drill']['decisions']).json()
+    assert g['drill']['complete'] and g['analysisJobId']
+    assert client.post(f"/api/games/{g['id']}/drill/target", json={'version': 0, 'revision': g['revision'], 'target': 0}).status_code == 409
