@@ -14,7 +14,8 @@ def test_scores_are_shown_on_one_objective_scale_whoever_moves():
 
 
 def test_rules_and_messages_no_longer_speak_from_the_players_side():
-    assert 'tuo punto di vista' not in prevention.RULE and 'col Nero non sopra +1,00' in prevention.RULE
+    # The prevention rule speaks in expected-score points, the same for both colours.
+    assert 'tuo punto di vista' not in prevention.RULE and '20 punti' in prevention.RULE
     import chess
     black = chess.Board('rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1')
     assert alternatives.fmt({'cp': 80, 'mate': None}, black) == '−0,80'

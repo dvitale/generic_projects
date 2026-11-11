@@ -41,7 +41,7 @@ def record(con, kind, target_id, attempt_id, board, move, best, actual, timestam
     evidence = {'fen': board.fen(), 'turn': 'w' if board.turn else 'b',
                 'move': move.uci(), 'san': board.san(move), 'best': best, 'actual': actual,
                 'lossCp': loss, 'engine': evaluator.name,
-                'criterion': 'Evita il blunder della partita: non andare oltre 1,00 di svantaggio (col Bianco non sotto −1,00, col Nero non sopra +1,00) oppure perdi meno di 2,00 rispetto alla migliore, senza subire un matto forzato.' if kind == 'prevention'
+                'criterion': 'Evita il blunder della partita: perdi meno di 20 punti di punteggio atteso rispetto alla migliore, senza subire un matto forzato.' if kind == 'prevention'
                 else 'Perdi meno di 0,70 rispetto alla migliore mossa di Stockfish (oltre ±6,00 la partita è decisa e la differenza non conta) e non manchi un matto in 1–2.'}
     con.execute('''INSERT INTO training_mistakes(kind,target_id,attempt_id,created_at,evidence)
                    VALUES(?,?,?,?,?)''', (kind, target_id, attempt_id, timestamp, json.dumps(evidence)))

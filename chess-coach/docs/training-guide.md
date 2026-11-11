@@ -102,7 +102,7 @@ Il calendario ti fa rigiocare le posizioni. **Studio**, nella barra laterale sot
 ### Dopo ogni partita: Impara da una partita
 
 1. In **Rivedi → Decisioni** premi **Studia questa partita**, oppure apri **Studio → Impara da una partita** e scegli la partita.
-2. L’elenco mostra le decisioni che hanno perso almeno 0,80. Per ciascuna trovi in un solo posto **Puzzle**, **Blunder prevention**, **Drill da qui**, **Gioca contro Stockfish**, **Chiedi al tutor** e **Rivedi nella partita**. Puzzle e Drill sono attivi solo per i tre errori più costosi; Blunder prevention solo per i blunder che rendono la posizione difficile da difendere.
+2. L’elenco mostra le decisioni che hanno perso almeno 0,80. Per ciascuna trovi in un solo posto **Puzzle**, **Blunder prevention**, **Drill da qui**, **Gioca contro Stockfish**, **Chiedi al tutor** e **Rivedi nella partita**. Puzzle e Drill sono attivi solo per i tre errori più costosi; Blunder prevention solo per i blunder che costano almeno 20 punti di punteggio atteso.
 3. Scrivi in **La mia lezione** una frase che controlleresti prima di muovere, per esempio «Prima di catturare conto chi difende la casa d’arrivo», e premi **Crea flashcard**.
 4. Chiudi con **Quiz della partita**.
 

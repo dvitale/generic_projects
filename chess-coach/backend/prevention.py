@@ -8,7 +8,7 @@ import chess
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
-from .engine import SHORT_MATE, evaluator
+from .engine import SHORT_MATE, capped, evaluator, expected
 from .maia import maia
 from . import mistakes
 from . import insights
@@ -16,15 +16,18 @@ from . import training_schedule
 from . import diagnosis
 
 SAFE_CP = -100
-BLUNDER_CP = -200
-# The exercise asks to avoid the game's blunder, not to find a good move: below SAFE_CP a move is still accepted
-# unless it gives up this much against the best one, the same gap that made the game move a blunder.
-AVOID_CP = 200
+# A blunder costs at least this much expected score (points out of 100, Lichess curve, as in «Valuta la posizione») against
+# the best move: what is lost in points, not in pawns, so +8 to +7 is nothing and +0.50 to -1.80 is a blunder.
+BLUNDER_DROP = 0.20
+# Near the threshold the verdict is repeated with a deeper search.
+DEEP_MARGIN = 0.03
+# Not raised when the 20-point rule replaced the 2.00 gap (11 Nov 2026): positions already verified stay in the catalog.
 RULE_VERSION = 1
 RULE = ('Basta evitare il blunder della partita: è accettata ogni mossa diversa da quella giocata allora che non è a sua '
-        'volta un blunder, cioè non porta oltre 1,00 di svantaggio (col Bianco non sotto −1,00, col Nero non sopra +1,00) '
-        'oppure perde meno di 2,00 rispetto alla migliore, senza subire un matto forzato. Non è richiesta la migliore: '
-        'anche una mossa che perde 1,10 rispetto a quella va bene.')
+        'volta un blunder, cioè non perde 20 punti o più di punteggio atteso rispetto alla migliore (per esempio dal 55% '
+        'al 35%) e non concede un matto forzato. Non è richiesta la migliore: vicino alla parità una mossa che perde '
+        'anche 2,00 va bene, mentre con un vantaggio grande conta poco perdere qualche pedone. Un matto vale come +6,00 '
+        '(o −6,00), come nel resto dell’app.')
 
 
 # «Alla portata»: a blunder is a lapse (abbaglio), not a skill gap, when humans of the game's level rarely play it
@@ -93,23 +96,31 @@ def safe(value):
     return value['mate'] > 0 if value['mate'] is not None else value['cp'] >= SAFE_CP
 
 
+def score(value):
+    # On the capped outcome scale (engine.capped): a mate counts as ±6.00, so giving up a mate for a won ending is no blunder.
+    return expected({'cp': capped(value), 'mate': None})
+
+
+def drop(best, actual):
+    """Expected score, out of 1, that the move gives up against the best one."""
+    return score(best) - score(actual)
+
+
+def blunder(best, actual):
+    """A forced mate against, or a loss of at least BLUNDER_DROP of expected score."""
+    if actual['mate'] is not None and actual['mate'] < 0:
+        return not (best['mate'] is not None and best['mate'] < 0)
+    return drop(best, actual) >= BLUNDER_DROP
+
+
 def accepted(best, actual, original=False):
     """The answer avoids the game's blunder: it is not the game move and is not a blunder itself."""
-    if original:
-        return False
-    if safe(actual):
-        return True
-    if actual['mate'] is not None or best['mate'] is not None:
-        return False
-    return best['cp'] - actual['cp'] < AVOID_CP
+    return not original and not blunder(best, actual)
 
 
 def eligible(best, actual):
-    if not safe(best) or safe(actual):
-        return False
-    if actual['mate'] is not None:
-        return actual['mate'] < 0
-    return actual['cp'] <= BLUNDER_CP and (best['mate'] is not None or best['cp'] - actual['cp'] >= AVOID_CP)
+    """A blunder from a position that was not already lost (the best move keeps at least -1.00)."""
+    return safe(best) and blunder(best, actual)
 
 
 def init_schema(con):
@@ -209,8 +220,8 @@ def install(app, database, reconstruct, now):
 
     def check(board, move):
         best, actual, _ = evaluator.compare(board, move, nodes=300000)
-        near_loss = best['mate'] is None and actual['mate'] is None and abs(best['cp'] - actual['cp'] - AVOID_CP) <= 50
-        if near_loss or any(v['mate'] is None and abs(v['cp'] - SAFE_CP) <= 50 for v in (best, actual)):
+        near_drop = abs(drop(best, actual) - BLUNDER_DROP) <= DEEP_MARGIN
+        if near_drop or (best['mate'] is None and abs(best['cp'] - SAFE_CP) <= 50):
             best, actual, _ = evaluator.compare(board, move, nodes=1200000)
         return best, actual
 
@@ -248,7 +259,7 @@ def install(app, database, reconstruct, now):
         return {'positions': items, 'stats': dict(stats), 'analyzedGames': analyzed,
                 'reach': {'lapse': counts.get('lapse', 0), 'typical': counts.get('typical', 0), 'complex': counts.get('complex', 0),
                           'pending': counts.get('pending', 0), 'available': maia.available(), 'description': REACH_RULE},
-                'rule': {'safeCp': SAFE_CP, 'avoidCp': AVOID_CP, 'description': RULE}}
+                'rule': {'safeCp': SAFE_CP, 'blunderDrop': round(BLUNDER_DROP * 100), 'description': RULE}}
 
     @app.post('/api/prevention/{position_id}/sessions')
     def session(position_id: str):
@@ -328,7 +339,7 @@ def install(app, database, reconstruct, now):
                 'original': explanation(row, json.loads(row['verification'])) if success else None,
                 'message': ('Blunder evitato: non serve che sia la migliore.' if success else
                             'È la stessa mossa della partita: cerca dove sta l’abbaglio.' if original else
-                            'Anche questa mossa è un blunder: secondo Stockfish scende sotto −1,00 e perde almeno 2,00 rispetto alla migliore. Riprova.')}
+                            'Anche questa mossa è un blunder: secondo Stockfish perde almeno 20 punti di punteggio atteso rispetto alla migliore. Riprova.')}
 
     @app.post('/api/prevention/{position_id}/reveal')
     def reveal(position_id: str, body: SessionBody):

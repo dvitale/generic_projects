@@ -39,7 +39,7 @@ def test_accepts_non_best_non_losing_move_for_both_colors_and_does_not_change_ga
     assert not {'original_move','best','verification'} & p.keys()
     s=session(client,p)
     assert session(client,p)['id']==s['id']
-    move='g3f4' if black else 'g6f5'
+    move='g3h4' if black else 'g6h5'
     result=attempt(client,p,s,move)
     assert result.status_code==200,result.text
     result=result.json()
@@ -53,7 +53,7 @@ def test_accepts_non_best_non_losing_move_for_both_colors_and_does_not_change_ga
 
 def test_retry_illegal_reveal_and_practice_do_not_inflate_independent_success(client):
     _,p=seed(client);s=session(client,p)
-    assert attempt(client,p,s,'g6f5').json()['success']
+    assert attempt(client,p,s,'g6h5').json()['success']
     s=session(client,p)
     # Make a valid-looking but illegal king move; no attempt should be recorded.
     before=client.get('/api/prevention').json()['stats']
@@ -82,11 +82,13 @@ def test_first_failure_then_success_remains_failed_first_attempt(client):
     assert client.get('/api/prevention').json()['positions'][0]['streak']==0
 
 
-def test_selection_filters_lost_positions_mates_and_non_losing_original_moves():
+def test_selection_filters_lost_positions_and_measures_blunders_in_expected_score():
     v=lambda cp,mate=None:{'cp':cp,'mate':mate}
     assert prevention.eligible(v(20),v(-300))
-    assert not prevention.eligible(v(-400),v(-900))
-    assert not prevention.eligible(v(800),v(0)) # Drawing is accepted; not an avoidance exercise.
+    assert not prevention.eligible(v(-400),v(-900))  # Already lost before the move.
+    # 20 points of expected score, not pawns: +0.50 to -1.80 is a blunder, +8 to +7 is not, a win thrown to a draw is.
+    assert prevention.eligible(v(50),v(-180)) and not prevention.eligible(v(50),v(-150))
+    assert not prevention.eligible(v(800),v(700)) and prevention.eligible(v(800),v(0))
     assert not prevention.eligible(v(100000,1),v(700))
     assert prevention.eligible(v(0),v(-100000,-2))
     assert prevention.safe(v(-100)) and not prevention.safe(v(-101))
@@ -146,11 +148,11 @@ def test_practice_after_closing_checks_moves_without_recording(client):
     _,p=seed(client)
     s=session(client,p)
     body=lambda move:{'session_id':s['id'],'move':move}
-    assert client.post(f"/api/prevention/{p['id']}/practice",json=body('g6f5')).status_code==409
-    assert attempt(client,p,s,'g6f5').json()['closed']
+    assert client.post(f"/api/prevention/{p['id']}/practice",json=body('g6h5')).status_code==409
+    assert attempt(client,p,s,'g6h5').json()['closed']
     before=client.get('/api/prevention').json()['stats']
     bad=client.post(f"/api/prevention/{p['id']}/practice",json=body('g6g8')).json()
-    good=client.post(f"/api/prevention/{p['id']}/practice",json=body('g6f5')).json()
+    good=client.post(f"/api/prevention/{p['id']}/practice",json=body('g6h5')).json()
     assert (bad['success'],bad['san'],good['success'])==(False,'Qg8+',True)
     assert client.get('/api/prevention').json()['stats']==before
     with main.database() as con:
@@ -160,17 +162,16 @@ def test_practice_after_closing_checks_moves_without_recording(client):
 def test_any_move_that_avoids_the_game_blunder_is_accepted():
     from backend.prevention import accepted
     e = lambda cp=None, mate=None: {'cp': cp if mate is None else (100000 - mate if mate > 0 else -100000 - mate), 'mate': mate}
-    # Avoiding the blunder is enough: from -0.80, a move to -1.20 or -1.90 is not a blunder; to -2.80 it is.
-    assert accepted(e(-80), e(-120))
-    assert accepted(e(0), e(-110)) and accepted(e(-80), e(-270))
-    assert not accepted(e(-80), e(-280))
-    assert accepted(e(300), e(-90))
+    # Avoiding the blunder is enough: near equality a move that loses 2.00 is still accepted, 2.50 is not.
+    assert accepted(e(0), e(-200)) and not accepted(e(0), e(-250))
+    assert accepted(e(-80), e(-270)) and not accepted(e(-80), e(-360))
+    # With a large lead a few pawns matter little; throwing the win away does.
+    assert accepted(e(900), e(500)) and not accepted(e(300), e(-90))
     # The game move itself is never accepted, whatever a deeper search now says.
     assert not accepted(e(-80), e(-90), original=True)
-    # A mate against is never accepted; missing a mate is judged by the safety line only.
+    # A mate against is never accepted; giving up a mate is judged by the expected score of what remains.
     assert not accepted(e(-50), e(mate=-5))
-    assert not accepted(e(mate=3), e(-150))
-    assert accepted(e(mate=3), e(-20))
+    assert not accepted(e(mate=3), e(-20)) and accepted(e(mate=3), e(400))
 
 
 def line(*moves):

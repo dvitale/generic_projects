@@ -63,7 +63,7 @@ export default function GamePack({games,gameId,onGame,actions}:{games:Saved[];ga
           {moment.refutation&&moment.refutation.length>1&&<p className="muted">Dopo {moment.playedSan} la risposta forte è <strong>{moment.refutation[1]}</strong>.</p>}
           <div className="pack-actions">
             <button disabled={!moment.exerciseId} title={moment.exerciseId?undefined:'Puzzle creati solo per i tre errori più costosi'} onClick={()=>moment.exerciseId&&actions.onPuzzle(moment.exerciseId)}>Puzzle</button>
-            <button disabled={!moment.preventionId} title={moment.preventionId?undefined:'Solo per i blunder che rendono la posizione difficile da difendere'} onClick={()=>moment.preventionId&&actions.onPrevention(moment.preventionId)}>Blunder prevention</button>
+            <button disabled={!moment.preventionId} title={moment.preventionId?undefined:'Solo per i blunder che costano almeno 20 punti di punteggio atteso'} onClick={()=>moment.preventionId&&actions.onPrevention(moment.preventionId)}>Blunder prevention</button>
             <button disabled={!moment.exerciseId} onClick={()=>moment.exerciseId&&actions.onDrill('personal:'+moment.exerciseId)}>Drill da qui</button>
             <button className="play-refutation" onClick={()=>actions.onPlayMistake({fen:moment.fen,move:moment.played,san:moment.playedSan})}><span aria-hidden="true">⚔</span> Gioca {moment.playedSan} contro Stockfish</button>
             <button onClick={()=>actions.onAsk({fen:moment.fen,title:`${pack.title} · ${moment.moveNumber}${moment.turn==='w'?'.':'…'}`,gameId:pack.gameId,ply:moment.ply,move:moment.played})}>Chiedi al tutor</button>
@@ -71,7 +71,7 @@ export default function GamePack({games,gameId,onGame,actions}:{games:Saved[];ga
           </div>
           <LessonForm key={moment.ply} gameId={pack.gameId} moment={moment} onSaved={()=>setReload(n=>n+1)}/>
         </section>
-        <InfoNote summary="Da dove vengono le attività">Puzzle e Blunder prevention nascono automaticamente dall’analisi: i puzzle per i tre errori più costosi, Blunder prevention per le mosse che rendono la posizione difficile da difendere. Gli altri strumenti funzionano su ogni momento.</InfoNote>
+        <InfoNote summary="Da dove vengono le attività">Puzzle e Blunder prevention nascono automaticamente dall’analisi: i puzzle per i tre errori più costosi, Blunder prevention per le mosse che costano almeno 20 punti di punteggio atteso. Gli altri strumenti funzionano su ogni momento.</InfoNote>
       </aside>
     </div>}
   </>
