@@ -1018,3 +1018,9 @@ details.panel>summary{font-weight:650;font-size:var(--fs-lg)}
 .drill-target{display:grid;gap:8px}
 @media (max-width:1100px){.drill-review-grid{grid-template-columns:1fr 1fr}.drill-review-side{grid-column:1/-1}}
 @media (max-width:680px){.drill-review-grid{grid-template-columns:1fr}}
+.opening-status{margin:6px 0;font-size:var(--fs-sm);padding-left:10px;border-left:3px solid var(--accent)}
+.opening-status span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.opening-status small{display:block;font-size:var(--fs-xs);color:var(--muted)}
+.opening-status.out-of-book{border-left-color:#c98a1b}
+.opening-status.out-of-book small{color:var(--text);font-weight:600}
+.drill-resume{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}

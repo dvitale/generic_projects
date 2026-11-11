@@ -9,6 +9,7 @@ import {evaluationSeries,evaluationText,type EvaluationPoint} from './evaluation
 import {gameAccuracy,winPercent} from './accuracy'
 import {classifyMove,MoveClassIcon,moveClassInfo,type MoveClass} from './moveClass'
 import type {Decision,Game} from './types'
+import OpeningStatus,{openingStatus} from './OpeningStatus'
 
 const kinds:MoveClass[]=['best','good','inaccuracy','error','blunder','missedMate']
 const critical:MoveClass[]=['inaccuracy','error','blunder','missedMate']
@@ -55,10 +56,13 @@ export default function DrillReview({game,onGame,onReview,onAgain,onNext}:{game:
   const first=drillPoints[0],last=drillPoints.at(-1)
   const feedback=accuracy===null?null:accuracy>=90?'Ottima prova: hai giocato con grande precisione.':accuracy>=70?'Buona prova: la maggior parte delle tue mosse era solida.':'Questa apertura va allenata ancora.'
   const serious=count.blunder+count.missedMate
+  const exit=openingStatus(game,game.version)
+  const exitPly=exit&&!exit.inBook?exit.exitPly:null
   const move=(d:Decision)=>{const f=d.fen.split(' ');return `${f[5]}${f[1]==='w'?'.':'…'} ${d.playedSan}`}
   const lost=(d:Decision)=>d.best.mate!==null||d.actual.mate!==null?'':` · perde ${(d.loss/100).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2})}`
   return <div className="drill-review" aria-label="Valutazione del drill">
     <section className="panel drill-review-head"><span className="eyebrow">VALUTAZIONE DEL DRILL</span><h2>{drill.name}</h2>
+      <OpeningStatus game={game} ply={game.version} engine={game.engineLabel??'Maia'}/>
       <p className="muted">{mine.length||drill.decisions} tue mosse analizzate · giochi col {game.playerColor==='w'?'Bianco':'Nero'} · Maia {game.elo}</p>
       {!ready&&!error&&<div role="status"><p>Stockfish analizza le tue mosse… {progress}%</p><progress value={progress} max={100}/></div>}
       {error&&<p className="alert" role="alert">{error}</p>}
@@ -80,7 +84,7 @@ export default function DrillReview({game,onGame,onReview,onAgain,onNext}:{game:
           {feedback&&<p role="status"><strong>{feedback}</strong>{serious>0&&` Attento: ${serious} ${serious===1?'errore grave':'errori gravi'}.`}</p>}
           <ul className="drill-review-counts">{kinds.map(k=><li key={k}><MoveClassIcon kind={k}/> {moveClassInfo[k].label} <b>{count[k]}</b></li>)}</ul>
           <h3>Decisioni critiche</h3>
-          {moments.length?<ol className="drill-moments">{moments.map(d=>{const k=classifyMove(d);return <li key={d.ply}><button onClick={()=>{setPlaying(false);setPly(d.ply)}} aria-label={`Vai a ${move(d)} · ${moveClassInfo[k].label}`}><MoveClassIcon kind={k}/> <b>{move(d)}</b> · {moveClassInfo[k].label}{lost(d)}{d.best.san[0]&&d.best.pv[0]!==d.played?` · meglio ${d.best.san[0]}`:''}</button></li>})}</ol>:<p className="muted">Nessuna imprecisione: ogni tua mossa ha perso meno di 0,80.</p>}
+          {moments.length?<ol className="drill-moments">{moments.map(d=>{const k=classifyMove(d);return <li key={d.ply}><button onClick={()=>{setPlaying(false);setPly(d.ply)}} aria-label={`Vai a ${move(d)} · ${moveClassInfo[k].label}`}><MoveClassIcon kind={k}/> <b>{move(d)}</b> · {moveClassInfo[k].label}{lost(d)}{d.best.san[0]&&d.best.pv[0]!==d.played?` · meglio ${d.best.san[0]}`:''}{d.ply===exitPly?' · prima mossa fuori teoria':''}</button></li>})}</ol>:<p className="muted">Nessuna imprecisione: ogni tua mossa ha perso meno di 0,80.</p>}
         </>}
       </section>
       <div className="drill-review-side">

@@ -40,6 +40,11 @@ su Lichess.
 - **Gioca**, nella partita in corso: sotto il titolo «Mosse della partita», il nome della posizione mostrata e, sotto,
   «In teoria» o «Fuori teoria dopo…»; le mosse di teoria sono in corsivo grigio. Si aggiorna a ogni mossa, perché
   ogni risposta del server porta la partita con il campo `opening` ricalcolato.
+- **Drill**, durante la sessione e nella valutazione del drill (dall'11 novembre 2026): nome della posizione e «In
+  teoria», oppure «Fuori teoria dopo…» con chi ne è uscito: tu, Maia, o nessuno dei due se la teoria del catalogo
+  finisce già dentro la linea scelta («già nella linea scelta»). Nella valutazione, la decisione critica che coincide
+  con la prima mossa fuori teoria lo dice. È un'indicazione, non un errore: la mossa non viene bloccata
+  (`web/src/OpeningStatus.tsx`).
 - **PGN esportato**: intestazioni `ECO` e `Opening`, se il PGN importato non ne aveva già.
 
 ## Limiti
@@ -105,7 +110,7 @@ tutte le mosse. Dopo la mossa 5 le nostre modalità sono diverse dalla sua, quin
 
 ## Drill delle aperture e ripasso delle linee
 
-Dall'11 novembre 2026, in **Drill → Aperture**, ci sono sette famiglie: Partita italiana, Difesa scandinava, Difesa russa
+Dall'11 novembre 2026, in **Drill → Aperture** (la prima sezione del catalogo), ci sono sette famiglie: Partita italiana, Difesa scandinava, Difesa russa
 (Petroff), Sistema London, Difesa siciliana, Difesa Caro-Kann e Gambetto di donna, con 63 linee in tutto
 (`backend/opening_lines.py`).
 

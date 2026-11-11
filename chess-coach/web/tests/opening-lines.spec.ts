@@ -39,7 +39,7 @@ test('Line review rejects a move out of book, shows the theory and ends with the
   await page.setViewportSize({width:1280,height:900})
   // The end of the line continues against Maia as a drill.
   await page.getByRole('button',{name:'Continua contro Maia da qui →'}).click()
-  await expect(page.getByText('Partita italiana: Hungarian Defense',{exact:true})).toBeVisible()
+  await expect(page.locator('.player-info strong').getByText('Partita italiana: Hungarian Defense',{exact:true})).toBeVisible()
   await expect(page.getByText(/Maia 1500 · Tocca a te/)).toBeVisible({timeout:60000})
 })
 
@@ -47,9 +47,30 @@ test('Each opening family starts a drill against Maia from the end of the chosen
   await page.goto('/?section=drill')
   await page.getByLabel('Linea di Difesa russa (Petroff)').selectOption('russa:damiano-qe2')
   await page.getByRole('button',{name:'Avvia Difesa russa (Petroff) contro Maia'}).click()
-  await expect(page.getByText('Difesa russa (Petroff): Damiano Variation, 4.Qe2',{exact:true})).toBeVisible()
+  await expect(page.locator('.player-info strong').getByText('Difesa russa (Petroff): Damiano Variation, 4.Qe2',{exact:true})).toBeVisible()
   await expect(page.locator('[data-square="e4"] img')).toBeVisible()
+  // The line goes beyond the Lichess catalogue: the exit happened inside the preset moves.
+  await expect(page.locator('.opening-status')).toContainText('già nella linea scelta')
   await page.screenshot({path:'test-results/opening-drill.png',fullPage:true})
+  // The page opens again on the catalogue, Openings first, with the drill in progress to resume.
+  await page.reload()
+  await expect(page.getByRole('heading',{name:'Aperture'})).toBeVisible()
+  const order=await page.locator('#drills-panel-catalog h2').allTextContents()
+  expect(order.indexOf('Aperture')).toBeLessThan(order.indexOf('Finali'))
+  await page.getByRole('button',{name:'Riprendi il drill →'}).click()
+  await expect(page.locator('.player-info strong').getByText('Difesa russa (Petroff): Damiano Variation, 4.Qe2',{exact:true})).toBeVisible()
+})
+
+test('The drill says at once when the theory ends and who left it',async({page})=>{
+  await page.goto('/?section=drill')
+  await page.getByLabel('Linea di Partita italiana').selectOption('italiana:giuoco-piano')
+  await page.getByRole('button',{name:'Avvia Partita italiana contro Maia'}).click()
+  const status=page.locator('.opening-status')
+  await expect(status).toContainText('C50 Italian Game: Giuoco Piano')
+  await expect(status).toContainText('In teoria')
+  await expect(page.getByText(/Maia 1500 · Tocca a te/)).toBeVisible({timeout:60000})
+  await page.locator('[data-square="h2"]').click();await page.locator('[data-square="h4"]').click()
+  await expect(status).toContainText('Fuori teoria dopo 3… Bc5 · ne sei uscito tu')
 })
 
 test('A drill as on Maia Chess: line on the board, target, extend, end and the drill review',async({page,request})=>{
@@ -66,7 +87,7 @@ test('A drill as on Maia Chess: line on the board, target, extend, end and the d
   await page.getByLabel('Durata drill').selectOption('3')
   await page.getByLabel('Linea di Partita italiana').selectOption('italiana:fried-liver')
   await page.getByRole('button',{name:'Avvia Partita italiana contro Maia'}).click()
-  await expect(page.getByText('Partita italiana: Two Knights Defense, Fried Liver Attack',{exact:true})).toBeVisible()
+  await expect(page.locator('.player-info strong').getByText('Partita italiana: Two Knights Defense, Fried Liver Attack',{exact:true})).toBeVisible()
   for(let i=0;i<3;i++)await decide()
   await expect(page.getByText('Traguardo raggiunto (3/3 mosse).')).toBeVisible()
   await page.getByRole('button',{name:'Prolunga il drill'}).click()
@@ -90,6 +111,6 @@ test('A drill as on Maia Chess: line on the board, target, extend, end and the d
   await page.screenshot({path:'test-results/drill-review-mobile.png',fullPage:true})
   await page.setViewportSize({width:1280,height:900})
   await page.getByRole('button',{name:'Rigioca la stessa linea →'}).click()
-  await expect(page.getByText('Partita italiana: Two Knights Defense, Fried Liver Attack',{exact:true})).toBeVisible()
+  await expect(page.locator('.player-info strong').getByText('Partita italiana: Two Knights Defense, Fried Liver Attack',{exact:true})).toBeVisible()
   await expect(page.getByText('0 / 3 decisioni')).toBeVisible()
 })
