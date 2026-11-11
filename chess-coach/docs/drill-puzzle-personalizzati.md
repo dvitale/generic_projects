@@ -40,7 +40,7 @@ Maia3 è basato su Transformer/Chessformer. Il riferimento iniziale a una CNN ri
 
 ### Drill
 
-- Catalogo iniziale: Italiana, Siciliana, Caro-Kann, Gambetto di donna e finale re e torre contro re.
+- Catalogo: sette famiglie di aperture con 63 linee e il finale re e torre contro re. Dall'11 novembre 2026 le aperture hanno anche il ripasso delle mosse di teoria (`backend/opening_lines.py`, vedi [aperture.md](aperture.md#drill-delle-aperture-e-ripasso-delle-linee)). I vecchi drill `italiana`, `siciliana`, `caro-kann` e `gambetto-donna` restano avviabili per identificativo (piani del tutor), ma non compaiono più nel catalogo.
 - Posizioni personali ricavate dagli esercizi creati nelle revisioni. Il colore coincide con chi doveva decidere nella partita originale.
 - **Fine della teoria**: fino a tre drill dall'ultima posizione di teoria della partita più recente di un'apertura del tuo repertorio, prima quelle da curare e poi le più giocate; colore e mosse precedenti sono quelli della tua partita (`opening:<id partita>`, vedi `docs/aperture.md`).
 - Livello Maia, colore dove applicabile e durata da 3 a 12 decisioni del giocatore.

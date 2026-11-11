@@ -95,6 +95,15 @@ Prima di ogni risposta, cerca uno scacco avversario, una cattura e una minaccia 
 
 Passa alla pratica: [Blunder prevention](http://localhost:8033/?section=prevention) per evitare una mossa perdente, [Drill](http://localhost:8033/?section=drill) per continuare a giocare e [Progressi](http://localhost:8033/?section=progress) per rivedere gli indicatori.
 
+### Ripassare le aperture
+
+In [Drill](http://localhost:8033/?section=drill), sezione **Aperture**, trovi le famiglie che giochi: Partita italiana, Difesa scandinava, Difesa russa (Petroff), Sistema London, Difesa siciliana, Difesa Caro-Kann e Gambetto di donna. Scegli il colore nelle impostazioni in alto; tutte le tue partite finora sono col Bianco.
+
+1. **Ripassa la linea**: parti dalla posizione iniziale e giochi tu le mosse di teoria. L'avversario sceglie fra le linee selezionate, preferendo quelle che incontri nelle tue partite (la Damiano 3…Cxe4 nella Russa, la Fried Liver nell'Italiana) e quelle da ripassare. Una mossa fuori dal libro non viene giocata: vedi quella giusta e la giochi tu. In **Linee del ripasso** togli le linee che non vuoi allenare.
+2. Alla fine, **Continua contro Maia da qui** prosegue la partita dalla fine della linea, come un Drill normale. Lo stesso fa **Contro Maia** sulla scheda dell'apertura, con la linea scelta nell'elenco.
+
+Una linea ripassata senza errori né aiuti torna dopo intervalli crescenti, come i Puzzle; con un errore torna dopo quattro ore, e il piano di oggi la propone come **Ripasso linea**. Prima di ogni mossa chiediti che cosa fa la mossa di teoria: ricordare il perché resiste più a lungo della sequenza.
+
 ## 3. Studio: fissare le lezioni delle tue partite
 
 Il calendario ti fa rigiocare le posizioni. **Studio**, nella barra laterale sotto Puzzle e Problemi (sul telefono nel menu **Altro**), serve a ricordare *perché* una mossa era sbagliata e a verificarlo senza aiuti. Le sei schede usano solo partite già analizzate: le partite di confutazione contro Stockfish non compaiono. [Apri Studio](http://localhost:8033/?section=study).

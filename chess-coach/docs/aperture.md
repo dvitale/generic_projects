@@ -103,6 +103,75 @@ Lo script misura solo la varietà, non la forza. Mobile Maia ha misurato anche q
 (tutte le mosse fino alla mossa 5, poi temperatura 1 e top-p 0,95) ha fatto il 60,7% dei punti contro la scelta su
 tutte le mosse. Dopo la mossa 5 le nostre modalità sono diverse dalla sua, quindi quel dato non vale tale e quale.
 
+## Drill delle aperture e ripasso delle linee
+
+Dall'11 novembre 2026, in **Drill → Aperture**, ci sono sette famiglie: Partita italiana, Difesa scandinava, Difesa russa
+(Petroff), Sistema London, Difesa siciliana, Difesa Caro-Kann e Gambetto di donna, con 63 linee in tutto
+(`backend/opening_lines.py`).
+
+### Da dove vengono le linee
+
+La scelta segue il catalogo dei drill di Maia Chess per queste famiglie (frontend `CSSLab/maia-platform-frontend`,
+commit `91c45f3`, file `src/constants/maia_openings_expanded.json`, esaminato l'11 novembre 2026). Ci sono in più le
+linee che ricorrono nelle tue partite: Damiano 3…Cxe4 con 4.De2 nella Russa (11 partite su 14), Paris Defense e
+Anti-Fried Liver nell'Italiana, Valencian e Gubinsky-Melts nella Scandinava, Tartakower nella Caro-Kann. Sono state
+aggiunte anche le risposte di teoria a due linee dubbie: 5…Ca5 (Polerio) contro la Fried Liver e la Stafford
+accettata con 5.d3. Le mosse sono fatti scacchistici, ricontrollati qui. I testi di Maia (licenza GPL-3) non sono
+copiati: le descrizioni sono nostre. Il nome di ogni linea è quello del catalogo Lichess (CC0, `openings.tsv`) quando
+la posizione finale ne ha uno, senza il prefisso della famiglia. Le poche posizioni senza nome hanno un nome
+descrittivo, per esempio «London System, 3.e3» o «Damiano Variation, 4.Qe2».
+
+### Come funziona un drill di Maia Chess
+
+Lo si ricava dal codice (`useOpeningDrillController.ts`):
+
+1. La linea scelta è **già giocata sulla scacchiera**. Il giocatore non deve ricordare le mosse di libro: parte dalla
+   fine della linea, col colore scelto.
+2. Si giocano poi le mosse scelte contro Maia. Per le prime 6 semimosse (`DRILL_BOOK_SAMPLING_MAX_PLIES`) Maia
+   risponde pescando, con i loro pesi, le mosse di un libro di partite umane del livello scelto. Il libro sta su un
+   servizio privato del loro server (`play/get_book_moves`); poi Maia usa la propria rete.
+3. Alla fine Stockfish classifica le mosse, e Maia stima il livello che spiega meglio le scelte.
+
+### I due modi in SparringMate
+
+- **Contro Maia** (`POST /api/drills/line:<linea>/start`) fa come Maia Chess. La linea è sulla scacchiera e continui
+  tu, con livello, colore e numero di decisioni delle impostazioni. È un Drill normale: annulla, suggerimento,
+  revisione delle sole decisioni giocate dopo la linea. Le risposte di Maia sono quelle di Gioca: fino alla mossa 5
+  Maia usa tutta la sua distribuzione, addestrata su partite umane, al posto del libro privato di Maia Chess.
+- **Ripassa la linea** (`/api/opening-lines/sessions`) mette alla prova la memoria della teoria, cosa che Maia Chess
+  non fa:
+  - parti dalla posizione iniziale e giochi le mosse del tuo colore;
+  - una mossa è di libro se porta a una delle posizioni che le linee selezionate raggiungono da lì, quindi conta la
+    posizione, non l'ordine delle mosse;
+  - una mossa fuori dal libro non viene giocata: l'errore è registrato una volta per posizione, con tutte le mosse
+    provate, e compare la mossa di teoria;
+  - **Mostra la mossa di teoria** è un aiuto e conta come tale.
+
+  L'avversario risponde subito dal libro. Se il ripasso arriva dal piano, cioè da una linea in scadenza, va verso
+  quella linea. Altrimenti sceglie fra le mosse di libro con un peso per ciascuna. Il peso è la somma, sulle linee che
+  passano da quella mossa, di 1, più 2 per ogni tua partita che ha raggiunto la fine della linea, più 3 se la linea è
+  da ripassare o era stata sbagliata. Il ripasso finisce dove finisce la linea, che
+  può poi proseguire contro Maia (**Continua contro Maia da qui**). In **Linee del ripasso** scegli quali linee
+  l'avversario può giocare. Ci sono solo quelle che nessun'altra linea prolunga: la scelta resta nel browser.
+
+### Ripasso dilazionato
+
+Ogni linea completata ha uno stato per colore (`opening_line_reviews`).
+
+- Senza errori né aiuti avanza di un livello sugli intervalli dei Puzzle: 4 ore, 1, 3, 7, 14, 30, 90 e 180 giorni.
+- Con un errore o un aiuto torna al livello 0 e rientra dopo 4 ore.
+- Un ripasso fatto prima della scadenza è pratica e non cambia il calendario.
+
+Ogni ripasso entra in `training_reviews` (tipo `line`), quindi conta nelle verifiche di oggi. Le linee già ripassate
+almeno una volta tornano nel piano come **Ripasso linea**. Quelle mai ripassate non vengono prescritte: il catalogo
+si apre da Drill.
+
+In `GET /api/opening-lines?color=w|b`, per ogni linea:
+
+- `met` è il numero di tue partite col colore scelto che ne hanno raggiunto la posizione finale. Contano le partite
+  dalla posizione iniziale, esclusi drill, partite contro Stockfish e copie, e solo le prime 40 semimosse.
+- `games` è lo stesso conteggio per la posizione di partenza della famiglia.
+
 ## Prossimi passi
 
 Nessuno in corso per le aperture.

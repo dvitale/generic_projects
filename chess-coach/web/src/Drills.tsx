@@ -11,9 +11,10 @@ import { paceServerReply } from './engine/play'
 import type { Color, Game } from './types'
 import MiniBoard from './MiniBoard'
 import {useMoveSuggestion,SuggestionBox} from './MoveSuggestion'
+import {OpeningFamilies,LineReview,type LineSession,type LineStart} from './OpeningLines'
 
 interface Template { id:string; name:string; kind:string; theme:string; goal:string; reason:string; color:Color|null; fen?:string; source?:string }
-export default function Drills({onReview,startTemplateId,onStarted}:{onReview:(game:Game)=>void;startTemplateId?:string|null;onStarted?:()=>void}) {
+export default function Drills({onReview,startTemplateId,onStarted,startLineId,onLineStarted}:{onReview:(game:Game)=>void;startTemplateId?:string|null;onStarted?:()=>void;startLineId?:string|null;onLineStarted?:()=>void}) {
   const [view,setView]=useState('catalog')
   const [catalog,setCatalog]=useState<Template[]>([])
   const [game,setGame]=useState<Game|null>(null)
@@ -25,6 +26,8 @@ export default function Drills({onReview,startTemplateId,onStarted}:{onReview:(g
   const [thinking,setThinking]=useState(false)
   const [error,setError]=useState('')
   const [retry,setRetry]=useState(0)
+  const [line,setLine]=useState<LineSession|null>(null)
+  const [lineStart,setLineStart]=useState<LineStart|null>(null)
   const botController=useRef<AbortController|null>(null)
   const hint=useMoveSuggestion(view==='session'?game:null)
   const moveTime=useMoveTime(game,view==='session'&&!!game&&!game.result&&!game.drill?.complete)
@@ -32,7 +35,10 @@ export default function Drills({onReview,startTemplateId,onStarted}:{onReview:(g
   function keep(g:Game,newTurn=false){if(newTurn)moveTime.begin(g);setGame(g);localStorage.setItem('chess-coach-drill',g.id)}
   useEffect(()=>{
     api<Template[]>('/drills').then(setCatalog).catch(fail)
+    if(startLineId){const [family,slug,color]=startLineId.split(':');startLine({target:`${family}:${slug}`,color:color==='b'?'b':'w'}).then(()=>onLineStarted?.());return}
     if(startTemplateId){start(startTemplateId).then(()=>onStarted?.());return}
+    const lineId=localStorage.getItem('chess-coach-line')
+    if(lineId)api<LineSession>('/opening-lines/sessions/'+lineId).then(s=>{if(s.status==='active'){setLine(s);setView('lines')}}).catch(()=>localStorage.removeItem('chess-coach-line'))
     const id=localStorage.getItem('chess-coach-drill')
     if(id)api<Game>('/games/'+id).then(g=>{keep(g);setView('session')}).catch(()=>localStorage.removeItem('chess-coach-drill'))
   },[])
@@ -62,6 +68,11 @@ export default function Drills({onReview,startTemplateId,onStarted}:{onReview:(g
     try{keep(await api<Game>(`/drills/${encodeURIComponent(id)}/start`,{color,elo,target}),true);setView('session')}
     catch(e){fail(e)}finally{setBusy(false)}
   }
+  async function startLine(body:LineStart){
+    setBusy(true);setError('')
+    try{const s=await api<LineSession>('/opening-lines/sessions',body);setLine(s);setLineStart(body);localStorage.setItem('chess-coach-line',s.id);setView('lines')}
+    catch(e){fail(e)}finally{setBusy(false)}
+  }
   async function move(move:string){
     if(!game||busy)return
     setBusy(true);setError('')
@@ -70,7 +81,7 @@ export default function Drills({onReview,startTemplateId,onStarted}:{onReview:(g
   }
   return <div>
     {error&&<div className="alert" role="alert">{error}<button onClick={()=>{setError('');setRetry(n=>n+1)}}>Riprova</button></div>}
-    <PanelTabs id="drills" label="Pannelli dei drill" value={view} onChange={setView} items={[{id:'catalog',label:'Scegli un drill'},{id:'session',label:'Sessione'}]}/>
+    <PanelTabs id="drills" label="Pannelli dei drill" value={view} onChange={setView} items={[{id:'catalog',label:'Scegli un drill'},{id:'session',label:'Sessione'},{id:'lines',label:'Ripasso linea'}]}/>
     <div role="tabpanel" id="drills-panel-session" aria-labelledby="drills-tab-session" hidden={view!=='session'}>
     {!game&&<section className="panel"><p>Scegli un drill per iniziare una sessione.</p><button onClick={()=>setView('catalog')}>Scegli un drill</button></section>}
     {game?.drill&&<div className="training-layout">
@@ -82,15 +93,19 @@ export default function Drills({onReview,startTemplateId,onStarted}:{onReview:(g
       </section>
       <aside className="coach-column"><section className="panel"><span className="eyebrow">PRATICA DI UNA SEQUENZA</span><h2>{game.drill.theme}</h2><p>{game.drill.goal}</p><p className="drill-count">{game.drill.decisions} / {game.drill.target} decisioni</p><progress value={game.drill.decisions} max={game.drill.target}/><button className="full" disabled={busy||!game.canUndo} onClick={undo}>Annulla ultima mossa</button><p className="muted">La revisione valuta solo le tue decisioni dopo la posizione iniziale del drill.</p><button className="primary full" disabled={busy||thinking||game.version===game.drill.startPly} onClick={()=>onReview(game)}>{game.drill.complete?'Rivedi il drill':'Rivedi fin qui'} →</button>{game.drill.complete&&<p role="status">Drill completato. Verifica le tue scelte prima di ripartire.</p>}</section><PgnExport game={game}/></aside>
     </div>}
+    </div><div role="tabpanel" id="drills-panel-lines" aria-labelledby="drills-tab-lines" hidden={view!=='lines'}>
+    {!line&&<section className="panel"><p>Scegli un’apertura e premi <strong>Ripassa la linea</strong>: giocherai tu le mosse di teoria dalla posizione iniziale.</p><button onClick={()=>setView('catalog')}>Scegli un’apertura</button></section>}
+    {line&&<LineReview key={line.id} session={line} onSession={setLine} onDrill={id=>void start(id)} onRestart={()=>void startLine(lineStart??{family:line.family,color:line.color})}/>}
     </div><div role="tabpanel" id="drills-panel-catalog" aria-labelledby="drills-tab-catalog" hidden={view!=='catalog'}>
-    <section className="panel drill-settings"><span className="eyebrow">IMPOSTAZIONI</span><h2>Avversario e durata</h2><div className="row"><label>Livello Maia <select aria-label="Livello drill" value={elo} onChange={e=>setElo(Number(e.target.value))}>{[800,1000,1200,1500,1800,2100,2400].map(n=><option key={n}>{n}</option>)}</select></label><label>Colore <select value={color} onChange={e=>setColor(e.target.value as Color)}><option value="w">Bianco</option><option value="b">Nero</option></select></label><label>Tue decisioni <select aria-label="Durata drill" value={target} onChange={e=>setTarget(Number(e.target.value))}>{[3,5,8,12].map(n=><option key={n}>{n}</option>)}</select></label></div><p className="footnote">Nelle tue posizioni critiche e nel finale di torre il colore è fissato dall'obiettivo. Le sessioni restano nell'archivio.</p></section>
+    <section className="panel drill-settings"><span className="eyebrow">IMPOSTAZIONI</span><h2>Avversario e durata</h2><div className="row"><label>Livello Maia <select aria-label="Livello drill" value={elo} onChange={e=>setElo(Number(e.target.value))}>{[800,1000,1200,1500,1800,2100,2400].map(n=><option key={n}>{n}</option>)}</select></label><label>Colore <select value={color} onChange={e=>setColor(e.target.value as Color)}><option value="w">Bianco</option><option value="b">Nero</option></select></label><label>Tue decisioni <select aria-label="Durata drill" value={target} onChange={e=>setTarget(Number(e.target.value))}>{[3,5,8,12].map(n=><option key={n}>{n}</option>)}</select></label></div><p className="footnote">Il colore vale per le aperture; nelle tue posizioni critiche e nel finale di torre è fissato dall'obiettivo. Le sessioni restano nell'archivio.</p></section>
     {(()=>{
-      const personal=catalog.filter(t=>t.kind==='personal'),openings=catalog.filter(t=>t.kind!=='personal'&&t.kind!=='endgame'),endgames=catalog.filter(t=>t.kind==='endgame')
+      const personal=catalog.filter(t=>t.kind==='personal'),endgames=catalog.filter(t=>t.kind==='endgame')
       const card=(t:Template)=><article className="panel drill-card" key={t.id}>{t.fen&&<MiniBoard fen={t.fen} orientation={t.color??'w'}/>}<div className="drill-card-body"><h3>{t.name}</h3><p>{t.goal}</p><p className="footnote">{t.reason}</p></div><button aria-label={`Avvia ${t.name}`} disabled={busy||thinking} onClick={()=>start(t.id)}>Avvia →</button></article>
       return <>
         {personal.length>0&&<section className="panel drill-personal"><div className="section-head"><div><span className="eyebrow">DALLE TUE PARTITE</span><h2>Le tue posizioni critiche</h2></div><span className="count-chip">{personal.length}</span></div><p className="muted">Riparti da un momento in cui hai sbagliato: trova una buona mossa e continua il piano contro Maia.</p>
           <div className="position-grid">{personal.map(t=><button key={t.id} className="position-tile" aria-label={`Avvia ${t.name} · ${t.theme}`} disabled={busy||thinking} onClick={()=>start(t.id)}>{t.fen&&<MiniBoard fen={t.fen} orientation={t.color??'w'}/>}<strong>{t.theme}</strong>{t.source&&<small>{t.source}</small>}</button>)}</div></section>}
-        {openings.length>0&&<><h2 className="group-title">Aperture</h2><div className="drill-catalog">{openings.map(card)}</div></>}
+        <h2 className="group-title">Aperture</h2><p className="muted group-intro"><strong>Contro Maia</strong> parte dalla fine della linea scelta, già giocata sulla scacchiera. <strong>Ripassa la linea</strong> ti fa giocare le mosse di teoria dalla posizione iniziale.</p>
+        <OpeningFamilies color={color} disabled={busy||thinking} onDrill={id=>void start(id)} onReview={body=>void startLine(body)}/>
         {endgames.length>0&&<><h2 className="group-title">Finali</h2><div className="drill-catalog">{endgames.map(card)}</div></>}
       </>
     })()}

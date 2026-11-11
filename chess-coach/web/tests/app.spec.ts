@@ -37,7 +37,8 @@ test('Real Maia play, black orientation, drill and mobile layout',async({page,re
   expect(black.version).toBe(1);expect(black.playerColor).toBe('b')
   await page.getByRole('button',{name:'Drill',exact:true}).click()
   await page.getByLabel('Durata drill').selectOption('3')
-  await page.getByRole('button',{name:'Avvia Partita italiana'}).click()
+  await page.getByLabel('Linea di Partita italiana').selectOption('italiana:giuoco-piano')
+  await page.getByRole('button',{name:'Avvia Partita italiana contro Maia'}).click()
   for(let i=0;i<3;i++){
     await expect(page.getByText(/Maia 1500 · Tocca a te/)).toBeVisible({timeout:60000})
     const drillId=await page.evaluate(()=>localStorage.getItem('chess-coach-drill'))

@@ -32,6 +32,7 @@ from . import problems
 from . import diagnosis
 from . import piece_moves
 from . import puzzle_history
+from . import opening_lines
 from . import gaps
 from . import auth
 from .maia import maia as maia_server
@@ -131,6 +132,7 @@ def init_db():
                 con.execute(f"ALTER TABLE attempts ADD COLUMN {name} {declaration}")
         puzzle_history.migrate(con)
         prevention.init_schema(con)
+        opening_lines.init_schema(con)
         mistakes.init_schema(con)
         training_schedule.init_schema(con)
         learning.init_schema(con)
@@ -1500,6 +1502,13 @@ def start_drill(template_id: str, body: DrillInput):
             raise HTTPException(404, "Apertura non riconosciuta")
         initial, moves = row["initial_fen"], json.loads(row["moves"])[:opening["bookPlies"]]
         template = {**opening_exit_drill({'family': openings.family(opening['name'])}), "color": row["player_color"]}
+    elif template_id.startswith("line:"):
+        line = opening_lines.LINE.get(template_id.removeprefix("line:"))
+        if line is None:
+            raise HTTPException(404, "Linea non trovata")
+        initial, moves = chess.STARTING_FEN, line["moves"]
+        template = {"name": f"{opening_lines.FAMILY[line['family']]['name']}: {line['name']}", "theme": "Dopo la linea di teoria",
+                    "goal": "La linea finisce qui: continua con un piano coerente con l’apertura e controlla scacchi, catture e minacce."}
     elif template_id.startswith("personal:"):
         with database() as con:
             ex = find_exercise(con, template_id.removeprefix("personal:"))
@@ -1640,6 +1649,8 @@ alternatives.install(app, database, now, find_game, PLAYABLE,
                      lambda game_id, move, version, revision: make_move(game_id, MoveInput(move=move, version=version, actor='human', revision=revision)),
                      lambda: DB_PATH.parent / problems.PUZZLES_FILE)
 training_schedule.PROVIDERS.append(alternatives.plan_rows)
+opening_lines.install(app, database, now)
+training_schedule.PROVIDERS.append(opening_lines.plan_rows)
 
 DIST = ROOT / "web" / "dist"
 @app.get('/api/training-guide')
