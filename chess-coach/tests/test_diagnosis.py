@@ -145,7 +145,20 @@ def test_hints_for_a_quiet_solution_never_point_to_checks_and_captures(client):
     found = diagnosis.solution_of(board)
     first, second = diagnosis.hints(board, found)
     assert found['kind'] == 'prophylaxis' and first['title'] == 'Profilassi' and first['text'].startswith('Non è uno scacco né una cattura')
-    assert second['squares'] == [chess.square_name(chess.Move.from_uci(found['move']).from_square)] and second['text'].endswith('L’idea da fermare è Ra1+.')
+    # The opponent's idea is named in the first hint, with Stockfish's line from the passed move.
+    assert 'idea migliore del Nero. Se toccasse al Nero, Stockfish giocherebbe 1… Ra1+' in first['text']
+    assert second['squares'] == [chess.square_name(chess.Move.from_uci(found['move']).from_square)] and second['text'].endswith('è il pezzo che muove.')
+
+
+def test_a_prophylactic_move_names_the_line_it_closes():
+    # Puzzle 16-25B: 25. c5 cuts the a7 bishop off d4, e3 and f2, next to White's king, and leaves it no active square.
+    board = chess.Board('3q1rk1/b4pp1/3Np1np/1R2P3/2P1Q3/7P/P2B1PP1/6K1 w - - 5 25')
+    assert diagnosis.blocked(board, chess.Move.from_uci('c4c5')) == {
+        'piece': 'B', 'square': 'a7', 'lost': ['d4', 'e3', 'f2'], 'near': ['f2'], 'king': True}
+    found = {'move': 'c4c5', 'kind': 'prophylaxis', 'stopped': {'san': 'f5', 'before': {'pv': ['f7f5', 'e4d3', 'g8h7', 'd3c3', 'd8h4']}}}
+    first, last = diagnosis.hints(board, found)
+    assert 'Stockfish giocherebbe 25… f5 26. Qd3 Kh7 27. Qc3 Qh4.' in first['text']
+    assert last['text'] == 'Guarda il tuo pedone in c4: è il pezzo che muove. Il pezzo avversario da frenare è l’alfiere in a7.'
 
 
 def test_obstacle_is_stored_and_missed_solutions_are_counted_by_kind(stocked):

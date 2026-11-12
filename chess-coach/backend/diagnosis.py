@@ -136,13 +136,53 @@ def solution(board, best, threat):
         if stopped in after.legal_moves:
             line = player_view(evaluator.evaluate(after, stopped, nodes=NODES))
             if value(line) - value(threat['evaluation']) >= PROPHYLAXIS_CP:
-                return {**found, 'kind': 'prophylaxis', 'stopped': {'san': threat['san'], 'before': threat['evaluation'], 'after': line}}
+                return {**found, 'kind': 'prophylaxis', 'stopped': {'san': threat['san'], 'before': threat['evaluation'], 'after': line},
+                        'blocked': blocked(board, move)}
     moved = board.piece_at(move.from_square)
     before, later = insights.features(board, board.turn), insights.features(after, board.turn)
     facts = {'piece': moved.symbol().upper(), 'reach': [before['pieceReach'], later['pieceReach']],
              'openRooks': later['openRooks'] if later['openRooks'] != before['openRooks'] else None,
              'center': later['center'] if len(later['center']) > len(before['center']) else None}
     return {**found, 'kind': 'improvement', 'facts': facts}
+
+
+def blocked(board, move):
+    """The opponent's line piece whose reach the solution cuts the most: the squares it no longer attacks, those next to
+    the player's king or holding the player's pieces first. A board fact, so it names what the prophylaxis changes."""
+    me, after = board.turn, board.copy(stack=False)
+    after.push(move)
+    king, best = board.king(me), None
+    for square in chess.SquareSet(board.occupied_co[not me]):
+        piece = board.piece_at(square)
+        if piece.piece_type not in (chess.BISHOP, chess.ROOK, chess.QUEEN):
+            continue
+        lost = board.attacks(square) & ~after.attacks(square)
+        if not lost:
+            continue
+        near = [s for s in lost if king is not None and chess.square_distance(s, king) <= 1 or board.color_at(s) == me]
+        key = (len(near), len(lost))
+        if best is None or key > best[0]:
+            ordered = sorted(lost, key=lambda s: chess.square_distance(s, square))
+            best = (key, {'piece': piece.symbol().upper(), 'square': chess.square_name(square),
+                          'lost': [chess.square_name(s) for s in ordered], 'near': [chess.square_name(s) for s in near],
+                          'king': king is not None and any(chess.square_distance(s, king) <= 1 for s in near)})
+    return best[1] if best else None
+
+
+def idea_line(board, stopped, plies=5):
+    """The opponent's best idea with a free move, as numbered SAN from the position after the pass."""
+    passed = threat_board(board)
+    pv = (stopped.get('before') or {}).get('pv') or []
+    if passed is None or not pv:
+        return stopped['san']
+    out, cursor = [], passed.copy(stack=False)
+    for i, uci in enumerate(pv[:plies]):
+        move = chess.Move.from_uci(uci)
+        if move not in cursor.legal_moves:
+            break
+        out.append(explain.label(cursor, move) if i == 0 or cursor.turn else cursor.san(move))
+        cursor.push(move)
+    return ' '.join(out) or stopped['san']
 
 
 def solution_of(board, move=None):
@@ -282,8 +322,11 @@ def hints(board, found, tempt=None, choices=None):
         first = ('Non è uno scacco né una cattura: è una mossa tranquilla che prepara una minaccia, e l’avversario dovrà occuparsene. '
                  'Chiediti: se potessi muovere due volte di fila, che cosa giocheresti?')
     elif kind == 'prophylaxis':
-        first = ('Non è uno scacco né una cattura: la mossa giusta toglie forza all’idea migliore dell’avversario. '
-                 'Prima di cercare la tua mossa, chiediti che cosa giocherebbe lui se toccasse a lui.')
+        # The opponent's idea is named at once: guessing it is the point of the method, not of the hint.
+        side = 'il Nero' if board.turn else 'il Bianco'
+        first = (f"Non è uno scacco né una cattura: la mossa giusta toglie forza all’idea migliore {explain.articled('del', side)}. "
+                 f"Se toccasse {explain.articled('al', side)}, Stockfish giocherebbe {idea_line(board, found['stopped'])}. "
+                 'Cerca la mossa che rende quell’idea meno efficace.')
     else:
         first = ('Non c’è un colpo tattico: la mossa giusta migliora un pezzo. '
                  'Cerca il tuo pezzo meno attivo e chiediti su quale casa lavorerebbe meglio.')
@@ -291,8 +334,9 @@ def hints(board, found, tempt=None, choices=None):
     square = chess.square_name(move.from_square)
     name, _, gender = explain.NAMES[board.piece_at(move.from_square).piece_type]
     second = f"Guarda {'la tua' if gender == 'f' else 'il tuo'} {name} in {square}: è il pezzo che muove."
-    if kind == 'prophylaxis':
-        second += f" L’idea da fermare è {found['stopped']['san']}."
+    if kind == 'prophylaxis' and (cut := found.get('blocked') or blocked(board, move)):
+        piece = chess.Piece.from_symbol(cut['piece'].lower() if board.turn else cut['piece'])
+        second += f" Il pezzo avversario da frenare è {explain.the(piece)} in {cut['square']}."
     given = [{'level': 1, 'title': HINT_TITLES[kind], 'text': first}]
     if tempt:
         given.append({'level': 2, 'title': 'La mossa che tenta', 'text': tempt['text'], 'fen': board.fen(), 'line': tempt['line']})
@@ -355,6 +399,10 @@ def classify(board, accepts, answer):
 
 def public(row):
     evidence = json.loads(row['evidence'])
+    found = evidence.get('solution')
+    # Diagnoses saved before `blocked` existed get it from the board, without a new search.
+    if found and found.get('kind') == 'prophylaxis' and 'blocked' not in found:
+        found['blocked'] = blocked(chess.Board(row['fen']), chess.Move.from_uci(found['move']))
     return {'id': row['id'], 'kind': row['kind'], 'createdAt': row['created_at'], 'answer': json.loads(row['answer']),
             'evidence': evidence, 'search': row['search'], 'reading': json.loads(row['reading']),
             'ruleVersion': row['rule_version'], 'points': points.breakdown(row['fen'], evidence['best']) if evidence.get('best') else None}

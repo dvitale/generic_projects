@@ -152,6 +152,22 @@ test('the diagnosis before the solution counts the failed attempts as candidates
   await expect(diagnosis).toContainText('Hai provato Qg8+, che non risolve: la mossa buona non era fra le tue candidate.',{timeout:30000})
   // Mate in one: the score comes from the king, not from the material.
   await expect(diagnosis.getByLabel('Da dove vengono i punti')).toContainText('Matto a tuo favore in 1')
+  // A prophylactic solution, as in puzzle 16-25B (25. c5 against ...f5), says which line it closes.
+  await page.route('**/api/diagnoses',async route=>{
+    const saved=await(await route.fetch()).json()
+    const ev={cp:300,mate:null,pv:[],san:[],perspective:'w'}
+    saved.evidence.solution={move:'c4c5',san:'c5',line:[],kind:'prophylaxis',stopped:{san:'f5',before:ev,after:{...ev,cp:630}},
+      blocked:{piece:'B',square:'a7',lost:['d4','e3','f2'],near:['f2'],king:true}}
+    await route.fulfill({json:saved})
+  })
+  await page.reload()
+  await page.getByRole('button',{name:/^Puzzle/}).click()
+  await page.getByRole('button',{name:'Mostra soluzione',exact:true}).click()
+  const again=page.getByRole('region',{name:'Diagnosi dell’errore'})
+  await again.getByLabel('Come valuti la posizione?').selectOption('much_better')
+  await again.getByRole('button',{name:'Non vedo minacce'}).click()
+  await again.getByRole('button',{name:'Confronta e mostra la soluzione'}).click()
+  await expect(again.locator('.diagnosis-solution')).toContainText('Il perché sulla scacchiera: c5 chiude la linea dell’alfiere in a7, che non arriva più a d4, e3 e f2, accanto al tuo re.',{timeout:30000})
 })
 
 test('a closed puzzle can be retried from the start without recording the moves',async({page,request})=>{
@@ -208,3 +224,4 @@ test('hints name the kind of move first, then highlight the piece that plays it'
   await expect(page.locator('[data-square="g6"]')).toHaveClass(/hint-square/)
   await expect(page.getByRole('button',{name:'Un altro indizio'})).toBeDisabled()
 })
+

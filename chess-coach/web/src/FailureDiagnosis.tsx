@@ -11,7 +11,7 @@ type Move={uci:string;san:string}
 type Context={existing:Diagnosis|null;fen?:string;color?:Color;playerMoves?:Move[];tried?:Move[];threatFen?:string|null;threatMoves?:Move[]}
 type Answer={assessment:string;confidence:string;fearedLost:boolean;threat:string|null;candidate:string|null;candidateReason:string|null;obstacle?:string|null;note:string}
 type Solution={kind:'forcing'|'quiet_threat'|'prophylaxis'|'improvement';san:string;line:string[];gain:{ply:number;san:string[]}|null;forcing?:string[];
-  threat?:{san:string;evaluation:Evaluation};stopped?:{san:string;before:Evaluation;after:Evaluation};facts?:{piece:string;reach:[number,number];openRooks:string[]|null;center:string[]|null}}
+  threat?:{san:string;evaluation:Evaluation};stopped?:{san:string;before:Evaluation;after:Evaluation};blocked?:{piece:string;square:string;lost:string[];near:string[];king:boolean}|null;facts?:{piece:string;reach:[number,number];openRooks:string[]|null;center:string[]|null}}
 type Evidence={best:Evaluation;engineBand:string;bandGap:number;tried?:string[];
   threat:{real:boolean;evaluation:Evaluation;san:string|null}|null;
   statedThreat?:{san:string;evaluation:Evaluation;concrete:boolean};
@@ -36,6 +36,8 @@ export const solutionLabels:Record<Solution['kind'],{title:string;practice:strin
   prophylaxis:{title:'Profilassi',practice:'Quando sei in vantaggio e nulla sembra funzionare, chiediti cosa giocherebbe l’avversario se toccasse a lui, e impediscilo: spesso l’unico modo di perdere il vantaggio è il suo controgioco.'},
   improvement:{title:'Miglioramento posizionale',practice:'Senza tattiche immediate, cerca il tuo pezzo peggiore e chiediti dove sarebbe più attivo; confronta le candidate guardando la posizione dopo 3–4 mosse, non dopo la prima.'},
 }
+const lineOf:Record<string,string>={B:'dell’alfiere',R:'della torre',Q:'della donna'}
+const listSquares=(q:string[])=>q.length>1?`${q.slice(0,-1).join(', ')} e ${q.at(-1)}`:q[0]
 const pieceNames:Record<string,string>={K:'il re',Q:'la donna',R:'la torre',B:'l’alfiere',N:'il cavallo',P:'il pedone'}
 const bandLabel=(id:string)=>bands.find(b=>b[0]===id)?.[1]??id
 
@@ -64,7 +66,7 @@ function describeSolution(d:Diagnosis,s:Solution,color:Color){
   switch(s.kind){
     case 'forcing':text=`${s.san} è ${s.forcing?.includes('check')?'uno scacco':s.forcing?.includes('capture')?'una cattura':'una promozione'}: una mossa forzante.${gain}`;break
     case 'quiet_threat':text=`${s.san} non dà scacco e non cattura, ma minaccia ${s.threat!.san} (${objectiveScore(s.threat!.evaluation,color)} se l’avversario non reagisse): l’avversario deve rispondere a quella minaccia.${gain}`;break
-    case 'prophylaxis':text=`${s.san} toglie all’avversario ${s.stopped!.san}: con una mossa libera la valutazione passerebbe a ${objectiveScore(s.stopped!.before,color)}, dopo ${s.san} resta ${objectiveScore(s.stopped!.after,color)}.${gain}`;break
+    case 'prophylaxis':text=`${s.san} toglie all’avversario ${s.stopped!.san}: con una mossa libera la valutazione passerebbe a ${objectiveScore(s.stopped!.before,color)}, dopo ${s.san} resta ${objectiveScore(s.stopped!.after,color)}.${s.blocked?` Il perché sulla scacchiera: ${s.san} chiude la linea ${lineOf[s.blocked.piece]??'del pezzo'} in ${s.blocked.square}, che non arriva più a ${listSquares(s.blocked.lost)}${s.blocked.king?', accanto al tuo re':''}.`:''}${gain}`;break
     case 'improvement':{const f=s.facts!,more=[f.reach[1]-f.reach[0]>=3?`la portata dei tuoi pezzi passa da ${f.reach[0]} a ${f.reach[1]} case`:'',f.openRooks?.length?`torre su colonna aperta (${f.openRooks.join(', ')})`:'',f.center?.length?`controllo del centro (${f.center.join(', ')})`:''].filter(Boolean)
       text=`${s.san} sposta ${pieceNames[f.piece]??'un pezzo'} senza scacchi, catture o minacce immediate${more.length?`: ${more.join('; ')}`:''}.${gain||` Nella variante di Stockfish (${s.line.slice(0,6).join(' ')}) non c’è guadagno di materiale a breve: il vantaggio è nella posizione.`}`}
   }

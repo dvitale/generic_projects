@@ -12,7 +12,7 @@ Vedi `docs/diagnosi-errori.md`, sezione «Indizi dei Puzzle». In breve:
 
 - livello 1, **tipo di mossa**: forzante (scacco, cattura, promozione), mossa tranquilla con minaccia, profilassi,
   miglioramento posizionale;
-- livello 2, **dove guardare**: il pezzo che muove, evidenziato sulla scacchiera (per la profilassi anche l'idea dell'avversario);
+- livello 2, **dove guardare**: il pezzo che muove, evidenziato sulla scacchiera (per la profilassi il pezzo avversario da frenare; l'idea dell'avversario è già nel livello 1);
 - il tipo di soluzione resta registrato nella sessione (`puzzle_sessions.solution`) ogni volta che il giocatore chiede
   un indizio o la soluzione: è il dato da cui partono le fasi 2 e 3.
 
