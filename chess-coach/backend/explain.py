@@ -17,14 +17,14 @@ TITLES = {'mate': 'Matto contro', 'missed_mate': 'Matto non visto', 'hanging': '
           'undefended': 'Difesa tolta', 'ignored_threat': 'Minaccia non parata', 'opened_line': 'Linea aperta',
           'skewer': 'Infilata', 'fork': 'Attacco doppio', 'trapped': 'Pezzo intrappolato',
           'discovered': 'Attacco di scoperta', 'pin': 'Inchiodatura', 'promotion': 'Promozione avversaria',
-          'material': 'Perdita di materiale', 'missed_gain': 'Occasione mancata', 'king': 'Re esposto', 'positional': 'Svantaggio di posizione',
+          'material': 'Perdita di materiale', 'pressure': 'Pezzo inchiodato', 'missed_gain': 'Occasione mancata', 'king': 'Re esposto', 'positional': 'Svantaggio di posizione',
           'engine': 'Deriva dalla linea di Stockfish'}
 MIN_LOSS = 80
 # Queen paper (arXiv 2610.03695): the better move is presented as the point only when it beats every other choice by
 # UNIQUE expected score; otherwise several moves were good and the text says so instead of claiming its motif.
 UNIQUE = 0.05
 # Motifs whose sentence names only the attempted line, never the better move: safe before a solution is revealed.
-SAFE_MOTIFS = {'mate', 'hanging', 'undefended', 'ignored_threat', 'skewer', 'fork', 'trapped', 'discovered', 'pin', 'promotion', 'material', 'king'}
+SAFE_MOTIFS = {'mate', 'hanging', 'undefended', 'ignored_threat', 'skewer', 'fork', 'trapped', 'discovered', 'pin', 'pressure', 'promotion', 'material', 'king'}
 
 
 def the(piece):
@@ -287,6 +287,41 @@ def refutation(board, played, positions, pv, lost):
     return None
 
 
+COUNTS = {1: 'uno', 2: 'due', 3: 'tre', 4: 'quattro'}
+
+
+def pawn_damage(end, best_end, me):
+    """Pawn weaknesses of `me` at the end of the played line that the better line does not leave."""
+    def doubled(board):
+        files = [chess.square_file(s) for s in board.pieces(chess.PAWN, me)]
+        return {f for f in files if files.count(f) > 1}
+    reasons = []
+    if new := sorted(doubled(end) - doubled(best_end)):
+        reasons.append('pedoni doppiati in colonna ' + ' e '.join(chess.FILE_NAMES[f] for f in new))
+    isolated = [s for s in features(end, me)['isolated'] if s not in features(best_end, me)['isolated']]
+    # Doubled pawns that are also isolated are already named once.
+    isolated = [s for s in isolated if chess.FILE_NAMES.index(s[0]) not in doubled(end)]
+    if isolated:
+        reasons.append(('un pedone isolato in ' if len(isolated) == 1 else 'pedoni isolati in ') + ', '.join(isolated))
+    return reasons
+
+
+def pressure(positions, pv, me):
+    """The reply pins a piece of `me` to the king and attacks it more than it is defended: nothing is lost yet,
+    but saving the piece costs what the rest of the line shows. Returns (square, attackers, defenders) or None."""
+    if len(positions) < 4:
+        return None
+    after, answer = positions[1], positions[2]
+    for square in chess.SquareSet(answer.occupied_co[me]):
+        piece = answer.piece_at(square)
+        if piece.piece_type in (chess.PAWN, chess.KING) or not answer.is_pinned(me, square) or after.is_pinned(me, square):
+            continue
+        attackers, defenders = len(answer.attackers(not me, square)), len(answer.attackers(me, square))
+        if attackers > defenders and chess.Move.from_uci(pv[1]).to_square != square:
+            return square, attackers, defenders
+    return None
+
+
 def positional(board, played, best_move, opponent):
     me = board.turn
     after, alternative = board.copy(stack=False), board.copy(stack=False)
@@ -361,6 +396,16 @@ def explain(fen, played, best, actual, choices=None):
                   and not ((p := positions[i].piece_at(chess.Move.from_uci(pv[i]).to_square)) and value(p) >= 3)]
         if len(checks) >= 2:
             motif, text = 'king', f"Dopo {san} il tuo re resta esposto: {opponent} prende l’iniziativa con una serie di scacchi ({line_text})."
+        elif pinned := pressure(positions, pv, me):
+            square, attackers, defenders = pinned
+            piece, reply = positions[2].piece_at(square), chess.Move.from_uci(pv[1])
+            damage = pawn_damage(shown[-1], best_shown[-1], me)
+            cost = f" e ti restano {' e '.join(damage)}" if damage else ''
+            motif, focus = 'pressure', [chess.square_name(square), chess.square_name(reply.to_square)]
+            text = (f"Dopo {san}, {label(positions[1], reply)} inchioda {the(piece)} in {chess.square_name(square)} al re: è "
+                    f"{agree(piece, 'attaccat')} da {COUNTS.get(attackers, attackers)} pezzi e {agree(piece, 'difes')} da "
+                    f"{COUNTS.get(defenders, defenders) if defenders else 'nessuno'}{' solo' if defenders == 1 else ''}. "
+                    f"Non perdi materiale subito, ma per salvarlo devi accettare questa linea: {sans(shown, shown_pv, 2, len(shown_pv))}{cost}.")
         elif reasons := positional(board, played, best_pv[0], opponent):
             motif, text = 'positional', f"Non perdi materiale subito, ma rispetto a {best_san} la tua mossa {' e '.join(reasons)}: è uno svantaggio che pesa più avanti."
         else:

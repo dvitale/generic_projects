@@ -74,7 +74,7 @@ def test_small_losses_and_best_moves_have_no_explanation():
 def test_insights_carry_the_explanation():
     b = chess.Board('4r1k1/5ppp/8/4B3/8/8/5PPP/6K1 w - - 0 1')
     result = insights.public(insights.compare(b.fen(), 'h2h3', value(b, ['e5c3', 'e8e2'], 0), value(b, ['h2h3', 'e8e5'], -400)))
-    assert insights.VERSION == 9 and result['explanation']['motif'] == 'ignored_threat'
+    assert insights.VERSION == 10 and result['explanation']['motif'] == 'ignored_threat'
 
 
 def test_a_line_cut_in_the_middle_of_an_exchange_does_not_hide_a_lost_piece():
@@ -140,3 +140,14 @@ def test_a_recapture_that_opens_the_file_to_the_rook_is_not_a_trapped_knight():
     assert result['motif'] == 'opened_line' and result['focus'] == ['a3', 'a1']
     assert result['text'] == ('Dopo b4, 7… Bxb4 prende un pedone: se lo riprendi con 8. axb4 liberi la linea a5–a1 '
                               'e 8… Qxa1 cattura la torre.')
+
+
+def test_a_pin_that_wins_nothing_yet_is_named_with_what_saving_the_piece_costs():
+    # Game 142, 10. Nc3?: 10... Bb4 pins the knight to the king, Ne4 attacks it too; a3 Bxc3+ bxc3 saves the material
+    # but leaves doubled c-pawns and an isolated a-pawn, which 10. Nbd2 does not.
+    fen = 'r2qk2r/ppp3pp/2nb1p2/5b2/4n2B/5N2/PPP1QPPP/RN2KB1R w KQkq - 2 10'
+    result = why(fen, ['b1d2', 'd8e7', 'd2e4', 'f5e4', 'e1c1', 'e8c8', 'f3d2', 'e4f5', 'e2e7', 'd6e7'],
+                 ['b1c3', 'd6b4', 'a2a3', 'b4c3', 'b2c3', 'd8d5', 'e2b5', 'e8c8', 'b5d5', 'd8d5'], best_cp=-58, actual_cp=-303)
+    assert result['motif'] == 'pressure' and result['title'] == 'Pezzo inchiodato' and result['focus'] == ['c3', 'b4']
+    assert result['text'].startswith('Dopo Nc3, 10… Bb4 inchioda il cavallo in c3 al re: è attaccato da due pezzi e difeso da uno solo.')
+    assert result['text'].endswith('11. a3 Bxc3+ 12. bxc3 Qd5 13. Qb5 O-O-O 14. Qxd5 Rxd5 e ti restano pedoni doppiati in colonna c e un pedone isolato in a3.')
