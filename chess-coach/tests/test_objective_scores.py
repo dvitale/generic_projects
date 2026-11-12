@@ -1,5 +1,6 @@
 from backend import alternatives, prevention, study
 from backend.engine import LOSS_NOTE, objective
+from test_coach import client  # noqa: F401
 
 
 def test_scores_are_shown_on_one_objective_scale_whoever_moves():
@@ -19,3 +20,9 @@ def test_rules_and_messages_no_longer_speak_from_the_players_side():
     import chess
     black = chess.Board('rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1')
     assert alternatives.fmt({'cp': 80, 'mate': None}, black) == '−0,80'
+
+
+def test_the_guide_explains_the_score_where_the_screens_link_to_it(client):
+    html = client.get('/api/training-guide/html').text
+    assert 'id="come-si-legge-il-punteggio"' in html and 'per il Nero, salire di 1,20' in html
+    assert '## Come si legge il punteggio' in client.get('/api/training-guide').text

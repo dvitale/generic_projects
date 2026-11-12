@@ -256,4 +256,15 @@ Per iniziare questa settimana: [importa le partite Maia](#da-maia-chess-a-sparri
 
 Prima della settimana successiva chiediti: ho evitato almeno una minaccia che prima non vedevo? Ho riconosciuto uno scacco dopo una cattura? Ho sfruttato un'occasione di recupero? Registra tutte le partite di verifica, non soltanto quelle frustranti. Un campione piccolo può oscillare: conta soprattutto la riduzione degli stessi errori in posizioni nuove.
 
+## Come si legge il punteggio
+
+Tutti i punteggi di Stockfish sono sulla stessa scala, chiunque debba muovere: **positivo se è avanti il Bianco, negativo se è avanti il Nero**. +1,00 vale all’incirca un pedone di vantaggio per il Bianco; −1,00 lo stesso per il Nero.
+
+- **Perdere** un punteggio significa spostarlo verso l’avversario. Perdere 1,20 significa, per il Bianco, scendere di 1,20 (da 0,00 a −1,20); per il Nero, salire di 1,20 (da 0,00 a +1,20).
+- Un **matto** si scrive per esteso: «matto del Bianco in 3», «matto del Nero in 3».
+- Nel giudizio delle mosse ogni valutazione è limitata a ±6,00: oltre, la partita è già decisa e un margine maggiore non cambia l’esito. Imprecisione da 0,80, errore da 1,80, errore grave da 3,00.
+- Blunder prevention misura invece il **punteggio atteso** (la probabilità di vincere, con la patta che vale metà): una mossa è un blunder se ne perde almeno 20 punti rispetto alla migliore.
+
+I valori sono stime del motore, non dimostrazioni: un calo non equivale a materiale perso.
+
 [Torna all’inizio della guida](#allenarsi-per-perdere-meno-contro-maia-guida-pratica).

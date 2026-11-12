@@ -2,7 +2,8 @@ import InfoNote from './InfoNote'
 import {useEffect,useState} from 'react'
 import {api} from './api'
 import type {Evaluation} from './types'
-import {SCORE_NOTE,moverOf,objectiveScore} from './evalText'
+import {moverOf,objectiveScore} from './evalText'
+import ScoreNote from './ScoreNote'
 import ChessInsights,{ReasoningSections,type Insight,type Reasoning} from './ChessInsights'
 import MistakeComparison,{type Comparison} from './MistakeComparison'
 import FloatingPanel from './FloatingPanel'
@@ -53,7 +54,7 @@ export default function MistakeHistory({kind,targetId,revision,onPlay}:{kind:'pr
   return <section className="panel mistake-history" aria-label="Tentativi sbagliati"><span className="eyebrow">IMPARA DAI TENTATIVI</span><h3>Tentativi sbagliati ({items.length})</h3>
     {error&&<p role="alert">{error} <button onClick={()=>setRetry(n=>n+1)}>Ricarica tentativi</button></p>}
     {!items.length?<p className="muted">Qui ritroverai gli errori di questa posizione, anche nelle prossime sessioni.</p>:<>
-      <InfoNote summary="Come leggere i tentativi">Calo registrato rispetto alla migliore alternativa: non equivale a materiale perso. {SCORE_NOTE} “Spiega motivo” approfondisce la verifica Stockfish e confronta le varianti. Nei casi di matto direttamente verificabili usa le risposte legali; negli altri casi invia a DeepSeek questa posizione e le varianti da confrontare. La spiegazione può svelare una mossa migliore e viene conservata. “Gioca contro Stockfish” apre una partita dopo il tuo tentativo: difendilo e guarda come il motore lo punisce.</InfoNote>
+      <InfoNote summary="Come leggere i tentativi">Calo registrato rispetto alla migliore alternativa: non equivale a materiale perso. “Spiega motivo” approfondisce la verifica Stockfish e confronta le varianti. Nei casi di matto direttamente verificabili usa le risposte legali; negli altri casi invia a DeepSeek questa posizione e le varianti da confrontare. La spiegazione può svelare una mossa migliore e viene conservata. “Gioca contro Stockfish” apre una partita dopo il tuo tentativo: difendilo e guarda come il motore lo punisce. <ScoreNote/></InfoNote>
       <ol className="mistake-list">{items.map(m=><MistakeRow key={m.id} mistake={m} path={path} onPlay={onPlay}/>)}</ol></>}
   </section>
 }

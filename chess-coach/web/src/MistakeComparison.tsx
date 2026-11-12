@@ -1,7 +1,8 @@
 import {useState} from 'react'
 import Board from './Board'
 import type {Color,Evaluation} from './types'
-import {SCORE_NOTE,objectiveScore} from './evalText'
+import {objectiveScore} from './evalText'
+import ScoreNote from './ScoreNote'
 
 interface Step {uci:string;san:string;side:Color;number:number;fen:string;checkmate:boolean}
 interface Line extends Evaluation {steps:Step[]}
@@ -25,7 +26,7 @@ export default function MistakeComparison({value:c}:{value:Comparison}){
     <div className="comparison-lines">
       {(['actual','best'] as const).map(key=><article key={key}><h4>{labels[key]} · {c[key].steps[0]?.san}</h4><strong>{objectiveScore(c[key],c.turn)}</strong><p className="variation">{c[key].steps.map(s=>`${s.number}${s.side==='w'?'.':'…'} ${s.san}`).join(' ')}</p><small>Profondità {c[key].depth} · {c[key].nodes.toLocaleString('it-IT')} nodi</small></article>)}
     </div>
-    <p className="footnote">{SCORE_NOTE} {c.criterion} Un punteggio 0,00 può indicare una difesa che salva la partita; un calo non equivale a materiale perso.</p>
+    <p className="footnote">{c.criterion} Un punteggio 0,00 può indicare una difesa che salva la partita; un calo non equivale a materiale perso. <ScoreNote/></p>
     {c.sameReply&&<p><strong>La stessa risposta cambia effetto? </strong>{c.sameReply.legalAfterAlternative
       ?`Dopo il tentativo: ${c.sameReply.attemptReply}. Dopo l’alternativa: ${c.sameReply.alternativeReply}. Puoi rivedere anche questo confronto sulla scacchiera.`
       :`${c.sameReply.attemptReply}, presente dopo il tentativo, non è legale dopo l’alternativa.`}</p>}

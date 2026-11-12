@@ -3,7 +3,8 @@ import PointsBreakdown,{type Points} from './PointsBreakdown'
 import Board from './Board'
 import {api} from './api'
 import type {Color,Evaluation} from './types'
-import {SCORE_NOTE,objectiveScore} from './evalText'
+import {objectiveScore} from './evalText'
+import ScoreNote from './ScoreNote'
 
 export type DiagnosisKind='puzzle'|'problem'|'prevention'
 type Move={uci:string;san:string}
@@ -84,7 +85,7 @@ function Result({diagnosis,color}:{diagnosis:Diagnosis;color:Color}){
       <strong>{diagnosisLabels[label].title}</strong><p>{explain(diagnosis,label,color)}</p><p className="muted">{practice(label)}</p></li>)}
       {s&&<li className={`diagnosis-solution solution-${s.kind}`}><strong>La soluzione: {solutionLabels[s.kind].title.toLowerCase()}</strong><p>{describeSolution(diagnosis,s,color)}</p><p className="muted">{solutionLabels[s.kind].practice}</p></li>}</ul>
     <PointsBreakdown points={diagnosis.points}/>
-    <p className="footnote">{SCORE_NOTE} Confronto con Stockfish a budget limitato. La minaccia si misura dando la mossa all’avversario; le fasce sono convenzioni didattiche (equilibrio fra −1 e +1, forte vantaggio da ±3). La diagnosi è salvata e non cambia rating né ripassi.</p>
+    <p className="footnote">Confronto con Stockfish a budget limitato. La minaccia si misura dando la mossa all’avversario; le fasce sono convenzioni didattiche (equilibrio fra −1 e +1, forte vantaggio da ±3). La diagnosi è salvata e non cambia rating né ripassi. <ScoreNote/></p>
   </div>
 }
 

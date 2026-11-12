@@ -27,12 +27,14 @@ Stockfish e le regole lavorano dal punto di vista di chi muove (positivo = buono
 si calcola nello stesso modo per i due colori. **Ciò che si mostra** è invece sempre sulla scala oggettiva: positivo se è
 avanti il Bianco, negativo se è avanti il Nero, chiunque muova. La conversione si fa solo nel testo:
 
-- interfaccia: `web/src/evalText.ts` (`objectiveScore(score, chi muove)`, `SCORE_NOTE`), usata da lezioni, «Segui la
+- interfaccia: `web/src/evalText.ts` (`objectiveScore(score, chi muove)`), usata da lezioni, «Segui la
   partita», Rivedi, Trova un’alternativa, confronto e storico degli errori, Blunder prevention, diagnosi e tutor dello
   Studio;
 - backend: `engine.objective(score, white)` e `LOSS_NOTE`, per i testi generati (spiegazioni, quiz, regole).
 
-Dicitura standard, la stessa ovunque: «Perdere 1,20 significa, per il Bianco, scendere di 1,20 (da 0,00 a −1,20); per
+Le schermate non ripetono la spiegazione: mostrano il link **Come leggo il punteggio ↗** (`web/src/ScoreNote.tsx`),
+che apre la sezione «Come si legge il punteggio» della guida (`/api/training-guide/html#come-si-legge-il-punteggio`).
+Dicitura standard, nella guida e nei testi generati: «Perdere 1,20 significa, per il Bianco, scendere di 1,20 (da 0,00 a −1,20); per
 il Nero, salire di 1,20 (da 0,00 a +1,20).» Le soglie delle regole si scrivono per i due colori («col Bianco non sotto
 −1,00, col Nero non sopra +1,00»). I matti: «matto del Bianco in 3», «matto del Nero in 3».
 I prompt del tutor DeepSeek restano dal punto di vista di chi muove: sono istruzioni interne, non testo mostrato.

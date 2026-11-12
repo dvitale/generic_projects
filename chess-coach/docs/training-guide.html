@@ -28,7 +28,7 @@ main{min-width:0;background:#fff;padding:36px 44px;border:1px solid #dfe5da;bord
 <a href="#aimchess-scegliere-cosa-allenare">4. Aimchess: scegliere cosa allenare</a>
 <a href="#movetrainer-ricordare-lidea-dopo-una-pausa">5. MoveTrainer: ricordare l'idea dopo una pausa</a>
 <a href="#noctie-provare-le-idee-durante-il-gioco">6. Noctie: provare le idee durante il gioco</a>
-<a href="#una-settimana-sostenibile">7. Una settimana sostenibile</a></nav></aside>
+<a href="#una-settimana-sostenibile">7. Una settimana sostenibile</a><a href="#come-si-legge-il-punteggio">Come si legge il punteggio</a></nav></aside>
 <main id="contenuto"><h1 id="allenarsi-per-perdere-meno-contro-maia-guida-pratica">Allenarsi per perdere meno contro Maia: guida pratica</h1>
 <p>Funzioni SparringMate aggiornate il 16 ottobre 2026. Tutorial esterni verificati il 6 ottobre 2026. I tutorial esterni si basano sulla documentazione ufficiale consultata il 6 ottobre: le aree personali a pagamento non sono state provate con il tuo account. Nomi e disponibilità possono variare. Le routine proposte sono consigli per il tuo obiettivo, non prescrizioni ufficiali dei servizi.</p>
 <p><strong>Passa subito alla pratica:</strong> <a target="_blank" rel="noopener noreferrer" href="http://localhost:8033/?section=schedule&amp;import=pgn">importa i PGN Maia</a> · <a target="_blank" rel="noopener noreferrer" href="http://localhost:8033/?section=schedule">apri Allenamento</a> · <a target="_blank" rel="noopener noreferrer" href="http://localhost:8033/?section=prevention">apri Blunder prevention</a> · <a target="_blank" rel="noopener noreferrer" href="http://localhost:8033/?section=study">apri Studio</a> · <a target="_blank" rel="noopener noreferrer" href="http://localhost:8033/?section=archive">rivedi le tue partite</a>.</p>
@@ -286,6 +286,15 @@ main{min-width:0;background:#fff;padding:36px 44px;border:1px solid #dfe5da;bord
 </table>
 <p>Per iniziare questa settimana: <a href="#da-maia-chess-a-sparringmate">importa le partite Maia</a>, <a target="_blank" rel="noopener noreferrer" href="http://localhost:8033/?section=schedule">imposta il calendario</a> e scegli un solo supporto tra <a href="#aimchess-scegliere-cosa-allenare">Aimchess</a>, <a href="#movetrainer-ricordare-lidea-dopo-una-pausa">MoveTrainer</a> e <a href="#noctie-provare-le-idee-durante-il-gioco">Noctie</a>.</p>
 <p>Prima della settimana successiva chiediti: ho evitato almeno una minaccia che prima non vedevo? Ho riconosciuto uno scacco dopo una cattura? Ho sfruttato un'occasione di recupero? Registra tutte le partite di verifica, non soltanto quelle frustranti. Un campione piccolo può oscillare: conta soprattutto la riduzione degli stessi errori in posizioni nuove.</p>
+<h2 id="come-si-legge-il-punteggio">Come si legge il punteggio</h2>
+<p>Tutti i punteggi di Stockfish sono sulla stessa scala, chiunque debba muovere: <strong>positivo se è avanti il Bianco, negativo se è avanti il Nero</strong>. +1,00 vale all’incirca un pedone di vantaggio per il Bianco; −1,00 lo stesso per il Nero.</p>
+<ul>
+<li><strong>Perdere</strong> un punteggio significa spostarlo verso l’avversario. Perdere 1,20 significa, per il Bianco, scendere di 1,20 (da 0,00 a −1,20); per il Nero, salire di 1,20 (da 0,00 a +1,20).</li>
+<li>Un <strong>matto</strong> si scrive per esteso: «matto del Bianco in 3», «matto del Nero in 3».</li>
+<li>Nel giudizio delle mosse ogni valutazione è limitata a ±6,00: oltre, la partita è già decisa e un margine maggiore non cambia l’esito. Imprecisione da 0,80, errore da 1,80, errore grave da 3,00.</li>
+<li>Blunder prevention misura invece il <strong>punteggio atteso</strong> (la probabilità di vincere, con la patta che vale metà): una mossa è un blunder se ne perde almeno 20 punti rispetto alla migliore.</li>
+</ul>
+<p>I valori sono stime del motore, non dimostrazioni: un calo non equivale a materiale perso.</p>
 <p><a href="#allenarsi-per-perdere-meno-contro-maia-guida-pratica">Torna all’inizio della guida</a>.</p>
 <footer>Guida personale SparringMate · Disponibile anche offline dopo il download. I collegamenti ai servizi esterni richiedono Internet.</footer></main></div>
 </body>

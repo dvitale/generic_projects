@@ -11,7 +11,8 @@ import {useTrainingMove} from './useTrainingMove'
 import ChessInsights,{ThinkingGuide,type Insight} from './ChessInsights'
 import {api} from './api'
 import type {Color,Evaluation,Practice} from './types'
-import {SCORE_NOTE,objectiveScore} from './evalText'
+import {objectiveScore} from './evalText'
+import ScoreNote from './ScoreNote'
 
 interface Position {id:string;gameId:string;title:string;gameNumber?:number|null;gameCreatedAt?:string;ply:number;fen:string;turn:Color;moveNumber:number;legalMoves:string[];dueAt:string;streak:number}
 interface Reach {lapse:number;typical:number;complex:number;pending:number;available:boolean;description:string}
@@ -121,7 +122,7 @@ export default function BlunderPrevention({onArchive,onReview,onPlayMistake,onPl
         <section className="panel"><ThinkingGuide/><p className="footnote">La mossa può perdere per una tattica o compromettere una posizione difendibile. Stockfish decide l’esito; la spiegazione distingue fatti e ipotesi.</p></section>
         <section className="panel"><span className="eyebrow">PRIMA DI MUOVERE</span><h2>Tre controlli</h2><ol><li>Il re è al sicuro?</li><li>Quali pezzi sono attaccati o indifesi?</li><li>Quali scacchi e catture avrà l’avversario?</li></ol><p className="muted">Una mossa semplice che evita l’abbaglio è sufficiente.</p>
           {!result?.closed&&<div className="row"><button disabled={busy||!session||diagnosing===session.id} onClick={()=>setDiagnosing(session!.id)}>Mostra una mossa sicura</button><button disabled={busy||!remaining.length} onClick={()=>{setDone(d=>[...d,position.id]);next()}}>Salta posizione</button></div>}
-          <InfoNote summary="Quali mosse sono accettate"><p>{catalog?.rule.description} I valori sono stime del motore. {SCORE_NOTE}</p></InfoNote>
+          <InfoNote summary="Quali mosse sono accettate"><p>{catalog?.rule.description} I valori sono stime del motore. <ScoreNote/></p></InfoNote>
           {reachNote}
           {session?.exposure==='practice'&&<p className="footnote">Ripetizione anticipata: utile per esercitarti, non aumenta i successi indipendenti.</p>}
         </section>

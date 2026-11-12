@@ -1,7 +1,8 @@
 import {useState} from 'react'
 import Board,{type AnalysisArrow} from './Board'
 import {api} from './api'
-import {SCORE_NOTE,objectiveScore} from './evalText'
+import {objectiveScore} from './evalText'
+import ScoreNote from './ScoreNote'
 import {useBoardOrientation} from './boardFlip'
 import type {Color} from './types'
 
@@ -78,7 +79,7 @@ export default function LessonWalk({walk,start,onExit}:{walk:WalkItem;start:Step
           {answer.engineNote&&<p className="lesson-disagree">{answer.engineNote}</p>}
           {answer.moves.length>1&&<table className="lesson-moves"><thead><tr><th>Mossa</th><th>Giudizio</th><th>Motore</th></tr></thead>
             <tbody>{answer.moves.map(m=><tr key={m.san} className={m.san===answer.move?'chosen':''}><td>{m.san}</td><td><span className={`kind-tag lesson-verdict-${m.verdict}`}>{VERDICT[m.verdict]}</span> {m.note}</td><td>{objectiveScore(m,current.turn)}</td></tr>)}</tbody></table>}
-          <p className="footnote">{SCORE_NOTE}</p>
+          <p className="footnote"><ScoreNote/></p>
         </section>
         {finished&&<section className="panel walk-end" aria-label="Fine della partita">
           <span className="eyebrow">FINE · {answer.result}</span>

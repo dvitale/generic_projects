@@ -116,7 +116,7 @@ test('A move played on the flashcard turns it and is judged, but the rating sets
   // An accepted move needs no other suggestion: the saved best move stays the reference.
   await expect(verdict).not.toContainText('Migliore')
   await expect(front).toContainText('Prima di prendere in e5 conto i difensori.')
-  await expect(front).toContainText('Punteggio oggettivo: positivo se è avanti il Bianco')
+  await expect(front.getByRole('link',{name:/Come leggo il punteggio/})).toHaveAttribute('href','/api/training-guide/html#come-si-legge-il-punteggio')
   await expect(page.getByText('Freccia verde: la tua mossa di oggi.')).toBeVisible()
   await expect(page.locator('.analysis-arrow[data-source="solution"][data-move="f1c4"]')).toHaveCount(1)
   await page.screenshot({path:'test-results/study-flashcard-move.png'})

@@ -3,7 +3,8 @@ import Board,{type AnalysisArrow} from './Board'
 import InfoNote from './InfoNote'
 import LessonWalk,{type WalkItem} from './LessonWalk'
 import {api} from './api'
-import {SCORE_NOTE,objectiveScore} from './evalText'
+import {objectiveScore} from './evalText'
+import ScoreNote from './ScoreNote'
 import {useBoardOrientation} from './boardFlip'
 import type {Color} from './types'
 
@@ -113,7 +114,7 @@ export default function Lessons(){
           {answer.engineNote&&<p className="lesson-disagree">{answer.engineNote}</p>}
           <table className="lesson-moves"><thead><tr><th>Mossa</th><th>Lezione</th><th>Motore</th></tr></thead>
             <tbody>{answer.moves.map(m=><tr key={m.san} className={m.san===answer.move?'chosen':''}><td>{m.san}</td><td><span className={`kind-tag lesson-verdict-${m.verdict}`}>{VERDICT[m.verdict]}</span> {m.note}</td><td>{objectiveScore(m,lesson.turn)}</td></tr>)}</tbody></table>
-          <p className="footnote">{SCORE_NOTE} Prime linee del motore: {answer.engine.lines.map(l=>`${l.san} ${objectiveScore(l,lesson.turn)}`).join(' · ')}.</p>
+          <p className="footnote">Prime linee del motore: {answer.engine.lines.map(l=>`${l.san} ${objectiveScore(l,lesson.turn)}`).join(' · ')}. <ScoreNote/></p>
         </section>
       </>}
       <p className="footnote lesson-citation">{lesson.game.citation}</p>

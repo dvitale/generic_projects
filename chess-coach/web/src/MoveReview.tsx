@@ -1,5 +1,6 @@
 import type { Decision, Evaluation, Game } from './types'
-import {SCORE_NOTE,moverOf,objectiveScore} from './evalText'
+import {moverOf,objectiveScore} from './evalText'
+import ScoreNote from './ScoreNote'
 import type { Prediction } from './engine/maia'
 import ChessInsights,{ThinkingGuide} from './ChessInsights'
 import MistakeExplanation from './MistakeExplanation'
@@ -31,7 +32,7 @@ export default function MoveReview({game,cursor,onPosition,level,onLevel,predict
       {(!game.analysis?.moves||(game.analysis.reviewVersion||0)<3)&&<><p className="footnote">Aggiorna l’analisi salvata per confrontare fino a tre scelte Stockfish per ogni mossa.</p><button disabled={analyzing} onClick={onAnalyze}>Aggiorna revisione completa</button></>}
       <div className="review-step-controls"><button aria-label="Decisione precedente" disabled={index===0} onClick={()=>onPosition(moves[index<0?moves.length-1:index-1].ply)}>←</button><label><span className="sr-only">Mossa da confrontare</span><select aria-label="Mossa da confrontare" value={current?.ply??''} onChange={e=>onPosition(Number(e.target.value))}>{!current&&<option value="">Scegli una mossa</option>}{moves.map(d=><option key={d.ply} value={d.ply}>{label(d)} · {d.fen.split(' ')[1]==='w'?'Bianco':'Nero'}</option>)}</select></label><button aria-label="Decisione successiva" disabled={index===moves.length-1} onClick={()=>onPosition(moves[index<0?0:index+1].ply)}>→</button></div>
       {current?<>
-        <h3>{currentLabel} · {current.label}</h3><p className="footnote">Scacchiera prima della mossa. {SCORE_NOTE}</p>
+        <h3>{currentLabel} · {current.label}</h3><p className="footnote">Scacchiera prima della mossa. <ScoreNote/></p>
         <MistakeExplanation key={current.ply} explanation={current.insight?.explanation}/>
         <table aria-label="Confronto delle mosse"><thead><tr><th scope="col">Mossa giocata</th><th scope="col">Stockfish</th><th scope="col">Maia {level}</th></tr></thead><tbody>{Array.from({length:choiceCount},(_,rank)=>{
           const sf=stockfishChoices[rank],maiaMove=maiaChoices[rank]

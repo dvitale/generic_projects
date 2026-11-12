@@ -1,6 +1,7 @@
 import {useEffect,useState} from 'react'
 import {api} from '../api'
-import {SCORE_NOTE,objectiveScore} from '../evalText'
+import {objectiveScore} from '../evalText'
+import ScoreNote from '../ScoreNote'
 import InfoNote from '../InfoNote'
 import StudyBoard from './StudyBoard'
 import type {AnalysisArrow} from '../Board'
@@ -75,7 +76,7 @@ export default function Flashcards({onReview}:{onReview:(gameId:string,ply:numbe
               {tried.sameAsPlayed?' È la stessa mossa di allora.':tried.played&&<> Allora: {tried.played.san} {objectiveScore(tried.played,card.turn)}.</>}
               {!tried.accepted&&tried.best.san&&<> Migliore: {tried.best.san} {objectiveScore(tried.best,card.turn)}.</>}</span></div>}
             {(card.san||card.bestSan)&&<p>{card.san&&<>Avevi giocato <strong>{card.san}</strong>. </>}{card.bestSan&&<>Stockfish preferisce <strong>{card.bestSan}</strong>.</>}</p>}
-            {tried&&<p className="footnote">{SCORE_NOTE}</p>}
+            {tried&&<p className="footnote"><ScoreNote/></p>}
             <p className="muted">Quanto ti è venuto facile ricordarla? La mossa non decide il ripasso: conta il tuo voto.</p>
             <div className="rating-row" role="group" aria-label="Valuta il ricordo">{ratings.map(([rating,label],i)=><button key={rating} className={'rating-'+rating} disabled={busy} onClick={()=>void act('review',{rating})}><strong>{label}</strong><small>{interval(card.preview[rating])} · {i+1}</small></button>)}</div>
           </>}

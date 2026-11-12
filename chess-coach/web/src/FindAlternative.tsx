@@ -4,7 +4,8 @@ import Board,{type AnalysisArrow} from './Board'
 import MiniBoard from './MiniBoard'
 import InfoNote from './InfoNote'
 import {api} from './api'
-import {SCORE_NOTE,objectiveScore} from './evalText'
+import {objectiveScore} from './evalText'
+import ScoreNote from './ScoreNote'
 import {useBoardOrientation} from './boardFlip'
 import type {Color,Evaluation,Game} from './types'
 
@@ -174,7 +175,7 @@ export default function FindAlternative({episodeId,onEpisode,embedded=false,onCl
         <details><summary>Alternative verificate e tuoi tentativi</summary>
           <ul className="alternative-attempts">{solution.alternatives.map(a=><li key={a.move}><b>{a.san}</b> · {a.label} · {score(a.evaluation,e.color)}</li>)}</ul>
           {e.attempts.length>0&&<ul className="alternative-attempts">{e.attempts.map(a=><li key={a.id}>Tuo tentativo <b>{a.san}</b> · {a.label}{a.evaluation?` · ${score(a.evaluation,e.color)}`:''}</li>)}</ul>}
-          <p className="footnote">{SCORE_NOTE} {solution.engine.name}, {solution.engine.nodes.toLocaleString('it-IT')} nodi per mossa, {solution.engine.candidates} candidate a confronto: è una stima, non una dimostrazione.</p>
+          <p className="footnote">{solution.engine.name}, {solution.engine.nodes.toLocaleString('it-IT')} nodi per mossa, {solution.engine.candidates} candidate a confronto: è una stima, non una dimostrazione. <ScoreNote/></p>
         </details>
         {e.origin==='live'&&e.pendingInGame&&<button className="primary" disabled={busy} onClick={()=>void apply()}>Gioca {e.found?.san??solution.san} nella partita</button>}
       </section>}
