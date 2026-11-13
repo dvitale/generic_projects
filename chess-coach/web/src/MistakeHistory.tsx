@@ -24,12 +24,17 @@ function MistakeRow({mistake:m,path,onPlay}:{mistake:Mistake;path:string;onPlay?
     catch(e){setError(e instanceof Error?e.message:'Spiegazione non disponibile. Riprova.')}
     finally{setBusy(false)}
   }
+  // One line per attempt: the details, from the explanation to the variant, open on request.
+  const mover=moverOf(m.fen),motif=m.insight?.explanation?.title
   return <li className="mistake-row">
-    <div className="mistake-heading"><strong>{m.san}</strong><span>{m.lossCp===null?'Confronto con matto: perdita non esprimibile in pedoni':`Calo ${(m.lossCp/100).toFixed(2)} punti`}</span><button disabled={busy} aria-expanded={expanded} onClick={()=>void explain()}>{busy?'Sto preparando…':expanded?'Nascondi spiegazione':'Spiega motivo'}</button></div>
-    <small>Migliore alternativa: {objectiveScore(m.reference,moverOf(m.fen))} → tua scelta: {objectiveScore(m.actual,moverOf(m.fen))}</small><small>{new Date(m.createdAt).toLocaleString('it-IT')}</small>
-    <details><summary>Variante Stockfish</summary><p className="variation">{m.actual.san.join(' ')}</p></details>
-    <ChessInsights insight={m.insight} compact/>
-    {onPlay&&<button className="play-refutation" onClick={()=>onPlay(m)} title="Nuova partita da questa posizione, dopo la tua mossa: Stockfish a piena forza cerca la confutazione"><span aria-hidden="true">⚔</span> Gioca {m.san} contro Stockfish</button>}
+    <div className="mistake-heading"><strong>{m.san}</strong><span>{m.lossCp===null?`${objectiveScore(m.reference,mover)} → ${objectiveScore(m.actual,mover)}`:`Calo ${(m.lossCp/100).toFixed(2)} punti`}</span>
+      <button disabled={busy} aria-expanded={expanded} onClick={()=>void explain()}>{busy?'Sto preparando…':expanded?'Nascondi spiegazione':'Spiega motivo'}</button>
+      {onPlay&&<button className="play-refutation" onClick={()=>onPlay(m)} aria-label={`Gioca ${m.san} contro Stockfish`} title="Nuova partita da questa posizione, dopo la tua mossa: Stockfish a piena forza cerca la confutazione"><span aria-hidden="true">⚔</span></button>}</div>
+    <details className="mistake-details"><summary>{motif??'Dettagli'} · {new Date(m.createdAt).toLocaleString('it-IT',{dateStyle:'short',timeStyle:'short'})}</summary>
+      <small>Migliore alternativa: {objectiveScore(m.reference,mover)} → tua scelta: {objectiveScore(m.actual,mover)}</small>
+      <p className="variation">{m.actual.san.join(' ')}</p>
+      <ChessInsights insight={m.insight} compact/>
+    </details>
     {error&&<p role="alert" className="error-text">{error}</p>}
     {expanded&&response&&<FloatingPanel title={`Perché ${m.san} non va`} onClose={()=>setExpanded(false)}><div className="mistake-explanation"><strong>Che cosa cambia rispetto all’alternativa</strong>
       {response.explanation.sharedIdea&&<p><strong>Perché possono sembrare simili. </strong>{response.explanation.sharedIdea}</p>}

@@ -117,11 +117,6 @@ label.chip input{width:16px;height:16px;accent-color:#fff}
 .nav-item .icon{flex:none;opacity:.9}
 .nav-badge{margin-left:auto;font-size:11px;font-weight:700;background:#d9412e;color:#fff;min-width:22px;padding:1px 6px;text-align:center;border-radius:var(--r-pill);line-height:1.5}
 .nav-more{display:none}
-.sidebar-note{list-style:none;margin:0;padding:14px 8px 0;border-top:1px solid #ffffff1a;display:grid;gap:10px;font-size:var(--fs-sm)}
-.sidebar-note li{display:flex;align-items:center;gap:10px}
-.sidebar-note b{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#ffffff14;color:#cfe3c9;font-size:var(--fs-xs)}
-.local-status{margin-top:auto;font-size:var(--fs-xs);color:var(--side-text);padding:8px}
-.local-status small{display:block;color:#8fa293;margin-top:4px}
 .status-dot{width:7px;height:7px;background:#56a35e;border-radius:50%;display:inline-block;margin-right:6px}
 .status-dot.waiting{background:var(--focus)}
 main{padding:0 28px;max-width:1840px;width:100%;margin:0 auto;min-width:0}
@@ -408,12 +403,14 @@ details.panel>summary{font-weight:650;font-size:var(--fs-lg)}
 .prevention .variation{overflow-wrap:anywhere}
 .mistake-list{list-style:none;padding:0!important;margin:0;max-height:460px;overflow:auto}
 .mistake-list:has(.mistake-explanation){max-height:none}
-.mistake-row{padding:14px 0;border-top:1px solid var(--border);overflow-wrap:anywhere}
+.mistake-row{padding:8px 0;border-top:1px solid var(--border);overflow-wrap:anywhere}
 .mistake-heading{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;line-height:1.4}
 .mistake-heading>span{flex:1;font-size:var(--fs-sm);min-width:100px}
 .mistake-heading button{min-height:34px;font-size:var(--fs-sm);padding:6px 10px}
 .mistake-row small{display:block;color:var(--muted);margin:6px 0}
-.mistake-row summary{font-size:var(--fs-sm)}
+.mistake-row summary{font-size:var(--fs-sm);color:var(--muted)}
+.mistake-details[open]{padding-bottom:4px}
+.mistake-details .chess-insight{margin:8px 0}
 .mistake-explanation{padding:12px;margin-top:10px;background:var(--surface-2);border-radius:var(--r-md);font-size:var(--fs-md);line-height:1.55}
 .mistake-explanation p{margin:8px 0}
 .floating-panel{position:fixed;z-index:60;display:flex;flex-direction:column;min-width:300px;min-height:220px;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-lg);box-shadow:var(--shadow-md),0 18px 48px rgba(0,0,0,.28);resize:both;overflow:hidden}
@@ -424,7 +421,7 @@ details.panel>summary{font-weight:650;font-size:var(--fs-lg)}
 .floating-head button{min-height:32px;padding:4px 10px}
 .floating-body{flex:1;overflow:auto;padding:0 14px 14px}
 .floating-body .mistake-explanation{background:none;padding:0}
-.play-refutation{margin-top:6px;min-height:34px;font-size:var(--fs-sm);padding:6px 10px}
+.play-refutation{min-height:34px;font-size:var(--fs-sm);padding:6px 10px}
 @media(max-width:680px){.floating-panel{left:0!important;right:0;top:auto!important;bottom:0;width:auto!important;height:62dvh!important;resize:none;border-radius:var(--r-lg) var(--r-lg) 0 0}.floating-head{cursor:default}.floating-hint{display:none}}
 .comparison-lines{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .comparison-lines article{border:1px solid var(--border);border-radius:var(--r-md);padding:10px;min-width:0}
@@ -670,8 +667,6 @@ details.panel>summary{font-weight:650;font-size:var(--fs-lg)}
   .nav-item{flex-direction:column;gap:3px;padding:8px 2px;font-size:11px;text-align:center;justify-content:center}
   .nav-item.active::before{left:-6px}
   .nav-badge{position:absolute;top:2px;right:8px;font-size:10px;min-width:18px;padding:0 4px}
-  .sidebar-note,.local-status small{display:none}
-  .local-status{font-size:0;text-align:center}.local-status .status-dot{margin:0}
   main{padding:0 18px}
   .training-layout{gap:18px;grid-template-columns:minmax(260px,1fr) minmax(280px,1fr)}
   .panel{padding:16px}
@@ -688,7 +683,7 @@ details.panel>summary{font-weight:650;font-size:var(--fs-lg)}
   .topbar .pill:not(.settings-menu .pill),.crumb span,.crumb{white-space:nowrap}
   .topbar-actions>.pill:not(.flip-button){display:none}
   .sidebar{position:fixed;inset:auto 0 0 0;height:auto;z-index:50;padding:4px 4px calc(4px + env(safe-area-inset-bottom));flex-direction:row;gap:0;overflow:visible;box-shadow:0 -4px 16px #0003}
-  .brand,.sidebar-note,.local-status{display:none}
+  .brand{display:none}
   .sidebar nav{width:100%;grid-template-columns:repeat(5,minmax(0,1fr));gap:2px}
   .sidebar nav .nav-item:not([data-primary]):not(.nav-more){display:none;order:10}
   .sidebar nav.more-open .nav-item:not([data-primary]):not(.nav-more){display:flex}
