@@ -31,6 +31,12 @@ test('a wrong move played again in a later session is named in the puzzle and li
   await expect(note).toContainText('Avevi giocato Qg8+ in questa posizione anche il',{timeout:30000})
   await note.getByText('Mostra la risposta che la confuta').click()
   await expect(note.locator('.variation')).toContainText('Qg8+ Kxg8')
+  // The refuting line also replays on a board, starting from the puzzle position.
+  await note.getByRole('button',{name:'Mostra',exact:true}).click()
+  const replay=page.getByRole('dialog',{name:'Perché Qg8+ non funziona'})
+  await expect(replay.getByRole('status')).toContainText(/Posizione prima della mossa|Qg8\+/)
+  await expect(replay.getByRole('status')).toContainText('Kxg8',{timeout:10000})
+  await replay.getByRole('button',{name:/Chiudi/}).click()
   await page.getByRole('button',{name:'Progressi',exact:true}).click()
   const gaps=page.getByRole('region',{name:'Lacune ricorrenti'})
   await expect(gaps.locator('.repeated-errors')).toContainText('Qg8+ in 2 sessioni')
