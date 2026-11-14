@@ -65,6 +65,7 @@ Maia3 è basato su Transformer/Chessformer. Il riferimento iniziale a una CNN ri
 - `listed_exercises` mette in lista i puzzle mai tentati solo entro `new_puzzle_quota` (limite delle nuove posizioni meno i puzzle tentati per la prima volta oggi, nel fuso del piano; `CHESS_COACH_NEW_PUZZLE_LIMIT` lo sostituisce nelle prove), i più costosi per primi; `GET /api/profile` riporta `newWaiting`. Ogni puzzle ha una `phase` (`opening`, `middlegame`, `endgame`) per i filtri dell'interfaccia.
 - Le sessioni aperte vengono riprese per impedire che una ricarica azzeri il primo tentativo.
 - A puzzle chiuso, **Gioca da qui** avvia una partita contro Maia dalla posizione del puzzle; prima della chiusura non è disponibile, per non anticipare il tentativo.
+- Dopo una mossa corretta compare anche **Continua da qui contro Maia**: la partita parte dalla posizione sulla scacchiera, dopo la tua mossa, e risponde subito Maia. Non compare se la mossa chiude la partita (per esempio un matto).
 - A puzzle chiuso, **↺ Riprova da capo** riporta la scacchiera alla posizione iniziale per rigiocarla: `POST /api/exercises/{id}/practice` applica lo stesso criterio del tentativo senza registrare nulla (né tentativi né ripassi) e risponde 409 finché la sessione è aperta.
 
 ### Profilo e piano

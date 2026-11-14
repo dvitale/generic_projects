@@ -368,6 +368,15 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
       keepGame(next,true); resetBoardFlip(); setPlayPosition(null); setTab('play'); setCursor(0); await refresh(); maia.load().catch(fail)
     } catch (e) {fail(e)} finally {setBusy(false)}
   }
+  /** After a correct puzzle move, a new game against Maia from the position on the board, Maia to move. */
+  function playAfterPuzzle(ex:Exercise){
+    const move=puzzleMove??attempt?.actual?.pv[0]
+    if(!attempt?.success||!move)return undefined
+    const board=new Chess(ex.fen)
+    try{board.move({from:move.slice(0,2),to:move.slice(2,4),promotion:move[4]})}catch{return undefined}
+    if(board.isGameOver())return undefined
+    return {label:'Continua da qui contro Maia',play:()=>void playFromFen(board.fen(),ex.turn,elo,fromTitle('Puzzle dalla partita',ex.gameNumber,ex.gameTitle??ex.theme,Number(ex.fen.split(' ')[5]??1),ex.turn)+' · dopo la soluzione')}
+  }
   /** Defend a rejected training move against full-strength Stockfish, starting right after that move. */
   async function playMistake(kind:'puzzle'|'prevention'|'study',targetId:string,mistake:Refutation){
     if ((game?.source === 'maia'||game?.source === 'stockfish') && !game.result && !window.confirm('Vuoi iniziare una nuova partita? La partita attuale resterà salvata e potrai riprenderla dall’archivio.')) return
@@ -573,7 +582,7 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
           {((tab==='play'||tab==='review')&&game||tab==='train'&&exercise)&&<LichessAnalysis key={tab==='train'?exercise!.id:game!.id+':'+tab} fen={boardFen} orientation={orientation} game={tab==='train'?undefined:game} ply={tab==='review'?cursor:playPly}/>}
         </section>
         <aside className="coach-column">
-          {tab==='train'&&exercise&&<PuzzleFeedback fen={exercise.fen} onPlayFrom={{label:`Gioca da qui col ${exercise.turn==='w'?'Bianco':'Nero'}`,play:()=>void playFromFen(exercise.fen,exercise.turn,elo,fromTitle('Puzzle dalla partita',exercise.gameNumber,exercise.gameTitle??exercise.theme,Number(exercise.fen.split(' ')[5]??1),exercise.turn))}} canRestart={dueExercises.length>0} comparing={puzzleComparing} practice={practicing?practice!.result:undefined} onPractice={()=>{puzzleMotion.show(null);setPractice({session:session!.id,result:null})}} motionMessage={puzzleMotion.message} attempt={attempt} busy={busy} ready={!!session} hasNext={!!nextPuzzle} onNext={()=>{if(nextPuzzle)void pickExercise(nextPuzzle)}} onRestart={()=>{setCompletedPuzzles([]);if(dueExercises[0])void pickExercise(dueExercises[0])}}/>}
+          {tab==='train'&&exercise&&<PuzzleFeedback fen={exercise.fen} onPlayAfter={playAfterPuzzle(exercise)} onPlayFrom={{label:`Gioca da qui col ${exercise.turn==='w'?'Bianco':'Nero'}`,play:()=>void playFromFen(exercise.fen,exercise.turn,elo,fromTitle('Puzzle dalla partita',exercise.gameNumber,exercise.gameTitle??exercise.theme,Number(exercise.fen.split(' ')[5]??1),exercise.turn))}} canRestart={dueExercises.length>0} comparing={puzzleComparing} practice={practicing?practice!.result:undefined} onPractice={()=>{puzzleMotion.show(null);setPractice({session:session!.id,result:null})}} motionMessage={puzzleMotion.message} attempt={attempt} busy={busy} ready={!!session} hasNext={!!nextPuzzle} onNext={()=>{if(nextPuzzle)void pickExercise(nextPuzzle)}} onRestart={()=>{setCompletedPuzzles([]);if(dueExercises[0])void pickExercise(dueExercises[0])}}/>}
           {tab==='play'&&jobId&&<section className="panel" role="status"><p>Analisi automatica della partita… {progress}%</p><progress value={progress} max={100}/></section>}
           {tab==='review'&&<>
             <div className="review-toolbar"><div className="row"><button className="primary" onClick={analyze} disabled={!game?.version||busy||!!jobId}>{game?.analysis?'Ricalcola analisi':'Analizza partita'}</button>{(game?.source==='maia'||game?.source==='stockfish')&&!game.result&&<button disabled={!!jobId} onClick={()=>setTab('play')}>Continua partita</button>}</div>{jobId&&<div role="status"><p>Stockfish analizza la partita… {progress}%</p><progress value={progress} max={100}/></div>}</div>

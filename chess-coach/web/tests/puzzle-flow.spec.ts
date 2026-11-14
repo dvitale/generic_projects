@@ -94,6 +94,32 @@ test('Puzzle feedback distinguishes retry, success and reveal and advances witho
   await expect(page.locator('.analysis-arrow')).toHaveCount(0)
 })
 
+test('after a correct puzzle move the game against Maia can continue from the position on the board',async({page,request})=>{
+  // Rxd5 wins the queen without ending the game; Ke2 lets it go.
+  const game=await(await request.post('/api/games',{data:{elo:600,fen:'k7/8/8/3q4/8/8/8/3RK3 w - - 0 1'}})).json()
+  await request.post(`/api/games/${game.id}/moves`,{data:{move:'e1e2',version:0,revision:0,actor:'human'}})
+  const job=await(await request.post(`/api/games/${game.id}/analysis`,{data:{}})).json()
+  await expect.poll(async()=>(await(await request.get('/api/jobs/'+job.jobId)).json()).status,{timeout:30000}).toBe('complete')
+  await page.route('**/api/exercises',async route=>{
+    const exercises=await(await route.fetch()).json()
+    await route.fulfill({json:exercises.filter((ex:{gameId:string})=>ex.gameId===game.id)})
+  })
+  let created:Record<string,unknown>|null=null
+  page.on('request',r=>{if(r.method()==='POST'&&r.url().endsWith('/api/games'))created=r.postDataJSON()})
+  await page.goto('/')
+  await page.getByRole('button',{name:/^Puzzle/}).click()
+  const feedback=page.getByRole('region',{name:'Esito del puzzle'})
+  await expect(feedback).toContainText('Trova una buona mossa')
+  await expect(feedback.getByRole('button',{name:'Continua da qui contro Maia'})).toHaveCount(0)
+  await page.locator('[data-square="d1"]').click();await page.locator('[data-square="d5"]').click()
+  await expect(feedback).toContainText('Mossa corretta!',{timeout:30000})
+  await feedback.getByRole('button',{name:'Continua da qui contro Maia',exact:true}).click()
+  await expect(page.getByRole('heading',{name:'Gioca contro Maia',exact:true})).toBeVisible()
+  expect(created).toMatchObject({fen:'k7/8/8/3R4/8/8/8/4K3 b - - 0 1',color:'w'})
+  expect(String(created!.title)).toMatch(/dopo la soluzione$/)
+  await expect(page.locator('[data-square="d5"] img')).toBeVisible()
+})
+
 test('Play from here starts a Maia game from the puzzle position once it is solved',async({page,request})=>{
   const game=await(await request.post('/api/games',{data:{elo:600,fen:'7k/8/5KQ1/8/8/8/2P5/8 w - - 0 1'}})).json()
   await request.post(`/api/games/${game.id}/moves`,{data:{move:'g6g8',version:0,revision:0,actor:'human'}})
