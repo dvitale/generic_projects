@@ -60,6 +60,8 @@ test('Review compares every move before it is played and uses the selected Maia 
     expect(board!.y+board!.height).toBeLessThan(size.height)
     expect(panel!.x+panel!.width).toBeGreaterThan(size.width-60)
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
+    // Every control under the board stays inside its toolbar.
+    expect(await page.locator('.review-controls').evaluate(bar=>{const r=bar.getBoundingClientRect();return [...bar.querySelectorAll('button')].every(b=>{const c=b.getBoundingClientRect();return c.left>=r.left-1&&c.right<=r.right+1})})).toBe(true)
     await page.screenshot({path:`test-results/review-${size.width}.png`,fullPage:true})
     expect(await page.evaluate(()=>document.documentElement.scrollHeight)).toBeLessThan(size.height+180)
   }

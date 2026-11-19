@@ -728,6 +728,11 @@ details.panel>summary{font-weight:650;font-size:var(--fs-lg)}
 @media(min-width:700px){.board-toolbar{flex-wrap:nowrap}.board-toolbar button{min-width:40px}}
 .board-toolbar button.play-from{flex:0 0 auto;padding:6px 14px;font-size:var(--fs-sm);font-weight:700;background:var(--accent);color:#fff;white-space:nowrap}
 .board-toolbar button.play-from:hover:not(:disabled){background:var(--accent);filter:brightness(1.12)}
+/* Compact like «Gioca da qui», at most two lines: the toolbar's arrow style made it wrap on three lines and the review page scroll. */
+.board-toolbar .stuck-control{flex:0 0 auto}
+.board-toolbar button.stuck-button{flex:0 0 auto;max-width:132px;padding:4px 10px;font-size:var(--fs-sm);font-weight:700;line-height:1.15;background:var(--accent-soft)}
+.board-toolbar button.stuck-button:hover:not(:disabled){background:var(--accent-soft);filter:brightness(.96)}
+.review-controls .review-step small{white-space:nowrap}
 .play-history-actions{display:flex;flex-wrap:wrap;gap:8px}
 .flip-button[aria-pressed=true]{background:var(--surface-3)}
 
