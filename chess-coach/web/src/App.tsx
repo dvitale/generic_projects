@@ -107,6 +107,8 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
   })
   const [tab, setTab] = useState<Tab>(entrySection??'play')
   const [reviewTab,setReviewTab] = useState('moves')
+  // Where a click on a listed mistake came from, so the Moves panel can lead back to the list.
+  const [reviewReturn,setReviewReturn] = useState<{tab:'quality'|'final';ply:number}|null>(null)
   const [arrowSources,setArrowSources]=useState({stockfish:true,maia:true,played:true})
   // Review: a selected piece shows Maia's probability for each of its moves, coloured by Stockfish's verdict.
   const [pieceOdds,setPieceOdds]=useState(true),[pieceSquare,setPieceSquare]=useState<string|null>(null)
@@ -329,7 +331,7 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
   },[tab,game?.id,game?.version])
 
   useEffect(()=>{setGuided(null)},[game?.id])
-  useEffect(()=>{if(game){setReviewElo(game.elo);setReviewTab(cursor<game.version?'moves':'quality')}},[game?.id])
+  useEffect(()=>{setReviewReturn(null);if(game){setReviewElo(game.elo);setReviewTab(cursor<game.version?'moves':'quality')}},[game?.id])
 
   const needsPrediction=arrowSources.maia||['moves','insights'].includes(reviewTab)||!!pieceSquare
   useEffect(() => {
@@ -475,14 +477,22 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
   }
   async function analyze() {
     if (!game) return
-    setReviewTab(current=>current==='evaluation'?'evaluation':'moves')
+    setReviewTab(current=>current==='evaluation'?'evaluation':'moves');setReviewReturn(null)
     setBusy(true); setError(''); setTab('review'); setCursor(game.version)
     try { const result = await api<{jobId:string}>(`/games/${game.id}/analysis`,{}); setProgress(0); setJobId(result.jobId) }
     catch (e) {fail(e)} finally {setBusy(false)}
   }
+  function backToList(){
+    if(!reviewReturn)return
+    const {tab:back,ply}=reviewReturn
+    setReviewReturn(null);setReviewTab(back)
+    // Once the list is visible again, put the focus (and the scroll) on the mistake just reviewed.
+    requestAnimationFrame(()=>{const panel=document.getElementById('review-panel-'+back),item=panel?.querySelector<HTMLElement>(`[data-ply="${ply}"]`)
+      if(item){item.focus();item.scrollIntoView({block:'center'})}else panel?.scrollIntoView({block:'start'})})
+  }
   async function openGame(id: string, ply?:number) {
     setBusy(true); setError('')
-    try {const next = await api<Game>('/games/'+id); keepGame(next); setCursor(ply??next.version); if(ply!==undefined)setReviewTab('moves'); setTab('review')}
+    try {const next = await api<Game>('/games/'+id); keepGame(next); setCursor(ply??next.version); setReviewReturn(null); if(ply!==undefined)setReviewTab('moves'); setTab('review')}
     catch(e){fail(e)} finally {setBusy(false)}
   }
   async function openTraining(kind:'puzzle'|'prevention'|'alternative'|'line',id:string){
@@ -588,12 +598,12 @@ export default function App({onLogout}:{onLogout?:(()=>void)|null}={}) {
             <div className="review-toolbar"><div className="row"><button className="primary" onClick={analyze} disabled={!game?.version||busy||!!jobId}>{game?.analysis?'Ricalcola analisi':'Analizza partita'}</button>{(game?.source==='maia'||game?.source==='stockfish')&&!game.result&&<button disabled={!!jobId} onClick={()=>setTab('play')}>Continua partita</button>}</div>{jobId&&<div role="status"><p>Stockfish analizza la partita… {progress}%</p><progress value={progress} max={100}/></div>}</div>
             {game&&<ReviewSummary game={game} cursor={cursor} onPosition={setCursor}/>}
             {game&&<PgnExport game={game}/>}
-            <PanelTabs id="review" label="Pannelli della revisione" value={reviewTab} onChange={setReviewTab} items={[{id:'quality',label:'Decisioni'},{id:'moves',label:'Mosse'},{id:'evaluation',label:'Andamento'},{id:'final',label:'Commento finale'},{id:'tutor',label:'Tutor'},{id:'insights',label:'Approfondimenti'}]}/>
+            <PanelTabs id="review" label="Pannelli della revisione" value={reviewTab} onChange={v=>{setReviewReturn(null);setReviewTab(v)}} items={[{id:'quality',label:'Decisioni'},{id:'moves',label:'Mosse'},{id:'evaluation',label:'Andamento'},{id:'final',label:'Commento finale'},{id:'tutor',label:'Tutor'},{id:'insights',label:'Approfondimenti'}]}/>
           </>}
-          {tab==='review'&&<div role="tabpanel" id="review-panel-final" aria-labelledby="review-tab-final" hidden={reviewTab!=='final'}>{game?<FinalReview game={game} disabled={!!jobId||busy} onPosition={ply=>{setCursor(ply);setReviewTab('moves')}}/>:<section className="panel"><p>Seleziona una partita per richiedere il commento finale.</p></section>}</div>}
+          {tab==='review'&&<div role="tabpanel" id="review-panel-final" aria-labelledby="review-tab-final" hidden={reviewTab!=='final'}>{game?<FinalReview game={game} disabled={!!jobId||busy} onPosition={ply=>{setCursor(ply);setReviewReturn({tab:'final',ply});setReviewTab('moves')}}/>:<section className="panel"><p>Seleziona una partita per richiedere il commento finale.</p></section>}</div>}
           {tab==='review'&&<div role="tabpanel" id="review-panel-evaluation" aria-labelledby="review-tab-evaluation" hidden={reviewTab!=='evaluation'}>{game?<EvaluationChart game={game} cursor={cursor} onPosition={setCursor} analyzing={!!jobId} onAnalyze={analyze}/>:<section className="panel"><p>Seleziona una partita per visualizzare il grafico.</p></section>}</div>}
-          {tab==='review'&&<div role="tabpanel" id="review-panel-moves" aria-labelledby="review-tab-moves" hidden={reviewTab!=='moves'}>{game?<MoveReview game={game} cursor={cursor} onPosition={setCursor} level={reviewElo} onLevel={setReviewElo} prediction={visiblePrediction} error={predictionError} onRetry={()=>setRetry(n=>n+1)} analyzing={busy||!!jobId} onAnalyze={analyze}/>:<section className="panel"><p>Gioca una partita o importa un PGN per iniziare.</p></section>}</div>}
-          {game&&(tab==='review'||(tab==='play'&&!!game.result))&&<div role={tab==='review'?'tabpanel':undefined} id="review-panel-quality" aria-labelledby={tab==='review'?'review-tab-quality':undefined} hidden={tab==='review'&&reviewTab!=='quality'}><DecisionQuality game={game} disabled={!!jobId||busy} onAnalyze={analyze} onPosition={ply=>{setTab('review');setCursor(ply);setReviewTab('moves')}}/><button className="full" onClick={()=>{setTab('review');setReviewTab('final')}}>Commento finale · andamento e punti da approfondire →</button>{game.analysis&&game.source!=='stockfish'&&<button className="full" onClick={()=>{setStudyGame(game.id);showStudySection('pack');navigate('study')}}>Studia questa partita · quiz, flashcard, tutor →</button>}<details className="panel maia-secondary"><summary>Somiglianza con Maia · facoltativa</summary><RatingPanel key={'rating:'+game.id+':'+game.version+':'+game.revision} game={game} disabled={!!jobId||busy} onRated={rating=>setGame(current=>current?.id===game.id&&current.version===game.version&&current.revision===game.revision?{...current,rating}:current)}/></details></div>}
+          {tab==='review'&&<div role="tabpanel" id="review-panel-moves" aria-labelledby="review-tab-moves" hidden={reviewTab!=='moves'}>{reviewReturn&&<button className="full review-return" onClick={backToList}>← Torna {reviewReturn.tab==='quality'?'alle decisioni':'al commento finale'}</button>}{game?<MoveReview game={game} cursor={cursor} onPosition={setCursor} level={reviewElo} onLevel={setReviewElo} prediction={visiblePrediction} error={predictionError} onRetry={()=>setRetry(n=>n+1)} analyzing={busy||!!jobId} onAnalyze={analyze}/>:<section className="panel"><p>Gioca una partita o importa un PGN per iniziare.</p></section>}</div>}
+          {game&&(tab==='review'||(tab==='play'&&!!game.result))&&<div role={tab==='review'?'tabpanel':undefined} id="review-panel-quality" aria-labelledby={tab==='review'?'review-tab-quality':undefined} hidden={tab==='review'&&reviewTab!=='quality'}><DecisionQuality game={game} disabled={!!jobId||busy} onAnalyze={analyze} onPosition={ply=>{setTab('review');setCursor(ply);setReviewReturn({tab:'quality',ply});setReviewTab('moves')}}/><button className="full" onClick={()=>{setTab('review');setReviewTab('final')}}>Commento finale · andamento e punti da approfondire →</button>{game.analysis&&game.source!=='stockfish'&&<button className="full" onClick={()=>{setStudyGame(game.id);showStudySection('pack');navigate('study')}}>Studia questa partita · quiz, flashcard, tutor →</button>}<details className="panel maia-secondary"><summary>Somiglianza con Maia · facoltativa</summary><RatingPanel key={'rating:'+game.id+':'+game.version+':'+game.revision} game={game} disabled={!!jobId||busy} onRated={rating=>setGame(current=>current?.id===game.id&&current.version===game.version&&current.revision===game.revision?{...current,rating}:current)}/></details></div>}
           {tab==='review'&&!game&&<div role="tabpanel" id="review-panel-quality" aria-labelledby="review-tab-quality" hidden={reviewTab!=='quality'} className="panel">Seleziona una partita per rivedere la qualità delle decisioni.</div>}
           {tab==='play'&&<>
             {game?.source==='stockfish'&&<section className="panel refutation-panel" aria-label="Confutazione"><span className="eyebrow">IMPARA DAL TENTATIVO</span><h3>Difendi {refutationOrigin?.gameId===game.id?refutationOrigin.san:'la tua mossa'} contro Stockfish</h3><p className="muted">La partita parte dopo la mossa che l’esercizio ha rifiutato. Stockfish gioca a piena forza: la sua prima risposta è di solito ciò che non avevi visto. Annulla e prova altre difese per capire se il problema si può riparare.</p><small className="footnote">Partita di studio: non crea puzzle e non entra nei Progressi.</small>{refutationOrigin?.gameId===game.id&&<button className="full" disabled={busy} onClick={()=>{const origin=refutationOrigin;if(origin.kind==='study')navigate('study');else if(origin.kind==='puzzle'&&exercise?.id===origin.targetId)setTab('train');else void openTraining(origin.kind,origin.targetId)}}>← Torna {refutationOrigin.kind==='puzzle'?'al puzzle':refutationOrigin.kind==='study'?'allo studio':'all’esercizio'}</button>}</section>}

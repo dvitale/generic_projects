@@ -26,7 +26,7 @@ export default function FinalReview({game,disabled,onPosition}:{game:Game;disabl
     catch(e){if(current===epoch.current)setError(e instanceof Error?e.message:'Commento non disponibile: riprova.')}
     finally{if(current===epoch.current)setBusy(false)}
   }
-  function links(point:Point){return <div className="row">{point.plies.map(ply=><button className="quiet" key={ply} onClick={()=>onPosition(ply)}>Rivedi {review?.references.find(r=>r.ply===ply)?.label??'la posizione'} ↗</button>)}</div>}
+  function links(point:Point){return <div className="row">{point.plies.map(ply=><button className="quiet" key={ply} data-ply={ply} onClick={()=>onPosition(ply)}>Rivedi {review?.references.find(r=>r.ply===ply)?.label??'la posizione'} ↗</button>)}</div>}
   return <section className="panel final-review" aria-label="Commento finale della partita">
     <span className="eyebrow">IL BILANCIO DELLA PARTITA</span><h2>Andamento e prossimi passi</h2>
     <p className="muted">Una lettura d’insieme: come è cambiata la partita, cosa ha funzionato e quali decisioni approfondire.</p>

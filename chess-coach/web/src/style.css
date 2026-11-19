@@ -308,6 +308,7 @@ details.panel>summary{font-weight:650;font-size:var(--fs-lg)}
 .panel-tabs button{flex:1;min-height:36px;padding:6px 10px;border-color:transparent;background:transparent;font-size:var(--fs-sm);white-space:nowrap;color:var(--text-2)}
 .panel-tabs button[aria-selected=true]{background:var(--surface);border-color:var(--border);box-shadow:var(--shadow-sm);color:var(--accent-ink);font-weight:650}
 .layout-review .panel-tabs{flex-wrap:nowrap;overflow-x:auto}
+.review-return{margin-bottom:8px}
 [role=tabpanel]{min-width:0}
 
 /* Review */

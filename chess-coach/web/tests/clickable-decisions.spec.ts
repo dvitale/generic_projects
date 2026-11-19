@@ -26,4 +26,15 @@ test('decision tile opens all mistakes, filters them and navigates to the select
   await list.getByRole('button',{name:/4\. Ba4/}).click()
   await expect(page.getByRole('tab',{name:'Mosse',exact:true})).toHaveAttribute('aria-selected','true')
   await expect(page.getByRole('combobox',{name:'Mossa da confrontare'})).toHaveValue('6')
+  // Back to the list: same filter, still expanded, focus on the mistake just reviewed.
+  await page.getByRole('button',{name:'← Torna alle decisioni'}).click()
+  await expect(page.getByRole('tab',{name:'Decisioni',exact:true})).toHaveAttribute('aria-selected','true')
+  await expect(list.getByRole('listitem')).toHaveCount(2)
+  await expect(list.getByRole('button',{name:/4\. Ba4/})).toBeFocused()
+  await list.getByRole('button',{name:/2\. Nf3/}).click()
+  await expect(page.getByRole('combobox',{name:'Mossa da confrontare'})).toHaveValue('2')
+  // Choosing a tab by hand drops the shortcut.
+  await page.getByRole('tab',{name:'Andamento',exact:true}).click()
+  await page.getByRole('tab',{name:'Mosse',exact:true}).click()
+  await expect(page.getByRole('button',{name:'← Torna alle decisioni'})).toHaveCount(0)
 })

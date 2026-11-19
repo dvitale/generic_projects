@@ -28,6 +28,8 @@ test('final comment is requested explicitly, saved, and links to the exact decis
   await panel.getByRole('button',{name:'Rivedi 3. Qxe5+ ↗',exact:true}).click()
   await expect(page.getByRole('tab',{name:'Mosse',exact:true})).toHaveAttribute('aria-selected','true')
   await expect(page.getByRole('combobox',{name:'Mossa da confrontare'})).toHaveValue('4')
+  await page.getByRole('button',{name:'← Torna al commento finale'}).click()
+  await expect(panel.getByRole('button',{name:'Rivedi 3. Qxe5+ ↗',exact:true})).toBeFocused()
   await page.reload()
   await page.getByRole('tab',{name:'Commento finale',exact:true}).click()
   await expect(panel).toContainText('Una svolta da rivedere.')
