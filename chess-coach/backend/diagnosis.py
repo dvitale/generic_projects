@@ -32,8 +32,13 @@ CONCRETE_DROP_CP = 150
 # and is prophylactic when it takes at least this much off the opponent's best threat.
 QUIET_THREAT_CP = 150
 PROPHYLAXIS_CP = 150
+# The opponent's free move mates or wins at least this much: the solution is a defence first, whatever it also
+# threatens (puzzle 96-22B: f3 parries ...Qg2#, and its follow-up threat sent the hint the wrong way).
+URGENT_CP = 300
+# Version of the solution rules: 2 puts an urgent defence first and counts a threat made illegal as stopped.
+SOLUTION_RULES = 2
 SOLUTIONS = ('forcing', 'quiet_threat', 'prophylaxis', 'improvement')
-OBSTACLES = ('inconclusive', 'no_plan', 'calculation', 'danger')
+OBSTACLES = ('inconclusive', 'exhausted', 'no_plan', 'calculation', 'danger')
 WINDOW = 30
 UCI = r'^[a-h][1-8][a-h][1-8][qrbn]?$'
 
@@ -69,7 +74,7 @@ class DiagnosisBody(ContextBody):
     candidate: str | None = Field(default=None, pattern=UCI)
     candidate_reason: Literal['material', 'mate', 'calculation', 'inconclusive', 'other'] | None = None
     # What stopped the search, in the player's words: needed when no candidate was forcing.
-    obstacle: Literal['inconclusive', 'no_plan', 'calculation', 'danger'] | None = None
+    obstacle: Literal['inconclusive', 'exhausted', 'no_plan', 'calculation', 'danger'] | None = None
     note: str = Field(default='', max_length=1000)
 
 
@@ -113,13 +118,17 @@ def solution(board, best, threat):
         return None
     move = chess.Move.from_uci(best['pv'][0])
     path = insights.line(board, best)
-    found = {'move': move.uci(), 'san': board.san(move), 'line': [s['san'] for s in path['steps'][:8]], 'gain': gain(path)}
+    found = {'move': move.uci(), 'san': board.san(move), 'line': [s['san'] for s in path['steps'][:8]], 'gain': gain(path),
+             'rules': SOLUTION_RULES}
     forcing = [name for name, hit in (('check', board.gives_check(move)), ('capture', board.is_capture(move)),
                                        ('promotion', bool(move.promotion))) if hit]
     if forcing:
         return {**found, 'kind': 'forcing', 'forcing': forcing}
     after = board.copy(stack=False)
     after.push(move)
+    defence = stops(board, move, after, best, threat)
+    if defence and value(best) - value(threat['evaluation']) >= URGENT_CP:
+        return {**found, **defence, 'urgent': True}
     # Moving again after the solution shows what it threatens; the opponent must answer it.
     again = threat_board(after)
     if again is not None:
@@ -130,20 +139,27 @@ def solution(board, best, threat):
         sooner = follow['mate'] is not None and best['mate'] is not None and 0 < follow['mate'] < best['mate']
         if forcing_hit and (sooner or value(follow) - value(best) >= QUIET_THREAT_CP):
             return {**found, 'kind': 'quiet_threat', 'threat': {'san': follow['san'][0], 'evaluation': follow}}
-    # The opponent's best move with a free tempo, played after the solution: does it still work?
-    if threat and threat['move'] and value(best) - value(threat['evaluation']) >= PROPHYLAXIS_CP:
-        stopped = chess.Move.from_uci(threat['move'])
-        if stopped in after.legal_moves:
-            line = player_view(evaluator.evaluate(after, stopped, nodes=NODES))
-            if value(line) - value(threat['evaluation']) >= PROPHYLAXIS_CP:
-                return {**found, 'kind': 'prophylaxis', 'stopped': {'san': threat['san'], 'before': threat['evaluation'], 'after': line},
-                        'blocked': blocked(board, move)}
+    if defence:
+        return {**found, **defence}
     moved = board.piece_at(move.from_square)
     before, later = insights.features(board, board.turn), insights.features(after, board.turn)
     facts = {'piece': moved.symbol().upper(), 'reach': [before['pieceReach'], later['pieceReach']],
              'openRooks': later['openRooks'] if later['openRooks'] != before['openRooks'] else None,
              'center': later['center'] if len(later['center']) > len(before['center']) else None}
     return {**found, 'kind': 'improvement', 'facts': facts}
+
+
+def stops(board, move, after, best, threat):
+    """The prophylaxis facts when the solution takes at least PROPHYLAXIS_CP off the opponent's best free move, or None."""
+    if not (threat and threat['move'] and value(best) - value(threat['evaluation']) >= PROPHYLAXIS_CP):
+        return None
+    stopped = chess.Move.from_uci(threat['move'])
+    # A solution that makes the threat illegal (a blocked line, a captured attacker) leaves its own line.
+    line = player_view(evaluator.evaluate(after, stopped, nodes=NODES)) if stopped in after.legal_moves else best
+    if value(line) - value(threat['evaluation']) < PROPHYLAXIS_CP:
+        return None
+    return {'kind': 'prophylaxis', 'stopped': {'san': threat['san'], 'before': threat['evaluation'], 'after': line},
+            'blocked': blocked(board, move)}
 
 
 def blocked(board, move):
@@ -324,9 +340,17 @@ def hints(board, found, tempt=None, choices=None):
     elif kind == 'prophylaxis':
         # The opponent's idea is named at once: guessing it is the point of the method, not of the hint.
         side = 'il Nero' if board.turn else 'il Bianco'
-        first = (f"Non è uno scacco né una cattura: la mossa giusta toglie forza all’idea migliore {explain.articled('del', side)}. "
-                 f"Se toccasse {explain.articled('al', side)}, Stockfish giocherebbe {idea_line(board, found['stopped'])}. "
-                 'Cerca la mossa che rende quell’idea meno efficace.')
+        mate = (found['stopped'].get('before') or {}).get('mate')
+        if found.get('urgent'):
+            # A threat this big comes before anything else: name it, and the question that finds it every time.
+            threat = 'matto' if mate is not None else 'un guadagno decisivo'
+            first = (f"Prima di cercare la tua mossa, guarda quella {explain.articled('del', side)}: minaccia {threat}. "
+                     f"Se toccasse {explain.articled('al', side)}, Stockfish giocherebbe {idea_line(board, found['stopped'])}. "
+                     'Cerca la mossa che lo impedisce: la domanda «che cosa minaccia?» viene prima di ogni attacco.')
+        else:
+            first = (f"Non è uno scacco né una cattura: la mossa giusta toglie forza all’idea migliore {explain.articled('del', side)}. "
+                     f"Se toccasse {explain.articled('al', side)}, Stockfish giocherebbe {idea_line(board, found['stopped'])}. "
+                     'Cerca la mossa che rende quell’idea meno efficace.')
     else:
         first = ('Non c’è un colpo tattico: la mossa giusta migliora un pezzo. '
                  'Cerca il tuo pezzo meno attivo e chiediti su quale casa lavorerebbe meglio.')

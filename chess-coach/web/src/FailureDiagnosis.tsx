@@ -29,7 +29,7 @@ export const diagnosisLabels:Record<string,{title:string;practice:string}>={
   accurate:{title:'Lettura corretta',practice:'Valutazione e minacce erano giuste: il punto debole è il calcolo della sequenza. Allenati con problemi a più mosse.'},
 }
 const reasons=[['material','Mi sembrava perdere materiale'],['mate','Temevo un matto o un attacco'],['calculation','Non riuscivo a calcolarla fino in fondo'],['inconclusive','Mi sembrava inconcludente'],['other','Altro motivo']] as const
-const obstacles=[['inconclusive','Le candidate erano inconcludenti: niente scacchi, catture o minacce utili'],['no_plan','Non sapevo quale piano seguire'],['calculation','Non riuscivo a calcolare le varianti'],['danger','Temevo le risposte dell’avversario']] as const
+const obstacles=[['inconclusive','Le candidate erano inconcludenti: niente scacchi, catture o minacce utili'],['exhausted','Ho finito le candidate: le ho provate tutte e nessuna funziona'],['no_plan','Non sapevo quale piano seguire'],['calculation','Non riuscivo a calcolare le varianti'],['danger','Temevo le risposte dell’avversario']] as const
 export const solutionLabels:Record<Solution['kind'],{title:string;practice:string}>={
   forcing:{title:'Soluzione forzante',practice:'Prima di valutare le mosse tranquille elenca tutti gli scacchi, le catture e le promozioni, anche quelli che sembrano perdere materiale, e gioca ciascuno fino alla risposta forzata.'},
   quiet_threat:{title:'Mossa tranquilla con una minaccia',practice:'Quando nessuna mossa forzante funziona, chiediti: quale mossa mi darebbe uno scacco, una cattura o un matto alla mossa successiva? Una minaccia che l’avversario deve parare vale quanto una mossa forzante.'},
@@ -74,6 +74,11 @@ function describeSolution(d:Diagnosis,s:Solution,color:Color){
   if((d.answer.obstacle==='inconclusive'||d.answer.obstacle==='no_plan')&&d.search==='missed_solution')
     text+=s.kind==='forcing'?` Le tue candidate ti sembravano inconcludenti${tried.length?` (${sanList(tried)})`:''}, ma la soluzione era proprio una mossa forzante che non avevi considerato.`
       :' Non hai trovato la mossa perché, probabilmente, cercavi scacchi, catture e minacce dirette: qui la soluzione è una mossa tranquilla, e va cercata con un’altra domanda.'
+  // Every candidate failed: the solution was not on the list, so the list needs a question it lacked.
+  if(d.answer.obstacle==='exhausted'&&d.search==='missed_solution')
+    text+=` Avevi provato tutte le candidate che vedevi${tried.length?` (${sanList(tried)})`:''}: la soluzione non era nella tua lista. `+(s.kind==='forcing'?'Era una mossa forzante che non avevi considerato: rifai il giro di scacchi, catture e minacce, anche quelle che sembrano sacrifici.'
+      :s.kind==='prophylaxis'?'Era una difesa: quando nessun attacco funziona, chiediti prima che cosa minaccia l’avversario.'
+      :'Era una mossa tranquilla: quando nessuna mossa diretta funziona, cerca quella che migliora un pezzo o prepara una minaccia.')
   return text
 }
 

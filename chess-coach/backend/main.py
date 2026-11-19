@@ -1282,9 +1282,16 @@ def exercise_solution(row):
     """The kind of solution of a puzzle, classified once per exercise; the endgame flag and the motif feed the gap analysis.
     Solutions stored before the motif existed get it on the next read, without asking Stockfish again."""
     found = json.loads(row["solution"]) if row.get("solution") else None
-    if found and "motif" in found:
+    stale = bool(found) and found.get("rules", 1) < diagnosis.SOLUTION_RULES and found.get("kind") in ("quiet_threat", "improvement")
+    if found and "motif" in found and not stale:
         return found
     board = reconstruct(row["initial_fen"], json.loads(row["history"]))
+    if stale:
+        # Only these kinds can change with the newer rules: the kind's evidence is replaced, the rest is kept.
+        fresh = diagnosis.solution_of(board)
+        if fresh:
+            kept = {k: v for k, v in found.items() if k not in ("kind", "threat", "stopped", "blocked", "facts", "forcing", "urgent")}
+            found = {**kept, **fresh}
     if found is None:
         found = diagnosis.solution_of(board)
         if found:
@@ -1359,7 +1366,9 @@ def attempt(exercise_id: str, body: AttemptInput):
     if move not in board.legal_moves:
         raise HTTPException(422, "Mossa non legale")
     best, actual, loss = evaluator.compare(board, move, nodes=80000)
-    success = mistakes.accepted(best, actual)
+    with database() as con:
+        known = puzzle_history.accepted_before(con, exercise_id, body.move)
+    success = known or mistakes.judge(board, move, best, actual)
     with database() as con:
         con.execute("BEGIN IMMEDIATE")
         session = active_session(con, exercise_id, body.session_id, body.version)
@@ -1424,7 +1433,9 @@ def practice(exercise_id: str, body: PracticeInput):
     if move not in board.legal_moves:
         raise HTTPException(422, "Mossa non legale")
     best, actual, loss = evaluator.compare(board, move, nodes=80000)
-    return {"success": mistakes.accepted(best, actual), "san": board.san(move), "actual": actual}
+    with database() as con:
+        known = puzzle_history.accepted_before(con, exercise_id, body.move)
+    return {"success": known or mistakes.judge(board, move, best, actual), "san": board.san(move), "actual": actual}
 
 
 def puzzle_diagnosis_position(con, exercise_id, session_id):

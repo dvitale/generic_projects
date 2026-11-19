@@ -31,6 +31,13 @@ def wrong_moves(con, exercise_id):
         ORDER BY a.id''', (exercise_id,))]
 
 
+def accepted_before(con, exercise_id, move):
+    """Whether the same move was already accepted on this position (copies included): a verdict never flips back."""
+    return con.execute('''SELECT 1 FROM attempts a JOIN exercises e ON e.id=a.exercise_id WHERE a.move=? AND a.success=1
+        AND (e.id=? OR e.position_key=(SELECT position_key FROM exercises WHERE id=?)) LIMIT 1''',
+        (move, exercise_id, exercise_id)).fetchone() is not None
+
+
 def repeated(con, exercise_id, session_id, move):
     """The earlier sessions in which the same wrong move was played on this position: count and last time, or None."""
     earlier = [(s, at) for s, m, at in wrong_moves(con, exercise_id) if m == move and s != session_id]

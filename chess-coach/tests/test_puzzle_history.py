@@ -80,3 +80,29 @@ def test_the_cap_holds_the_review_stage_of_a_persistent_puzzle(client):
     # Without the repeated mistake a third success would retire it, and the next review would be three days away.
     row = client.get('/api/exercises/ex').json()
     assert row['retired'] is None and row['streak'] == 2
+
+
+def test_a_move_accepted_once_on_a_position_stays_accepted(client):
+    # Puzzle 96-22B: Bc4+ passed on one day and failed on another, only from engine noise near the threshold.
+    seed()
+    s1 = client.post('/api/exercises/ex/sessions').json()['id']
+    assert not guess(client, s1, 'g6g8', 0)['success']
+    with main.database() as con:
+        con.execute("UPDATE attempts SET success=1 WHERE session_id=?", (s1,))
+    client.post('/api/exercises/ex/reveal', json={'session_id': s1})
+    s2 = client.post('/api/exercises/ex/sessions').json()['id']
+    assert guess(client, s2, 'g6g8', 0)['success']
+
+
+def test_a_borderline_loss_is_judged_again_in_one_search(monkeypatch):
+    import chess
+    board, move = chess.Board(), chess.Move.from_uci('d2d4')
+    line = lambda uci, cp: {'cp': cp, 'mate': None, 'pv': [uci], 'san': []}
+    best, actual = line('e2e4', -228), line('d2d4', -310)
+    asked = []
+    monkeypatch.setattr(main.mistakes.evaluator, 'rank', lambda b, moves, nodes: asked.append(moves) or [line('e2e4', -300), line('d2d4', -330)])
+    # 0.82 lost in two searches, 0.30 in one: the same-search comparison decides.
+    assert not main.mistakes.accepted(best, actual) and main.mistakes.judge(board, move, best, actual)
+    assert asked == [[chess.Move.from_uci('e2e4'), move]]
+    # Far from the threshold the first verdict stands, without another search.
+    assert not main.mistakes.judge(board, move, best, line('d2d4', -500)) and len(asked) == 1

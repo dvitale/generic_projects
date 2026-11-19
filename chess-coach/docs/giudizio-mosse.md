@@ -49,6 +49,11 @@ Blunder prevention e *Trova un'alternativa* hanno criteri propri, già legati al
 
 ## Limiti noti
 
-La franchigia elimina il rumore solo nelle zone sature. Nella zona in bilico, fra −6 e +6, la stessa mossa può ancora ricevere giudizi diversi in momenti diversi. Ci sono tre ragioni: le ricerche sono brevi (10.000–80.000 nodi) e con due thread non sono ripetibili, revisione e puzzle usano procedure diverse (`compare_candidates` contro `compare`), e un verdetto già dato non viene salvato né riusato. Restano da fare un giudice unico ripetibile e i verdetti salvati per coppia posizione–mossa.
+La franchigia elimina il rumore solo nelle zone sature. Nella zona in bilico, fra −6 e +6, la stessa mossa può ancora ricevere giudizi diversi in momenti diversi. Ci sono tre ragioni: le ricerche sono brevi (10.000–80.000 nodi) e con due thread non sono ripetibili, revisione e puzzle usano procedure diverse (`compare_candidates` contro `compare`), e un verdetto già dato non viene salvato né riusato. Dal 19 novembre 2026 i Puzzle (tentativi e pratica libera) attenuano il problema in due modi (`mistakes.judge`, `puzzle_history.accepted_before`):
+
+- **Verdetto che non torna indietro:** una mossa già accettata in quella posizione, copie comprese, resta accettata.
+- **Confronto nella stessa ricerca:** quando la perdita cade a meno di 40 centesimi dalla soglia di 70 (fra 30 e 109), la migliore e la mossa giocata vengono rivalutate insieme in una sola ricerca MultiPV (`Evaluator.rank`), e decide quel confronto. Nel puzzle 96-22B Bc4+ era stata accettata il 10 novembre e respinta il 19, con una perdita di 0,82 misurata in due ricerche separate contro una differenza reale di circa 0,25.
+
+Restano da fare un giudice unico ripetibile anche per revisione ed Esame, e i verdetti salvati per coppia posizione–mossa anche per le mosse respinte.
 
 Prove: `tests/test_review_loss.py`, `tests/test_learning.py`, `web/tests/review-summary.spec.ts`.

@@ -35,6 +35,22 @@ def accepted(best, actual):
     return review_loss(best, actual) < PUZZLE_TOLERANCE_CP and not missed_mate(best, actual)
 
 
+# Two separate searches can disagree by a few tenths, enough to flip a verdict near the threshold (puzzle 96-22B:
+# Bc4+ passed on one day and failed on another). Near it, the two moves are compared again in one MultiPV search.
+BORDERLINE_CP = 40
+
+
+def judge(board, move, best, actual, nodes=80000):
+    """The puzzle verdict of a move against the best one, with a same-search comparison when the loss is borderline."""
+    verdict = accepted(best, actual)
+    top = best['pv'][0] if best['pv'] else None
+    if (top is None or top == move.uci() or best['mate'] is not None or actual['mate'] is not None
+            or abs(review_loss(best, actual) - PUZZLE_TOLERANCE_CP) >= BORDERLINE_CP):
+        return verdict
+    lines = {e['pv'][0]: e for e in evaluator.rank(board, [chess.Move.from_uci(top), move], nodes=nodes)}
+    return accepted(lines[top], lines[move.uci()]) if top in lines and move.uci() in lines else verdict
+
+
 def record(con, kind, target_id, attempt_id, board, move, best, actual, timestamp):
     # Mate scores are not pawn values: never turn engine mate sentinels into a loss.
     loss = review_loss(best, actual) if best['mate'] is None and actual['mate'] is None else None

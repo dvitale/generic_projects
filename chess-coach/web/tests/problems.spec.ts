@@ -51,6 +51,7 @@ test('Problems from real games: rating bands, solving, mistakes and the Maia est
   await diagnosis.locator('[data-square="d6"]').click();await diagnosis.locator('[data-square="c5"]').click()
   await expect(diagnosis.getByText('Candidata: Qc5+')).toBeVisible()
   await diagnosis.getByLabel('Perché l’hai scartata?').selectOption('calculation')
+  await expect(diagnosis.getByLabel('Cosa ti bloccava?').locator('option[value="exhausted"]')).toHaveText('Ho finito le candidate: le ho provate tutte e nessuna funziona')
   await diagnosis.getByLabel('Cosa ti bloccava?').selectOption('inconclusive')
   await diagnosis.getByRole('button',{name:'Confronta e mostra la soluzione'}).click()
   await expect(diagnosis.getByRole('heading',{name:'La tua diagnosi'})).toBeVisible({timeout:30000})

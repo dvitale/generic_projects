@@ -144,10 +144,27 @@ def test_hints_for_a_quiet_solution_never_point_to_checks_and_captures(client):
     board = chess.Board('r5k1/5ppp/8/8/8/1Q6/5PPP/6K1 w - - 0 1')
     found = diagnosis.solution_of(board)
     first, second = diagnosis.hints(board, found)
-    assert found['kind'] == 'prophylaxis' and first['title'] == 'Profilassi' and first['text'].startswith('Non è uno scacco né una cattura')
-    # The opponent's idea is named in the first hint, with Stockfish's line from the passed move.
-    assert 'idea migliore del Nero. Se toccasse al Nero, Stockfish giocherebbe 1… Ra1+' in first['text']
+    # Black would mate on the back rank: the threat is named first, as a defence before any attack.
+    assert found['kind'] == 'prophylaxis' and found['urgent'] and first['title'] == 'Profilassi'
+    assert first['text'].startswith('Prima di cercare la tua mossa, guarda quella del Nero: minaccia matto. Se toccasse al Nero, Stockfish giocherebbe 1… Ra1+')
     assert second['squares'] == [chess.square_name(chess.Move.from_uci(found['move']).from_square)] and second['text'].endswith('è il pezzo che muove.')
+
+
+def test_parrying_a_mate_threat_is_a_defence_even_when_the_move_also_threatens():
+    # Puzzle 96-22B: ...Qg2# is threatened along the long diagonal. f3 shuts it and also prepares dxe5, so the rules
+    # used to call it a quiet move with a threat, and the first hint asked what White would play with two moves in a row.
+    from backend.engine import evaluator
+    board = chess.Board('b5k1/1q2p1bp/1p3np1/4p3/3P2P1/2PBP2P/PP3P1B/R4RK1 w - - 0 22')
+    best = evaluator.evaluate(board, chess.Move.from_uci('f2f3'), nodes=diagnosis.NODES)
+    passed = diagnosis.player_view(evaluator.evaluate(diagnosis.threat_board(board), nodes=diagnosis.NODES))
+    found = diagnosis.solution(board, best, {'move': passed['pv'][0], 'san': passed['san'][0], 'evaluation': passed})
+    # The queen move is no longer legal after f3: the threat counts as stopped, with the solution's own line.
+    assert found['kind'] == 'prophylaxis' and found['urgent'] and found['rules'] == diagnosis.SOLUTION_RULES
+    assert found['stopped']['san'] in ('Qg2#', 'Qh1#') and found['stopped']['after'] is best
+    assert found['blocked']['square'] in ('a8', 'b7') and found['blocked']['king']
+    first = diagnosis.hints(board, found)[0]
+    assert first['text'].startswith('Prima di cercare la tua mossa, guarda quella del Nero: minaccia matto.')
+    assert 'due volte di fila' not in first['text']
 
 
 def test_a_prophylactic_move_names_the_line_it_closes():
@@ -168,6 +185,12 @@ def test_obstacle_is_stored_and_missed_solutions_are_counted_by_kind(stocked):
     assert saved['answer']['obstacle'] == 'inconclusive' and saved['ruleVersion'] == 2
     assert saved['search'] == 'missed_solution' and saved['evidence']['solution']['kind'] == 'forcing'
     assert stocked.get('/api/diagnoses/summary').json()['recent']['solutions']['forcing'] == 1
+
+
+def test_running_out_of_candidates_is_an_obstacle_of_its_own(stocked):
+    problem = start(stocked, band=0)
+    saved = diagnose(stocked, 'problem', problem['puzzle']['id'], problem['sessionId'], assessment='better', obstacle='exhausted').json()
+    assert saved['answer']['obstacle'] == 'exhausted'
 
 
 def fake_maia(monkeypatch, moves):
