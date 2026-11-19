@@ -1025,3 +1025,10 @@ details.panel>summary{font-weight:650;font-size:var(--fs-lg)}
 .opening-status.out-of-book{border-left-color:#c98a1b}
 .opening-status.out-of-book small{color:var(--text);font-weight:600}
 .drill-resume{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.prevention-checks{padding:12px 16px}
+.prevention-checklist{margin:0 0 10px;font-size:var(--fs-sm);line-height:1.4;color:var(--text-2)}
+.prevention-checklist strong{color:var(--text)}
+.prevention-checks .row{margin:0}
+.prevention-notes{display:flex;flex-wrap:wrap;column-gap:18px;margin-top:8px}
+.prevention-notes>*{margin:0}
+.prevention-notes>[open]{flex-basis:100%}

@@ -22,6 +22,11 @@ test('Blunder prevention accepts alternatives, rejects the original blunder and 
   await expect(page.getByRole('heading',{name:'Blunder prevention',exact:true})).toBeVisible()
   // From the menu the first position opens straight away, with no overview page in between.
   await expect(page.getByRole('heading',{name:'Evita il blunder',exact:true})).toBeVisible()
+  // The pre-move checks fit in one short box: one line of questions and the buttons.
+  const checks=page.getByRole('region',{name:'Prima di muovere'})
+  await expect(checks).toContainText('Prima di muovere: re al sicuro? · pezzi attaccati o indifesi? · scacchi e catture dell’avversario?')
+  await page.screenshot({path:'test-results/prevention-checks.png'})
+  expect((await checks.boundingBox())!.height).toBeLessThan(170)
   await expect(page.getByRole('button',{name:'Inizia Blunder prevention'})).toHaveCount(0)
   await expect(page.getByText('Muove il Bianco',{exact:true})).toBeVisible()
   await expect(page.getByText('Avevi giocato',{exact:false})).toHaveCount(0)

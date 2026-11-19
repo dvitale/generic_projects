@@ -120,10 +120,10 @@ export default function BlunderPrevention({onArchive,onReview,onPlayMistake,onPl
         </section>
         <ExerciseSource title={position.title} number={position.gameNumber} createdAt={position.gameCreatedAt} fen={position.fen} disabled={busy} onReview={()=>onReview(position.gameId,position.ply)}/>
         <section className="panel"><ThinkingGuide/><p className="footnote">La mossa può perdere per una tattica o compromettere una posizione difendibile. Stockfish decide l’esito; la spiegazione distingue fatti e ipotesi.</p></section>
-        <section className="panel"><span className="eyebrow">PRIMA DI MUOVERE</span><h2>Tre controlli</h2><ol><li>Il re è al sicuro?</li><li>Quali pezzi sono attaccati o indifesi?</li><li>Quali scacchi e catture avrà l’avversario?</li></ol><p className="muted">Una mossa semplice che evita l’abbaglio è sufficiente.</p>
+        <section className="panel prevention-checks" aria-label="Prima di muovere"><p className="prevention-checklist"><strong>Prima di muovere:</strong> re al sicuro? · pezzi attaccati o indifesi? · scacchi e catture dell’avversario?</p>
           {!result?.closed&&<div className="row"><button disabled={busy||!session||diagnosing===session.id} onClick={()=>setDiagnosing(session!.id)}>Mostra una mossa sicura</button><button disabled={busy||!remaining.length} onClick={()=>{setDone(d=>[...d,position.id]);next()}}>Salta posizione</button></div>}
-          <InfoNote summary="Quali mosse sono accettate"><p>{catalog?.rule.description} I valori sono stime del motore. <ScoreNote/></p></InfoNote>
-          {reachNote}
+          <div className="prevention-notes"><InfoNote summary="Quali mosse sono accettate"><p>{catalog?.rule.description} I valori sono stime del motore. <ScoreNote/></p></InfoNote>
+          {reachNote}</div>
           {session?.exposure==='practice'&&<p className="footnote">Ripetizione anticipata: utile per esercitarti, non aumenta i successi indipendenti.</p>}
         </section>
         {session&&diagnosing===session.id&&<FailureDiagnosis kind="prevention" targetId={position.id} sessionId={session.id} onReveal={()=>void submit()} onCancel={()=>setDiagnosing(null)}/>}
