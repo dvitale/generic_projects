@@ -446,6 +446,12 @@ details.panel>summary{font-weight:650;font-size:var(--fs-lg)}
 .mistake-explanation-text{font-size:var(--fs-md);font-weight:600;margin:6px 0}
 .mistake-explanation-board{margin-top:10px;max-width:340px}
 .mistake-explanation-board .review-step-controls{margin-top:8px}
+.mistake-explanation-board.explore{max-width:368px}
+.line-replay-stage{display:grid;grid-template-columns:20px minmax(0,1fr);gap:6px}
+.line-replay-stage .eval-bar{width:20px}
+.line-analysis p{margin:6px 0;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.line-candidates button small{color:var(--muted);margin-left:2px}
+.line-verdict.good strong{color:var(--success,#2f8f46)}.line-verdict.inaccuracy strong{color:#b7791f}.line-verdict.mistake strong{color:var(--error)}
 .insight-badge{display:inline-block;font-size:var(--fs-xs);font-weight:700;border-radius:var(--r-pill);padding:3px 10px;margin:4px 0;background:var(--surface-3);color:var(--text-2)}
 .insight-tactical{background:#fff0e3;color:#8b4820}
 .insight-positional{background:var(--info-bg);color:var(--info)}

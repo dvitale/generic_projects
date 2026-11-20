@@ -14,6 +14,15 @@ Stockfish dice *quanto* una mossa peggiora la posizione, non *perché*. Quando l
 
 Compare per ogni mossa che perde almeno 0,80 rispetto alla migliore, oppure quando concede o manca un matto. Se nessuno dei motivi qui sotto è verificato, la spiegazione non inventa una causa: dice **Deriva dalla linea di Stockfish**, mostra la linea e offre il tasto **Mostra**, che apre una finestra dove la variante si gioca da sola, partendo dalla linea migliore quando è quella a vincere materiale (campo `bestWins`) (una mossa ogni 1,2 secondi, ▶/⏸ per riprodurla o fermarla, ← → per scorrerla a mano). Vedere come la posizione peggiora mossa dopo mossa spiega la valutazione meglio di una frase generica. Negli altri casi **Guarda la variante sulla scacchiera** apre una scacchiera piccola: **Dopo la tua mossa** riproduce la confutazione, **Mossa migliore** la linea di Stockfish, con le frecce ← → per scorrere.
 
+Quella scacchiera è anche una **scacchiera di analisi**, sul modello di «Analizza con Lichess»:
+
+- **barra di valutazione** verticale accanto alla scacchiera, per ogni posizione mostrata;
+- **mosse di Stockfish**: la migliore come freccia blu (si spegne con «Freccia della mossa migliore»), le prime tre in elenco sotto la scacchiera, con il punteggio sulla scala oggettiva; un clic la gioca;
+- **mosse tue**: muovendo un pezzo si esce dalla variante («Fuori dalla variante · …»); ← → scorrono anche le mosse fuori linea, una nuova mossa a metà le sostituisce da lì in avanti, **↩ Torna alla variante** riporta al punto di uscita. Giocare la mossa successiva della variante fa solo un passo avanti lungo la linea;
+- **giudizio**: ogni mossa fuori linea è giudicata con la regola unica della revisione (`review_loss`, `missed_mate`, `review_label`; [giudizio-mosse.md](giudizio-mosse.md)): «prima scelta di Stockfish», buona scelta, imprecisione, errore o matto mancato, con quanto perde e la valutazione dopo la mossa.
+
+Le analisi vengono da `POST /api/analysis/position` (`backend/position_analysis.py`): con `{fen}` restituisce valutazione dal punto di vista di chi muove, posizione finale (`terminal`: matto o patta) e le tre migliori mosse (MultiPV 3, 15.000 nodi per linea); con `{fen, move}` aggiunge il giudizio di quella mossa. I risultati restano in cache (512 posizioni sul server, tutta la sessione nel browser). La finestra di **Mostra** (linea di Stockfish, indizi dei Puzzle) resta solo riproduzione: lì la freccia della mossa migliore rivelerebbe la soluzione.
+
 ## Come funziona
 
 `backend/explain.py`, chiamato da `insights.compare`, senza LLM e senza nuove ricerche del motore: usa le due varianti già salvate (la mossa giocata e la migliore) e controlla la scacchiera con regole fisse.

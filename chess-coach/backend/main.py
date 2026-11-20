@@ -31,6 +31,7 @@ from . import study, openings, visualization, lessons
 from . import problems
 from . import diagnosis
 from . import piece_moves
+from . import position_analysis
 from . import puzzle_history
 from . import opening_lines
 from . import gaps
@@ -1687,6 +1688,7 @@ auth.install(app, ENV_PATH, lambda: DB_PATH.parent)
 problems.install(app, database, lambda: DB_PATH.parent, now)
 gaps.install(app, database, lambda: problems.open_store(DB_PATH.parent), solution_by_id, now)
 piece_moves.install(app)
+position_analysis.install(app)
 visualization.install(app, database, now)
 lessons.install(app, database, now)
 lessons.install_walks(app, database, now)
